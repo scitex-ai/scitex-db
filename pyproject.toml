@@ -39,7 +39,6 @@ dependencies = [
     "numpy",
     "pandas",
     "scitex-core>=0.1.0",
-    "scitex",
 ]
 
 [project.optional-dependencies]
