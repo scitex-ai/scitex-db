@@ -60,6 +60,29 @@ For all features:
 pip install scitex-db[all]
 ```
 
+## Architecture
+
+```
+scitex_db/
+├── __init__.py                ← public API (SQLite3, PostgreSQL, ...)
+├── __main__.py                ← `python -m scitex_db` CLI entry
+├── _BaseMixins/               ← backend-agnostic mixins (CRUD, schema, ...)
+├── _sqlite3/                  ← SQLite3 driver
+├── _SQLite3Mixins/            ← SQLite3-specific mixin overrides
+├── _postgresql/               ← PostgreSQL driver
+├── _PostgreSQLMixins/         ← PostgreSQL-specific mixin overrides
+├── _check_health.py           ← `scitex-db health` command
+├── _inspect.py                ← `scitex-db inspect` (schema dump + stats)
+├── _inspect_optimized.py      ← faster path for large DBs
+├── _delete_duplicates.py      ← duplicate-row cleanup
+├── _utils.py                  ← shared helpers
+└── _skills/                   ← agent-facing skill files
+```
+
+Each backend (`_sqlite3/`, `_postgresql/`) composes its mixin folder
+with `_BaseMixins/` to expose a uniform `SQLite3` / `PostgreSQL` class —
+swap drivers without changing call sites.
+
 ## Quick Start
 
 ### Basic Usage
@@ -161,6 +184,20 @@ db.inspect_table("results")
 # Health check
 from scitex_db import check_health
 check_health("database.db", fix_issues=True)
+```
+
+## Demo
+
+```mermaid
+flowchart LR
+    U["user code"] --> A["scitex_db.SQLite3('experiments.db')"]
+    U --> B["scitex_db.PostgreSQL(host=..., user=..., ...)"]
+    A --> M["_BaseMixins (CRUD · schema · maintenance)"]
+    B --> M
+    A -.-> SM["_SQLite3Mixins<br/>(backend overrides)"]
+    B -.-> PM["_PostgreSQLMixins<br/>(backend overrides)"]
+    M --> H["scitex-db health<br/>(fix orphans, vacuum)"]
+    M --> I["scitex-db inspect<br/>(schema + row counts)"]
 ```
 
 ## Part of SciTeX Ecosystem
