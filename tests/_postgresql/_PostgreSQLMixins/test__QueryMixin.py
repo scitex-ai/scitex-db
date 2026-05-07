@@ -11,6 +11,10 @@ be lazy-imported inside the function bodies — not at module top.
 
 import importlib
 
+import pytest
+
+pytest.importorskip("psycopg2")
+
 
 def test_module_imports():
     """Smoke: target module imports without error."""

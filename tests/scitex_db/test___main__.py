@@ -1,4 +1,4 @@
-"""Auto-generated smoke test for scitex_db._main__.
+"""Auto-generated smoke test for scitex_db.__main__.
 
 Replaces the prior placeholder-only stub (audit-project PS206). The
 test imports the target module — if the import fails, the test
@@ -14,4 +14,4 @@ import importlib
 
 def test_module_imports():
     """Smoke: target module imports without error."""
-    importlib.import_module('scitex_db._main__')
+    importlib.import_module("scitex_db.__main__")
