@@ -22,16 +22,16 @@ def test_audit_all_clean():
             "scitex-db",
             skip_rules=(
                 # README structural backlog
-                "PS107",
-                "PS110",
-                "PS112",
-                "PS113",
-                "PS115",
-                "PS120",
-                "PS129",
+                "PS-107",
+                "PS-110",
+                "PS-112",
+                "PS-113",
+                "PS-115",
+                "PS-120",
+                "PS-129",
                 # Test layout backlog (tests/_sqlite3 etc. need move under tests/scitex_db/)
-                "PS206",
-                "PS302",
+                "PS-206",
+                "PS-302",
                 # CLI ergonomics overhaul (tab completion, lazy import, --yes flag)
                 "§1a",
                 "§2",
