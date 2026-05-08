@@ -30,8 +30,6 @@ def test_audit_all_clean():
                 "PS120",
                 "PS129",
                 # Test layout backlog (tests/_sqlite3 etc. need move under tests/scitex_db/)
-                "PS202",
-                "PS204",
                 "PS206",
                 "PS302",
                 # CLI ergonomics overhaul (tab completion, lazy import, --yes flag)
