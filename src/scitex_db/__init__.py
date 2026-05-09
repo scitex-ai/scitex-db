@@ -1,7 +1,17 @@
+"""Database operations module for scitex.
+
+PostgreSQL support is optional and requires ``psycopg2``. All public
+symbols are imported lazily via PEP 562 ``__getattr__`` so that
+``import scitex_db`` stays under the §10 cold-start budget — Click
+runs the CLI once per Tab press, and slow imports break tab-completion.
+"""
+
 from __future__ import annotations
 
 try:
-    from importlib.metadata import version as _v, PackageNotFoundError
+    from importlib.metadata import PackageNotFoundError
+    from importlib.metadata import version as _v
+
     try:
         __version__ = _v("scitex-db")
     except PackageNotFoundError:
@@ -10,54 +20,51 @@ try:
 except ImportError:  # pragma: no cover — only on ancient Pythons
     __version__ = "0.0.0+local"
 
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-# Timestamp: "2025-07-16 12:49:57 (ywatanabe)"
-# File: /ssh:sp:/home/ywatanabe/proj/scitex_repo/src/scitex/db/__init__.py
-# ----------------------------------------
-import os
-__FILE__ = __file__
-__DIR__ = os.path.dirname(__FILE__)
-# ----------------------------------------
-"""Database operations module for scitex.
 
-PostgreSQL support is optional and requires ``psycopg2``; it is imported
-lazily so that installing ``scitex-db`` without the ``[postgres]`` extra
-still exposes ``SQLite3`` and friends.
-"""
+_LAZY_ATTRS = {
+    "SQLite3": ("._sqlite3._SQLite3", "SQLite3"),
+    "PostgreSQL": ("._postgresql._PostgreSQL", "PostgreSQL"),
+    "delete_duplicates": ("._delete_duplicates", "delete_duplicates"),
+    "delete_sqlite3_duplicates": (
+        "._sqlite3._delete_duplicates",
+        "delete_sqlite3_duplicates",
+    ),
+    "inspect": ("._inspect", "inspect"),
+    "check_health": ("._check_health", "check_health"),
+    "batch_health_check": ("._check_health", "batch_health_check"),
+}
 
-try:
-    from ._postgresql._PostgreSQL import PostgreSQL
-except ImportError:  # psycopg2 not installed
-    PostgreSQL = None  # type: ignore[assignment]
 
-from ._sqlite3._SQLite3 import SQLite3
-from ._sqlite3._delete_duplicates import delete_sqlite3_duplicates
-from ._delete_duplicates import delete_duplicates
-from ._inspect import inspect
-from ._check_health import check_health, batch_health_check
+def __getattr__(name: str):
+    target = _LAZY_ATTRS.get(name)
+    if target is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from importlib import import_module
+
+    module_path, attr = target
+    try:
+        module = import_module(module_path, __name__)
+    except ImportError:
+        # Optional dep (psycopg2 for PostgreSQL) — return None for back-compat.
+        if name == "PostgreSQL":
+            return None
+        raise
+    value = getattr(module, attr)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    return sorted({*globals(), *_LAZY_ATTRS, "__version__"})
+
 
 __all__ = [
     "__version__",
     "PostgreSQL",
     "SQLite3",
+    "batch_health_check",
+    "check_health",
     "delete_duplicates",
     "delete_sqlite3_duplicates",
     "inspect",
 ]
-
-# Clean up namespace - remove private modules from public access
-def _cleanup_namespace():
-    import sys
-    current_module = sys.modules[__name__]
-    names_to_remove = []
-    for name in list(vars(current_module).keys()):
-        if name.startswith('_') and not name.startswith('__') and name not in ['_cleanup_namespace']:
-            names_to_remove.append(name)
-    for name in names_to_remove:
-        delattr(current_module, name)
-
-_cleanup_namespace()
-del _cleanup_namespace
-
-# EOF

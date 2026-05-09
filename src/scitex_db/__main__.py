@@ -144,7 +144,12 @@ def check_health(db_paths, fix, quiet, dry_run, yes, as_json):
         click.echo("Dry-run: --fix would attempt repair on listed databases.", err=True)
         fix = False
     if fix and not yes:
-        click.confirm(f"Apply --fix to {len(db_paths)} database(s)?", abort=True)
+        click.echo(
+            f"Refusing to --fix {len(db_paths)} database(s) without --yes/-y. "
+            "Re-run with --dry-run to preview, or --yes to apply.",
+            err=True,
+        )
+        sys.exit(2)
 
     if len(db_paths) == 1:
         _check(db_paths[0], verbose=not quiet, fix_issues=fix)
@@ -201,12 +206,21 @@ def list_python_apis(as_json):
             click.echo(a)
 
 
-
 # audit-cli §1a — packages with _skills/ MUST expose
 # `<cli> skills {list,get,install}`.
 from ._skills import skills_group as _skills_group
 
 main.add_command(_skills_group, name="skills")
+
+# audit-cli §1a — wire `install-shell-completion` / `print-shell-completion`
+try:
+    from scitex_dev._cli._completion import attach_shell_completion
+
+    attach_shell_completion(main, prog_name="scitex-db")
+except Exception:
+    # scitex-dev not installed (e.g. minimal runtime install) — skip silently;
+    # tab-completion is a developer convenience, not a runtime dependency.
+    pass
 
 if __name__ == "__main__":
     sys.exit(main() or 0)
@@ -215,9 +229,7 @@ if __name__ == "__main__":
 # audit §4 — inject version into root --help
 try:
     from importlib.metadata import version as _v
-    main.help = (
-        f"scitex-db (v{_v('scitex-db')}) — "
-        + (main.help or "").lstrip()
-    )
+
+    main.help = f"scitex-db (v{_v('scitex-db')}) — " + (main.help or "").lstrip()
 except Exception:
     pass
