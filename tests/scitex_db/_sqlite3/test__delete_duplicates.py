@@ -12,7 +12,6 @@ import pytest
 
 pytest.importorskip("psycopg2")
 import sqlite3
-from unittest.mock import MagicMock, patch
 
 import pandas as pd
 
@@ -26,7 +25,6 @@ from scitex_db._sqlite3._delete_duplicates import (
     _fetch_as_df,
     _find_duplicated,
     _sort_db,
-    delete_sqlite3_duplicates,
     verify_duplicated_index,
 )
 
@@ -208,15 +206,18 @@ class TestDeleteDuplicates:
         )
         conn.commit()
 
-        # Test "all" with include_blob=True
+        # Test "all" with include_blob=True. PK columns are excluded by
+        # design — including them would make every row unique and silently
+        # dedup nothing (see test_delete_duplicates_all_columns).
         columns = _determine_columns(cursor, "test_table", "all", include_blob=True)
-        assert "id" in columns
+        assert "id" not in columns
         assert "name" in columns
         assert "value" in columns
         assert "data" in columns
 
         # Test "all" with include_blob=False
         columns = _determine_columns(cursor, "test_table", "all", include_blob=False)
+        assert "id" not in columns
         assert "data" not in columns  # BLOB column should be excluded
 
         # Test specific columns
