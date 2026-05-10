@@ -9,7 +9,7 @@
 <p align="center"><b>Database utilities for scientific computing — SQLite3 + PostgreSQL with NumPy-aware storage.</b></p>
 
 <p align="center">
-  <a href="https://scitex-db.readthedocs.io/">Full Documentation</a> · <code>pip install scitex-db</code>
+  <a href="https://scitex-db.readthedocs.io/">Full Documentation</a> · <code>uv pip install scitex-db[all]</code>
 </p>
 
 <!-- scitex-badges:start -->
