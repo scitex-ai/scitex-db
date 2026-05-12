@@ -21,3 +21,13 @@ wheels/
 MANIFEST
 
 docs/sphinx/_build/
+
+# Coverage artifacts (combined + parallel shards)
+.coverage
+.coverage.*
+
+# .scitex/ is a local-state directory; only the tracked config is committed.
+.scitex/*
+!.scitex/dev/
+.scitex/dev/*
+!.scitex/dev/config.yaml

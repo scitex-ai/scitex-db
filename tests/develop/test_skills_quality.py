@@ -2,6 +2,9 @@
 
 from pathlib import Path
 
+import pytest
+
+scitex_dev = pytest.importorskip("scitex_dev")
 from scitex_dev._skills_quality_pytest import make_skill_quality_tests
 
 test_skills_quality = make_skill_quality_tests(

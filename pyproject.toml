@@ -55,6 +55,8 @@ dev = [
     "pytest-cov>=4.0.0",
     "pytest-xdist>=3.0.0",
     "pre-commit>=3.5.0",
+    "coverage>=7.0",            # tests/conftest.py subprocess-coverage shim
+    "psycopg2-binary",          # tests/**/_postgresql/test_*.py
 ]
 docs = [
     "sphinx>=7.0",
@@ -90,6 +92,11 @@ packages = ["src/scitex_db"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-v --tb=short --cov=scitex_db --cov-report=term-missing"
+
+[tool.coverage.run]
+parallel = true
+source = ["scitex_db"]
+concurrency = ["multiprocessing", "thread"]
 
 [tool.ruff]
 line-length = 88
