@@ -1,0 +1,268 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>scitex_db._postgresql._PostgreSQL &mdash; SciTeX DB v0.1.8</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=22607128"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            SciTeX DB
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../installation.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../installation.html#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../installation.html#basic-installation">Basic Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../installation.html#development">Development</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/scitex_db.html">scitex_db</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/scitex_db.html#scitex_db.PostgreSQL"><code class="docutils literal notranslate"><span class="pre">PostgreSQL</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../api/scitex_db.html#scitex_db.PostgreSQL.__init__"><code class="docutils literal notranslate"><span class="pre">PostgreSQL.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api/scitex_db.html#scitex_db.PostgreSQL.__call__"><code class="docutils literal notranslate"><span class="pre">PostgreSQL.__call__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api/scitex_db.html#scitex_db.PostgreSQL.summary"><code class="docutils literal notranslate"><span class="pre">PostgreSQL.summary</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/scitex_db.html#scitex_db.SQLite3"><code class="docutils literal notranslate"><span class="pre">SQLite3</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../api/scitex_db.html#scitex_db.SQLite3.__init__"><code class="docutils literal notranslate"><span class="pre">SQLite3.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api/scitex_db.html#scitex_db.SQLite3.__enter__"><code class="docutils literal notranslate"><span class="pre">SQLite3.__enter__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api/scitex_db.html#scitex_db.SQLite3.__exit__"><code class="docutils literal notranslate"><span class="pre">SQLite3.__exit__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api/scitex_db.html#scitex_db.SQLite3.__del__"><code class="docutils literal notranslate"><span class="pre">SQLite3.__del__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api/scitex_db.html#scitex_db.SQLite3.__call__"><code class="docutils literal notranslate"><span class="pre">SQLite3.__call__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api/scitex_db.html#scitex_db.SQLite3.summary"><code class="docutils literal notranslate"><span class="pre">SQLite3.summary</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/scitex_db.html#scitex_db.delete_duplicates"><code class="docutils literal notranslate"><span class="pre">delete_duplicates()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/scitex_db.html#scitex_db.delete_sqlite3_duplicates"><code class="docutils literal notranslate"><span class="pre">delete_sqlite3_duplicates()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/scitex_db.html#scitex_db.inspect"><code class="docutils literal notranslate"><span class="pre">inspect()</span></code></a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">SciTeX DB</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">scitex_db._postgresql._PostgreSQL</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for scitex_db._postgresql._PostgreSQL</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Time-stamp: &quot;2024-11-25 02:00:06 (ywatanabe)&quot;</span>
+<span class="c1"># File: ./scitex_repo/src/scitex/db/_postgresql/_PostgreSQL.py</span>
+
+<span class="n">THIS_FILE</span> <span class="o">=</span> <span class="s2">&quot;/home/ywatanabe/proj/scitex_repo/src/scitex/db/_postgresql/_PostgreSQL.py&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.._utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">printc</span> <span class="k">as</span> <span class="n">_printc</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">psycopg2</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">._PostgreSQLMixins._BackupMixin</span><span class="w"> </span><span class="kn">import</span> <span class="n">_BackupMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">._PostgreSQLMixins._BatchMixin</span><span class="w"> </span><span class="kn">import</span> <span class="n">_BatchMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">._PostgreSQLMixins._ConnectionMixin</span><span class="w"> </span><span class="kn">import</span> <span class="n">_ConnectionMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">._PostgreSQLMixins._ImportExportMixin</span><span class="w"> </span><span class="kn">import</span> <span class="n">_ImportExportMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">._PostgreSQLMixins._IndexMixin</span><span class="w"> </span><span class="kn">import</span> <span class="n">_IndexMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">._PostgreSQLMixins._MaintenanceMixin</span><span class="w"> </span><span class="kn">import</span> <span class="n">_MaintenanceMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">._PostgreSQLMixins._QueryMixin</span><span class="w"> </span><span class="kn">import</span> <span class="n">_QueryMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">._PostgreSQLMixins._RowMixin</span><span class="w"> </span><span class="kn">import</span> <span class="n">_RowMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">._PostgreSQLMixins._SchemaMixin</span><span class="w"> </span><span class="kn">import</span> <span class="n">_SchemaMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">._PostgreSQLMixins._TableMixin</span><span class="w"> </span><span class="kn">import</span> <span class="n">_TableMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">._PostgreSQLMixins._TransactionMixin</span><span class="w"> </span><span class="kn">import</span> <span class="n">_TransactionMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">._PostgreSQLMixins._BlobMixin</span><span class="w"> </span><span class="kn">import</span> <span class="n">_BlobMixin</span>
+
+
+<div class="viewcode-block" id="PostgreSQL">
+<a class="viewcode-back" href="../../../api/scitex_db.html#scitex_db.PostgreSQL">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PostgreSQL</span><span class="p">(</span>
+    <span class="n">_BackupMixin</span><span class="p">,</span>
+    <span class="n">_BatchMixin</span><span class="p">,</span>
+    <span class="n">_ConnectionMixin</span><span class="p">,</span>
+    <span class="n">_ImportExportMixin</span><span class="p">,</span>
+    <span class="n">_IndexMixin</span><span class="p">,</span>
+    <span class="n">_MaintenanceMixin</span><span class="p">,</span>
+    <span class="n">_QueryMixin</span><span class="p">,</span>
+    <span class="n">_RowMixin</span><span class="p">,</span>
+    <span class="n">_SchemaMixin</span><span class="p">,</span>
+    <span class="n">_TableMixin</span><span class="p">,</span>
+    <span class="n">_TransactionMixin</span><span class="p">,</span>
+    <span class="n">_BlobMixin</span><span class="p">,</span>
+<span class="p">):</span>
+
+<div class="viewcode-block" id="PostgreSQL.__init__">
+<a class="viewcode-back" href="../../../api/scitex_db.html#scitex_db.PostgreSQL.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">dbname</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">user</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">password</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">host</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;localhost&quot;</span><span class="p">,</span>
+        <span class="n">port</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5432</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="n">dbname</span><span class="o">=</span><span class="n">dbname</span><span class="p">,</span> <span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">password</span><span class="o">=</span><span class="n">password</span><span class="p">,</span> <span class="n">host</span><span class="o">=</span><span class="n">host</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="n">port</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PostgreSQL.__call__">
+<a class="viewcode-back" href="../../../api/scitex_db.html#scitex_db.PostgreSQL.__call__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">return_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">print_summary</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">table_names</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Display or return database summary.&quot;&quot;&quot;</span>
+        <span class="n">summary</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_summaries</span><span class="p">(</span>
+            <span class="n">table_names</span><span class="o">=</span><span class="n">table_names</span><span class="p">,</span>
+            <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">,</span>
+            <span class="n">limit</span><span class="o">=</span><span class="n">limit</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">print_summary</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">summary</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">_printc</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">k</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">v</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">return_summary</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">summary</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">summary</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Property to quickly access database summary.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="p">()</span></div>
+
+
+
+<span class="c1"># class BaseSQLiteDB(</span>
+<span class="c1">#     _ConnectionMixin,</span>
+<span class="c1">#     _QueryMixin,</span>
+<span class="c1">#     _TransactionMixin,</span>
+<span class="c1">#     _TableMixin,</span>
+<span class="c1">#     _IndexMixin,</span>
+<span class="c1">#     _RowMixin,</span>
+<span class="c1">#     _BatchMixin,</span>
+<span class="c1">#     _BlobMixin,</span>
+<span class="c1">#     _ImportExportMixin,</span>
+<span class="c1">#     _MaintenanceMixin,</span>
+<span class="c1"># ):</span>
+<span class="c1">#     &quot;&quot;&quot;Comprehensive SQLite database management class.&quot;&quot;&quot;</span>
+
+<span class="c1">#     def __init__(self, db_path: str, use_temp: bool = False):</span>
+<span class="c1">#         &quot;&quot;&quot;Initializes database with option for temporary copy.&quot;&quot;&quot;</span>
+<span class="c1">#         _ConnectionMixin.__init__(self, db_path, use_temp)</span>
+
+<span class="c1">#     def __call__(</span>
+<span class="c1">#         self,</span>
+<span class="c1">#         return_summary=False,</span>
+<span class="c1">#         print_summary=True,</span>
+<span class="c1">#         table_names: Optional[List[str]] = None,</span>
+<span class="c1">#         verbose: bool = True,</span>
+<span class="c1">#         limit: int = 5,</span>
+<span class="c1">#     ):</span>
+<span class="c1">#         summary = self.get_summaries(</span>
+<span class="c1">#             table_names=table_names,</span>
+<span class="c1">#             verbose=verbose,</span>
+<span class="c1">#             limit=limit,</span>
+<span class="c1">#         )</span>
+
+<span class="c1">#         if print_summary:</span>
+<span class="c1">#             for k, v in summary.items():</span>
+<span class="c1">#                 _printc(f&quot;{k}\n{v}&quot;)</span>
+
+<span class="c1">#         if return_summary:</span>
+<span class="c1">#             return summary</span>
+
+<span class="c1">#     @property</span>
+<span class="c1">#     def summary(self):</span>
+<span class="c1">#         self()</span>
+
+
+<span class="c1"># EOF</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Yusuke Watanabe.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
