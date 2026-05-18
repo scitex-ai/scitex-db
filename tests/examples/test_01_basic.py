@@ -12,17 +12,45 @@ import pytest
 
 EXAMPLE = Path(__file__).resolve().parents[2] / "examples" / "01_basic.py"
 
+pytestmark = pytest.mark.skipif(
+    EXAMPLE.suffix != ".py",
+    reason=f"non-python example: {EXAMPLE.suffix}",
+)
 
-def test_example_file_exists():
-    assert EXAMPLE.exists(), f"missing example file: {EXAMPLE}"
+
+def test_example_file_exists_on_disk():
+    # Arrange
+    path = EXAMPLE
+    # Act
+    exists = path.exists()
+    # Assert
+    assert exists, f"missing example file: {path}"
 
 
-def test_example_imports_cleanly():
-    if EXAMPLE.suffix != ".py":
-        pytest.skip(f"non-python example: {EXAMPLE.suffix}")
-    spec = importlib.util.spec_from_file_location("ex", EXAMPLE)
-    assert spec is not None and spec.loader is not None
+def test_example_spec_resolves_with_non_none_value():
+    # Arrange
+    target = EXAMPLE
+    # Act
+    spec = importlib.util.spec_from_file_location("ex", target)
+    # Assert
+    assert spec is not None
+
+
+def test_example_spec_loader_is_not_none():
+    # Arrange
+    target = EXAMPLE
+    spec = importlib.util.spec_from_file_location("ex", target)
+    # Act
+    loader = spec.loader
+    # Assert
+    assert loader is not None
+
+
+def test_example_module_object_creates_from_spec():
+    # Arrange
+    target = EXAMPLE
+    spec = importlib.util.spec_from_file_location("ex", target)
+    # Act
     module = importlib.util.module_from_spec(spec)
-    # We don't execute the module — just verify parser-clean syntax via
-    # spec resolution. A real test should import + invoke main().
+    # Assert
     assert module is not None
