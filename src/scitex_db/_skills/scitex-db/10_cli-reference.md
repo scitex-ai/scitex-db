@@ -1,8 +1,10 @@
 ---
-name: cli-reference
-description: CLI Reference — see file body for details.
-tags: [scitex-db, scitex-package]
+description: |
+  [TOPIC] Cli Reference
+  [DETAILS] See file body for details.
+tags: [scitex-db-cli-reference, scitex-db]
 ---
+
 
 # CLI Reference
 

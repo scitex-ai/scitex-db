@@ -4,16 +4,14 @@
 # File: /ssh:sp:/home/ywatanabe/proj/scitex_repo/src/scitex/db/_sqlite3/_delete_duplicates.py
 # ----------------------------------------
 import os
+
 __FILE__ = __file__
 __DIR__ = os.path.dirname(__FILE__)
 # ----------------------------------------
 # Time-stamp: "2024-11-11 14:16:58 (ywatanabe)"
 
 import sqlite3
-from typing import List
-from typing import Optional
-from typing import Tuple
-from typing import Union
+from typing import List, Optional, Tuple, Union
 
 import pandas as pd
 
@@ -29,9 +27,7 @@ Prerequisites:
 """
 
 
-def _sort_db(
-    cursor: sqlite3.Cursor, table_name: str, columns: List[str]
-) -> None:
+def _sort_db(cursor: sqlite3.Cursor, table_name: str, columns: List[str]) -> None:
     """
     Sorts the database table based on the specified columns.
 
@@ -91,6 +87,7 @@ def _sort_db(
 
 #     return columns
 
+
 def _determine_columns(
     cursor: sqlite3.Cursor,
     table_name: str,
@@ -101,13 +98,17 @@ def _determine_columns(
     table_info = cursor.fetchall()
     all_columns = [col[1] for col in table_info]
     column_types = {col[1]: col[2] for col in table_info}
+    # PRAGMA columns: (cid, name, type, notnull, dflt_value, pk).
+    pk_columns = {col[1] for col in table_info if col[5]}
 
     if columns == "all":
-        columns = all_columns
-        # Exclude blob columns
+        # Exclude PK columns — by definition unique, so they prevent any row
+        # from matching another and 'all' would silently dedup nothing.
+        columns = [col for col in all_columns if col not in pk_columns]
+        # Exclude blob columns unless caller opted in.
         if not include_blob:
             columns = [col for col in columns if column_types[col].lower() != "blob"]
-        # Exclude timestamp columns
+        # Exclude timestamp columns (e.g. created_at, updated_at).
         columns = [col for col in columns if not col.endswith("_at")]
     elif isinstance(columns, str):
         columns = [columns]
@@ -116,6 +117,7 @@ def _determine_columns(
     print(f"Columns considered for duplicates: {columns_str}")
 
     return columns
+
 
 def _fetch_as_df(
     cursor: sqlite3.Cursor, columns: List[str], table_name: str
@@ -131,9 +133,7 @@ def _fetch_as_df(
 def _find_duplicated(df: pd.DataFrame) -> pd.DataFrame:
     df_duplicated = df[df.duplicated(keep="first")].copy()
     duplication_rate = len(df_duplicated) / (len(df) - len(df_duplicated))
-    print(
-        f"\n{100*duplication_rate:.2f}% of data was duplicated. Cleaning up..."
-    )
+    print(f"\n{100 * duplication_rate:.2f}% of data was duplicated. Cleaning up...")
     print(f"\nOriginal entries:\n{df.head()}")
     print(f"\nDuplicated entries:\n{df_duplicated.head()}")
     return df_duplicated
@@ -178,16 +178,28 @@ def _delete_entry(
         cursor, duplicated_row, table_name, dry_run
     )
     if is_verified:
-        delete_query = select_query.replace("SELECT", "DELETE")
+        # Build DELETE directly: `select_query.replace("SELECT", "DELETE")`
+        # produced `DELETE col1, col2 FROM ...` which is not valid SQLite.
+        columns = list(duplicated_row.index)
+        where_conditions = " AND ".join([f"{col} = ?" for col in columns])
+        delete_query = f"DELETE FROM {table_name} WHERE {where_conditions} LIMIT 1"
         if dry_run:
             print(f"[DRY RUN] Would delete entry:\n{duplicated_row}")
         else:
-            cursor.execute(delete_query, tuple(duplicated_row))
+            try:
+                cursor.execute(delete_query, tuple(duplicated_row))
+            except sqlite3.OperationalError:
+                # Older SQLite builds compiled without ENABLE_UPDATE_DELETE_LIMIT
+                # — fall back to a rowid-based delete that hits one row only.
+                cursor.execute(
+                    f"DELETE FROM {table_name} WHERE rowid = ("
+                    f"SELECT rowid FROM {table_name} WHERE {where_conditions} "
+                    f"LIMIT 1)",
+                    tuple(duplicated_row),
+                )
             print(f"Deleted entry:\n{duplicated_row}")
     else:
-        print(
-            f"Skipping entry (not found or already deleted):\n{duplicated_row}"
-        )
+        print(f"Skipping entry (not found or already deleted):\n{duplicated_row}")
 
 
 def delete_sqlite3_duplicates(
@@ -221,7 +233,9 @@ def delete_sqlite3_duplicates(
         all_cols_str = ", ".join(all_cols)
 
         # Create temp table with same structure
-        cursor.execute(f"CREATE TABLE {temp_table} AS SELECT {all_cols_str} FROM {table_name} LIMIT 0")
+        cursor.execute(
+            f"CREATE TABLE {temp_table} AS SELECT {all_cols_str} FROM {table_name} LIMIT 0"
+        )
 
         # Get total row count
         total_rows = cursor.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
@@ -245,7 +259,9 @@ def delete_sqlite3_duplicates(
             conn.commit()
 
         # Count unique rows
-        total_unique = cursor.execute(f"SELECT COUNT(*) FROM {temp_table}").fetchone()[0]
+        total_unique = cursor.execute(f"SELECT COUNT(*) FROM {temp_table}").fetchone()[
+            0
+        ]
         total_duplicates = total_rows - total_unique
 
         if not dry_run:
@@ -270,5 +286,6 @@ def delete_sqlite3_duplicates(
 
     finally:
         conn.close()
+
 
 # EOF

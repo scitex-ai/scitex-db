@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>scitex_db &mdash; SciTeX DB v0.1.8</title>
+  <title>scitex_db &mdash; SciTeX DB v0.1.9</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
@@ -14,7 +14,7 @@
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=22607128"></script>
+      <script src="../_static/documentation_options.js?v=8618f531"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
@@ -56,12 +56,6 @@
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">scitex_db</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#scitex_db.PostgreSQL"><code class="docutils literal notranslate"><span class="pre">PostgreSQL</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#scitex_db.PostgreSQL.__init__"><code class="docutils literal notranslate"><span class="pre">PostgreSQL.__init__()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#scitex_db.PostgreSQL.__call__"><code class="docutils literal notranslate"><span class="pre">PostgreSQL.__call__()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#scitex_db.PostgreSQL.summary"><code class="docutils literal notranslate"><span class="pre">PostgreSQL.summary</span></code></a></li>
-</ul>
-</li>
 <li class="toctree-l2"><a class="reference internal" href="#scitex_db.SQLite3"><code class="docutils literal notranslate"><span class="pre">SQLite3</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#scitex_db.SQLite3.__init__"><code class="docutils literal notranslate"><span class="pre">SQLite3.__init__()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#scitex_db.SQLite3.__enter__"><code class="docutils literal notranslate"><span class="pre">SQLite3.__enter__()</span></code></a></li>
@@ -71,6 +65,8 @@
 <li class="toctree-l3"><a class="reference internal" href="#scitex_db.SQLite3.summary"><code class="docutils literal notranslate"><span class="pre">SQLite3.summary</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="#scitex_db.batch_health_check"><code class="docutils literal notranslate"><span class="pre">batch_health_check()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#scitex_db.check_health"><code class="docutils literal notranslate"><span class="pre">check_health()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#scitex_db.delete_duplicates"><code class="docutils literal notranslate"><span class="pre">delete_duplicates()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#scitex_db.delete_sqlite3_duplicates"><code class="docutils literal notranslate"><span class="pre">delete_sqlite3_duplicates()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#scitex_db.inspect"><code class="docutils literal notranslate"><span class="pre">inspect()</span></code></a></li>
@@ -104,29 +100,11 @@
              
   <section id="module-scitex_db">
 <span id="scitex-db"></span><h1>scitex_db<a class="headerlink" href="#module-scitex_db" title="Link to this heading"></a></h1>
-<dl class="py class">
-<dt class="sig sig-object py" id="scitex_db.PostgreSQL">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">scitex_db.</span></span><span class="sig-name descname"><span class="pre">PostgreSQL</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dbname</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">password</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">host</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'localhost'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">port</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5432</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/scitex_db/_postgresql/_PostgreSQL.html#PostgreSQL"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scitex_db.PostgreSQL" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">_BackupMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_BatchMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_ConnectionMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_ImportExportMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_IndexMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_MaintenanceMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_QueryMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_RowMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_SchemaMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_TableMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_TransactionMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_BlobMixin</span></code></p>
-<dl class="py method">
-<dt class="sig sig-object py" id="scitex_db.PostgreSQL.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dbname</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">password</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">host</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'localhost'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">port</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5432</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/scitex_db/_postgresql/_PostgreSQL.html#PostgreSQL.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scitex_db.PostgreSQL.__init__" title="Link to this definition"></a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="scitex_db.PostgreSQL.__call__">
-<span class="sig-name descname"><span class="pre">__call__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">return_summary</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">print_summary</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table_names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">limit</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/scitex_db/_postgresql/_PostgreSQL.html#PostgreSQL.__call__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scitex_db.PostgreSQL.__call__" title="Link to this definition"></a></dt>
-<dd><p>Display or return database summary.</p>
-</dd></dl>
-
-<dl class="py property">
-<dt class="sig sig-object py" id="scitex_db.PostgreSQL.summary">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">summary</span></span><a class="headerlink" href="#scitex_db.PostgreSQL.summary" title="Link to this definition"></a></dt>
-<dd><p>Property to quickly access database summary.</p>
-</dd></dl>
-
-</dd></dl>
-
+<p>Database operations module for scitex.</p>
+<p>PostgreSQL support is optional and requires <code class="docutils literal notranslate"><span class="pre">psycopg2</span></code>. All public
+symbols are imported lazily via PEP 562 <code class="docutils literal notranslate"><span class="pre">__getattr__</span></code> so that
+<code class="docutils literal notranslate"><span class="pre">import</span> <span class="pre">scitex_db</span></code> stays under the §10 cold-start budget — Click
+runs the CLI once per Tab press, and slow imports break tab-completion.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="scitex_db.SQLite3">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">scitex_db.</span></span><span class="sig-name descname"><span class="pre">SQLite3</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">db_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_temp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">compress_by_default</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">autocommit</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/scitex_db/_sqlite3/_SQLite3.html#SQLite3"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scitex_db.SQLite3" title="Link to this definition"></a></dt>
@@ -256,6 +234,48 @@ automatic compression, thread-safe operations, and specialized numpy array handl
 <dd><p>Quick access to database summary.</p>
 </dd></dl>
 
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="scitex_db.batch_health_check">
+<span class="sig-prename descclassname"><span class="pre">scitex_db.</span></span><span class="sig-name descname"><span class="pre">batch_health_check</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">db_paths</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fix_issues</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/scitex_db/_check_health.html#batch_health_check"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scitex_db.batch_health_check" title="Link to this definition"></a></dt>
+<dd><p>Run health check on multiple databases</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>db_paths</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em> of </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – List of database paths</p></li>
+<li><p><strong>verbose</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>default False</em>) – Print results for each database</p></li>
+<li><p><strong>fix_issues</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>default False</em>) – Attempt to fix issues</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Results for each database</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)">dict</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="scitex_db.check_health">
+<span class="sig-prename descclassname"><span class="pre">scitex_db.</span></span><span class="sig-name descname"><span class="pre">check_health</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">db_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fix_issues</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/scitex_db/_check_health.html#check_health"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scitex_db.check_health" title="Link to this definition"></a></dt>
+<dd><p>Comprehensive health check for SQLite database</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>db_path</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Path to database file</p></li>
+<li><p><strong>verbose</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>default True</em>) – Print detailed results</p></li>
+<li><p><strong>fix_issues</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>default False</em>) – Attempt to fix detected issues</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Health check results</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)">dict</a></p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py function">

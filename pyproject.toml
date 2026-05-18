@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "scitex-db"
-version = "0.1.8"
+version = "0.1.9"
 description = "Database utilities for scientific computing with SQLite3 and PostgreSQL"
 readme = "README.md"
 license = "AGPL-3.0-only"
@@ -35,10 +35,10 @@ classifiers = [
 ]
 
 dependencies = [
+    "click>=8.0",
     "numpy",
     "pandas",
     "scitex-core>=0.1.0",
-    "scitex",
 ]
 
 [project.optional-dependencies]
@@ -50,11 +50,13 @@ postgresql = [
     "sqlalchemy",
 ]
 dev = [
-    "scitex-dev",
+    "scitex-dev>=0.11.7",
     "pytest>=7.0",
     "pytest-cov>=4.0.0",
     "pytest-xdist>=3.0.0",
     "pre-commit>=3.5.0",
+    "coverage>=7.0",            # tests/conftest.py subprocess-coverage shim
+    "psycopg2-binary",          # tests/**/_postgresql/test_*.py
 ]
 docs = [
     "sphinx>=7.0",
@@ -90,6 +92,11 @@ packages = ["src/scitex_db"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-v --tb=short --cov=scitex_db --cov-report=term-missing"
+
+[tool.coverage.run]
+parallel = true
+source = ["scitex_db"]
+concurrency = ["multiprocessing", "thread"]
 
 [tool.ruff]
 line-length = 88

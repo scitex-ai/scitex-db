@@ -1,0 +1,516 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>scitex_db._check_health &mdash; SciTeX DB v0.1.9</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=8618f531"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            SciTeX DB
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../installation.html#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation.html#basic-installation">Basic Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation.html#development">Development</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/scitex_db.html">scitex_db</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../api/scitex_db.html#scitex_db.SQLite3"><code class="docutils literal notranslate"><span class="pre">SQLite3</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../api/scitex_db.html#scitex_db.SQLite3.__init__"><code class="docutils literal notranslate"><span class="pre">SQLite3.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/scitex_db.html#scitex_db.SQLite3.__enter__"><code class="docutils literal notranslate"><span class="pre">SQLite3.__enter__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/scitex_db.html#scitex_db.SQLite3.__exit__"><code class="docutils literal notranslate"><span class="pre">SQLite3.__exit__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/scitex_db.html#scitex_db.SQLite3.__del__"><code class="docutils literal notranslate"><span class="pre">SQLite3.__del__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/scitex_db.html#scitex_db.SQLite3.__call__"><code class="docutils literal notranslate"><span class="pre">SQLite3.__call__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/scitex_db.html#scitex_db.SQLite3.summary"><code class="docutils literal notranslate"><span class="pre">SQLite3.summary</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/scitex_db.html#scitex_db.batch_health_check"><code class="docutils literal notranslate"><span class="pre">batch_health_check()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/scitex_db.html#scitex_db.check_health"><code class="docutils literal notranslate"><span class="pre">check_health()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/scitex_db.html#scitex_db.delete_duplicates"><code class="docutils literal notranslate"><span class="pre">delete_duplicates()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/scitex_db.html#scitex_db.delete_sqlite3_duplicates"><code class="docutils literal notranslate"><span class="pre">delete_sqlite3_duplicates()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/scitex_db.html#scitex_db.inspect"><code class="docutils literal notranslate"><span class="pre">inspect()</span></code></a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">SciTeX DB</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">scitex_db._check_health</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for scitex_db._check_health</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Timestamp: &quot;2025-09-10 08:05:21 (ywatanabe)&quot;</span>
+<span class="c1"># File: /ssh:sp:/home/ywatanabe/proj/scitex_repo/src/scitex/db/_check_health.py</span>
+<span class="c1"># ----------------------------------------</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="n">__FILE__</span> <span class="o">=</span> <span class="vm">__file__</span>
+<span class="n">__DIR__</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">__FILE__</span><span class="p">)</span>
+<span class="c1"># ----------------------------------------</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">sqlite3</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+
+
+<div class="viewcode-block" id="check_health">
+<a class="viewcode-back" href="../../api/scitex_db.html#scitex_db.check_health">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">check_health</span><span class="p">(</span>
+    <span class="n">db_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">fix_issues</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Comprehensive health check for SQLite database</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    db_path : str</span>
+<span class="sd">        Path to database file</span>
+<span class="sd">    verbose : bool, default True</span>
+<span class="sd">        Print detailed results</span>
+<span class="sd">    fix_issues : bool, default False</span>
+<span class="sd">        Attempt to fix detected issues</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    dict</span>
+<span class="sd">        Health check results</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;database_path&quot;</span><span class="p">:</span> <span class="n">db_path</span><span class="p">,</span>
+        <span class="s2">&quot;exists&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="s2">&quot;accessible&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="s2">&quot;integrity&quot;</span><span class="p">:</span> <span class="s2">&quot;UNKNOWN&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;tables&quot;</span><span class="p">:</span> <span class="p">[],</span>
+        <span class="s2">&quot;issues&quot;</span><span class="p">:</span> <span class="p">[],</span>
+        <span class="s2">&quot;stats&quot;</span><span class="p">:</span> <span class="p">{},</span>
+        <span class="s2">&quot;recommendations&quot;</span><span class="p">:</span> <span class="p">[],</span>
+        <span class="s2">&quot;loadability&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;rows&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;arrays&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;blobs&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span>
+    <span class="p">}</span>
+
+    <span class="c1"># Check file existence</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">db_path</span><span class="p">):</span>
+        <span class="n">results</span><span class="p">[</span><span class="s2">&quot;issues&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Database file does not exist: </span><span class="si">{</span><span class="n">db_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">results</span>
+
+    <span class="n">results</span><span class="p">[</span><span class="s2">&quot;exists&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">results</span><span class="p">[</span><span class="s2">&quot;stats&quot;</span><span class="p">][</span><span class="s2">&quot;file_size_mb&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">getsize</span><span class="p">(</span><span class="n">db_path</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">sqlite3</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">db_path</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mf">10.0</span><span class="p">)</span> <span class="k">as</span> <span class="n">conn</span><span class="p">:</span>
+            <span class="n">cursor</span> <span class="o">=</span> <span class="n">conn</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span>
+            <span class="n">results</span><span class="p">[</span><span class="s2">&quot;accessible&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+
+            <span class="c1"># Integrity check</span>
+            <span class="n">integrity_result</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+                <span class="s2">&quot;PRAGMA integrity_check&quot;</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span>
+            <span class="n">results</span><span class="p">[</span><span class="s2">&quot;integrity&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="s2">&quot;OK&quot;</span> <span class="k">if</span> <span class="n">integrity_result</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;ok&quot;</span> <span class="k">else</span> <span class="s2">&quot;CORRUPTED&quot;</span>
+            <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">results</span><span class="p">[</span><span class="s2">&quot;integrity&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;CORRUPTED&quot;</span><span class="p">:</span>
+                <span class="n">results</span><span class="p">[</span><span class="s2">&quot;issues&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;Database integrity check failed&quot;</span><span class="p">)</span>
+                <span class="n">results</span><span class="p">[</span><span class="s2">&quot;recommendations&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="s2">&quot;Run VACUUM or restore from backup&quot;</span>
+                <span class="p">)</span>
+
+            <span class="c1"># Get table information</span>
+            <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;SELECT name FROM sqlite_master WHERE type=&#39;table&#39;&quot;</span><span class="p">)</span>
+            <span class="n">table_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">row</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">cursor</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()]</span>
+            <span class="n">results</span><span class="p">[</span><span class="s2">&quot;stats&quot;</span><span class="p">][</span><span class="s2">&quot;table_count&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">table_names</span><span class="p">)</span>
+
+            <span class="n">total_rows</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">for</span> <span class="n">table_name</span> <span class="ow">in</span> <span class="n">table_names</span><span class="p">:</span>
+                <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;SELECT COUNT(*) FROM </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">row_count</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">total_rows</span> <span class="o">+=</span> <span class="n">row_count</span>
+                <span class="n">results</span><span class="p">[</span><span class="s2">&quot;tables&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">table_name</span><span class="p">,</span> <span class="s2">&quot;row_count&quot;</span><span class="p">:</span> <span class="n">row_count</span><span class="p">}</span>
+                <span class="p">)</span>
+
+            <span class="n">results</span><span class="p">[</span><span class="s2">&quot;stats&quot;</span><span class="p">][</span><span class="s2">&quot;total_rows&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">total_rows</span>
+
+            <span class="c1"># Check for empty tables</span>
+            <span class="n">empty_tables</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="n">t</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">results</span><span class="p">[</span><span class="s2">&quot;tables&quot;</span><span class="p">]</span> <span class="k">if</span> <span class="n">t</span><span class="p">[</span><span class="s2">&quot;row_count&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span>
+            <span class="p">]</span>
+            <span class="k">if</span> <span class="n">empty_tables</span><span class="p">:</span>
+                <span class="n">results</span><span class="p">[</span><span class="s2">&quot;issues&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">empty_tables</span><span class="p">)</span><span class="si">}</span><span class="s2"> empty tables found&quot;</span>
+                <span class="p">)</span>
+
+            <span class="c1"># Check database settings</span>
+            <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;PRAGMA journal_mode&quot;</span><span class="p">)</span>
+            <span class="n">journal_mode</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">results</span><span class="p">[</span><span class="s2">&quot;stats&quot;</span><span class="p">][</span><span class="s2">&quot;journal_mode&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">journal_mode</span>
+
+            <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;PRAGMA page_size&quot;</span><span class="p">)</span>
+            <span class="n">page_size</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">results</span><span class="p">[</span><span class="s2">&quot;stats&quot;</span><span class="p">][</span><span class="s2">&quot;page_size&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">page_size</span>
+
+            <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;PRAGMA page_count&quot;</span><span class="p">)</span>
+            <span class="n">page_count</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">results</span><span class="p">[</span><span class="s2">&quot;stats&quot;</span><span class="p">][</span><span class="s2">&quot;page_count&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">page_count</span>
+
+            <span class="c1"># Check for foreign key violations</span>
+            <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;PRAGMA foreign_key_check&quot;</span><span class="p">)</span>
+            <span class="n">fk_violations</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">fk_violations</span><span class="p">:</span>
+                <span class="n">results</span><span class="p">[</span><span class="s2">&quot;issues&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">fk_violations</span><span class="p">)</span><span class="si">}</span><span class="s2"> foreign key violations&quot;</span>
+                <span class="p">)</span>
+                <span class="n">results</span><span class="p">[</span><span class="s2">&quot;recommendations&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="s2">&quot;Fix foreign key constraints&quot;</span>
+                <span class="p">)</span>
+
+            <span class="c1"># Performance recommendations</span>
+            <span class="k">if</span> <span class="n">results</span><span class="p">[</span><span class="s2">&quot;stats&quot;</span><span class="p">][</span><span class="s2">&quot;total_rows&quot;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">10000</span><span class="p">:</span>
+                <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+                    <span class="s2">&quot;SELECT COUNT(*) FROM sqlite_master WHERE type=&#39;index&#39;&quot;</span>
+                <span class="p">)</span>
+                <span class="n">index_count</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">index_count</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">table_names</span><span class="p">):</span>
+                    <span class="n">results</span><span class="p">[</span><span class="s2">&quot;recommendations&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                        <span class="s2">&quot;Consider adding indexes for better performance&quot;</span>
+                    <span class="p">)</span>
+
+            <span class="c1"># Auto-vacuum check</span>
+            <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;PRAGMA auto_vacuum&quot;</span><span class="p">)</span>
+            <span class="n">auto_vacuum</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">auto_vacuum</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">results</span><span class="p">[</span><span class="s2">&quot;stats&quot;</span><span class="p">][</span><span class="s2">&quot;file_size_mb&quot;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">100</span><span class="p">:</span>
+                <span class="n">results</span><span class="p">[</span><span class="s2">&quot;recommendations&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="s2">&quot;Consider enabling auto_vacuum for large databases&quot;</span>
+                <span class="p">)</span>
+
+            <span class="c1"># Attempt fixes if requested</span>
+            <span class="k">if</span> <span class="n">fix_issues</span> <span class="ow">and</span> <span class="n">results</span><span class="p">[</span><span class="s2">&quot;issues&quot;</span><span class="p">]:</span>
+                <span class="k">if</span> <span class="s2">&quot;CORRUPTED&quot;</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">results</span><span class="p">[</span><span class="s2">&quot;issues&quot;</span><span class="p">]):</span>
+                    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Attempting to fix corruption with VACUUM...&quot;</span><span class="p">)</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;VACUUM&quot;</span><span class="p">)</span>
+                        <span class="n">conn</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+                        <span class="n">results</span><span class="p">[</span><span class="s2">&quot;recommendations&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                            <span class="s2">&quot;Database vacuumed successfully&quot;</span>
+                        <span class="p">)</span>
+                    <span class="k">except</span> <span class="n">sqlite3</span><span class="o">.</span><span class="n">Error</span> <span class="k">as</span> <span class="n">ee</span><span class="p">:</span>
+                        <span class="n">results</span><span class="p">[</span><span class="s2">&quot;issues&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;VACUUM failed: </span><span class="si">{</span><span class="n">ee</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">except</span> <span class="n">sqlite3</span><span class="o">.</span><span class="n">Error</span> <span class="k">as</span> <span class="n">ee</span><span class="p">:</span>
+        <span class="n">results</span><span class="p">[</span><span class="s2">&quot;issues&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Database connection failed: </span><span class="si">{</span><span class="n">ee</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">ee</span><span class="p">:</span>
+        <span class="n">results</span><span class="p">[</span><span class="s2">&quot;issues&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected error: </span><span class="si">{</span><span class="n">ee</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Test loadability</span>
+    <span class="n">results</span><span class="p">[</span><span class="s2">&quot;loadability&quot;</span><span class="p">][</span><span class="s2">&quot;rows&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">is_rows_loadable</span><span class="p">(</span><span class="n">db_path</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">)</span>
+    <span class="n">results</span><span class="p">[</span><span class="s2">&quot;loadability&quot;</span><span class="p">][</span><span class="s2">&quot;arrays&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">is_arrays_loadable</span><span class="p">(</span>
+        <span class="n">db_path</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span>
+    <span class="p">)</span>
+    <span class="n">results</span><span class="p">[</span><span class="s2">&quot;loadability&quot;</span><span class="p">][</span><span class="s2">&quot;blobs&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">is_blobs_loadable</span><span class="p">(</span>
+        <span class="n">db_path</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Add loadability issues</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">results</span><span class="p">[</span><span class="s2">&quot;loadability&quot;</span><span class="p">][</span><span class="s2">&quot;rows&quot;</span><span class="p">]:</span>
+        <span class="n">results</span><span class="p">[</span><span class="s2">&quot;issues&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;Rows are not loadable&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">results</span><span class="p">[</span><span class="s2">&quot;loadability&quot;</span><span class="p">][</span><span class="s2">&quot;arrays&quot;</span><span class="p">]:</span>
+        <span class="n">results</span><span class="p">[</span><span class="s2">&quot;issues&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;Arrays are not loadable&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">results</span><span class="p">[</span><span class="s2">&quot;loadability&quot;</span><span class="p">][</span><span class="s2">&quot;blobs&quot;</span><span class="p">]:</span>
+        <span class="n">results</span><span class="p">[</span><span class="s2">&quot;issues&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;Blobs are not loadable&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Generate summary</span>
+    <span class="n">health_score</span> <span class="o">=</span> <span class="mi">100</span>
+    <span class="n">health_score</span> <span class="o">-=</span> <span class="nb">len</span><span class="p">(</span><span class="n">results</span><span class="p">[</span><span class="s2">&quot;issues&quot;</span><span class="p">])</span> <span class="o">*</span> <span class="mi">20</span>
+    <span class="n">health_score</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">health_score</span><span class="p">)</span>
+
+    <span class="n">results</span><span class="p">[</span><span class="s2">&quot;health_score&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">health_score</span>
+    <span class="n">results</span><span class="p">[</span><span class="s2">&quot;status&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="s2">&quot;HEALTHY&quot;</span>
+        <span class="k">if</span> <span class="n">health_score</span> <span class="o">&gt;=</span> <span class="mi">80</span>
+        <span class="k">else</span> <span class="s2">&quot;ISSUES_FOUND&quot;</span> <span class="k">if</span> <span class="n">health_score</span> <span class="o">&gt;=</span> <span class="mi">50</span> <span class="k">else</span> <span class="s2">&quot;CRITICAL&quot;</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Database Health Check: </span><span class="si">{</span><span class="n">db_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Status: </span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;status&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> (Score: </span><span class="si">{</span><span class="n">health_score</span><span class="si">}</span><span class="s2">/100)&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;File size: </span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;stats&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;file_size_mb&#39;</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> MB&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Tables: </span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;stats&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;table_count&#39;</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total rows: </span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;stats&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;total_rows&#39;</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Loadability status</span>
+        <span class="n">loadability</span> <span class="o">=</span> <span class="n">results</span><span class="p">[</span><span class="s2">&quot;loadability&quot;</span><span class="p">]</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Loadability - Rows: </span><span class="si">{</span><span class="s1">&#39;✓&#39;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">loadability</span><span class="p">[</span><span class="s1">&#39;rows&#39;</span><span class="p">]</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;✗&#39;</span><span class="si">}</span><span class="s2">, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Arrays: </span><span class="si">{</span><span class="s1">&#39;✓&#39;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">loadability</span><span class="p">[</span><span class="s1">&#39;arrays&#39;</span><span class="p">]</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;✗&#39;</span><span class="si">}</span><span class="s2">, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Blobs: </span><span class="si">{</span><span class="s1">&#39;✓&#39;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">loadability</span><span class="p">[</span><span class="s1">&#39;blobs&#39;</span><span class="p">]</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;✗&#39;</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">results</span><span class="p">[</span><span class="s2">&quot;issues&quot;</span><span class="p">]:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Issues found (</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;issues&#39;</span><span class="p">])</span><span class="si">}</span><span class="s2">):&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">issue</span> <span class="ow">in</span> <span class="n">results</span><span class="p">[</span><span class="s2">&quot;issues&quot;</span><span class="p">]:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  - </span><span class="si">{</span><span class="n">issue</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">results</span><span class="p">[</span><span class="s2">&quot;recommendations&quot;</span><span class="p">]:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Recommendations (</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;recommendations&#39;</span><span class="p">])</span><span class="si">}</span><span class="s2">):&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">rec</span> <span class="ow">in</span> <span class="n">results</span><span class="p">[</span><span class="s2">&quot;recommendations&quot;</span><span class="p">]:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  - </span><span class="si">{</span><span class="n">rec</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">results</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">is_rows_loadable</span><span class="p">(</span>
+    <span class="n">db_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">table_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if database/table is loadable without errors</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    db_path : str</span>
+<span class="sd">        Path to database file</span>
+<span class="sd">    table_name : str, optional</span>
+<span class="sd">        Specific table to test. If None, tests all tables</span>
+<span class="sd">    verbose : bool, default False</span>
+<span class="sd">        Print detailed error information</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    bool</span>
+<span class="sd">        True if loadable, False otherwise</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">scitex</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">stx</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">stx</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">db_path</span><span class="p">)</span> <span class="k">as</span> <span class="n">db</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">table_name</span><span class="p">:</span>
+                <span class="n">db</span><span class="o">.</span><span class="n">get_rows</span><span class="p">(</span><span class="n">table_name</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">True</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">table_names</span> <span class="o">=</span> <span class="n">db</span><span class="o">.</span><span class="n">get_table_names</span><span class="p">()</span>
+                <span class="k">for</span> <span class="n">tname</span> <span class="ow">in</span> <span class="n">table_names</span><span class="p">:</span>
+                    <span class="n">db</span><span class="o">.</span><span class="n">get_rows</span><span class="p">(</span><span class="n">tname</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">ee</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Load failed for </span><span class="si">{</span><span class="n">db_path</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">ee</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">is_arrays_loadable</span><span class="p">(</span>
+    <span class="n">db_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">table_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if arrays in database/table are loadable</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    db_path : str</span>
+<span class="sd">        Path to database file</span>
+<span class="sd">    table_name : str, optional</span>
+<span class="sd">        Specific table to test. If None, tests all tables</span>
+<span class="sd">    verbose : bool, default False</span>
+<span class="sd">        Print detailed error information</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    bool</span>
+<span class="sd">        True if arrays loadable, False otherwise</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">scitex</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">stx</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">stx</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">db_path</span><span class="p">)</span> <span class="k">as</span> <span class="n">db</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">table_name</span><span class="p">:</span>
+                <span class="n">db</span><span class="o">.</span><span class="n">load_arrays</span><span class="p">(</span><span class="n">table_name</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">True</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">table_names</span> <span class="o">=</span> <span class="n">db</span><span class="o">.</span><span class="n">get_table_names</span><span class="p">()</span>
+                <span class="k">for</span> <span class="n">tname</span> <span class="ow">in</span> <span class="n">table_names</span><span class="p">:</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">db</span><span class="o">.</span><span class="n">load_arrays</span><span class="p">(</span><span class="n">tname</span><span class="p">)</span>
+                    <span class="k">except</span><span class="p">:</span>
+                        <span class="k">continue</span>
+                <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">ee</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Array load failed for </span><span class="si">{</span><span class="n">db_path</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">ee</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">is_blobs_loadable</span><span class="p">(</span>
+    <span class="n">db_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">table_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if blobs in database/table are loadable</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    db_path : str</span>
+<span class="sd">        Path to database file</span>
+<span class="sd">    table_name : str, optional</span>
+<span class="sd">        Specific table to test. If None, tests all tables</span>
+<span class="sd">    verbose : bool, default False</span>
+<span class="sd">        Print detailed error information</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    bool</span>
+<span class="sd">        True if blobs loadable, False otherwise</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">scitex</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">stx</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">stx</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">db_path</span><span class="p">)</span> <span class="k">as</span> <span class="n">db</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">table_name</span><span class="p">:</span>
+                <span class="n">db</span><span class="o">.</span><span class="n">load_blob</span><span class="p">(</span><span class="n">table_name</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">True</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">table_names</span> <span class="o">=</span> <span class="n">db</span><span class="o">.</span><span class="n">get_table_names</span><span class="p">()</span>
+                <span class="k">for</span> <span class="n">tname</span> <span class="ow">in</span> <span class="n">table_names</span><span class="p">:</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">db</span><span class="o">.</span><span class="n">load_blob</span><span class="p">(</span><span class="n">tname</span><span class="p">)</span>
+                    <span class="k">except</span><span class="p">:</span>
+                        <span class="k">continue</span>
+                <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">ee</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Blob load failed for </span><span class="si">{</span><span class="n">db_path</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">ee</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+
+<div class="viewcode-block" id="batch_health_check">
+<a class="viewcode-back" href="../../api/scitex_db.html#scitex_db.batch_health_check">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">batch_health_check</span><span class="p">(</span>
+    <span class="n">db_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">fix_issues</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Run health check on multiple databases</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    db_paths : list of str</span>
+<span class="sd">        List of database paths</span>
+<span class="sd">    verbose : bool, default False</span>
+<span class="sd">        Print results for each database</span>
+<span class="sd">    fix_issues : bool, default False</span>
+<span class="sd">        Attempt to fix issues</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    dict</span>
+<span class="sd">        Results for each database</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Running health check on </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">db_paths</span><span class="p">)</span><span class="si">}</span><span class="s2"> databases...&quot;</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">db_path</span> <span class="ow">in</span> <span class="n">db_paths</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Checking: </span><span class="si">{</span><span class="n">db_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="n">results</span><span class="p">[</span><span class="n">db_path</span><span class="p">]</span> <span class="o">=</span> <span class="n">check_health</span><span class="p">(</span>
+            <span class="n">db_path</span><span class="o">=</span><span class="n">db_path</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">,</span> <span class="n">fix_issues</span><span class="o">=</span><span class="n">fix_issues</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Summary</span>
+    <span class="n">healthy</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="mi">1</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">results</span><span class="o">.</span><span class="n">values</span><span class="p">()</span> <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="s2">&quot;status&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;HEALTHY&quot;</span><span class="p">)</span>
+    <span class="n">issues</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="mi">1</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">results</span><span class="o">.</span><span class="n">values</span><span class="p">()</span> <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="s2">&quot;status&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;ISSUES_FOUND&quot;</span><span class="p">)</span>
+    <span class="n">critical</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="mi">1</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">results</span><span class="o">.</span><span class="n">values</span><span class="p">()</span> <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="s2">&quot;status&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;CRITICAL&quot;</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Batch Health Check Summary:&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Healthy: </span><span class="si">{</span><span class="n">healthy</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Issues: </span><span class="si">{</span><span class="n">issues</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Critical: </span><span class="si">{</span><span class="n">critical</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">results</span></div>
+
+
+<span class="c1"># EOF</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Yusuke Watanabe.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

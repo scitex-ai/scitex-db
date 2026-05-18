@@ -1,6 +1,10 @@
 ---
 name: scitex-db
-description: Relational-DB wrapper for scientific Python — `SQLite3` and `PostgreSQL` classes composed from a dozen shared mixins (connection, transaction, query, schema, index, row/batch ops, import/export, backup, blob, maintenance) with first-class numpy `ndarray` BLOB storage, health checks, duplicate removal, and schema inspection. Public API (5 symbols) — `SQLite3(db_path, ...)` (unified SQLite client with `.execute(sql, params)`, pandas `.to_df(table)`, `.save_array(name, arr)` / `.load_array(name)` for compressed-ndarray BLOBs, `.check_health()`, `.inspect()`, context-manager transactions), `PostgreSQL(dsn, ...)` (same surface for Postgres), `delete_duplicates(conn, table, columns=None)` (dedupe rows by column subset), `delete_sqlite3_duplicates(db_path, ...)` (SQLite-specific convenience), `inspect(db)` (dump schema + row counts + index summary). CLI — `scitex-db inspect <db>`, `scitex-db health <db>`. No MCP tools. Drop-in replacement for hand-rolled `sqlite3.connect(...)` wrappers, `psycopg2` boilerplate, storing ndarrays via `pickle.dumps` → `BLOB` (no compression, no typed load), SQLAlchemy Core when you don't need an ORM, and bespoke "find and delete duplicate rows" SQL snippets. Use whenever the user asks to "store numpy arrays in SQLite", "persist experiment results to Postgres", "dedupe rows in a table", "check this SQLite DB is healthy / not corrupt", "inspect the schema of a DB", "save/load compressed ndarrays as BLOBs", or mentions `scitex.db`, `SQLite3` class, numpy BLOB storage.
+description: |
+  [WHAT] Relational-DB wrapper for scientific Python.
+  [WHEN] Use when the user asks to "store numpy arrays in SQLite", "persist experiment results to Postgres", "dedupe rows in a table", "check this SQLite DB is healthy / not corrupt", "inspect the schema of a DB", "save/load compressed ndarrays a....
+  [HOW] `import scitex_db` then call `SQLite3(db_path, ...)`.
+tags: [scitex-db]
 primary_interface: python
 interfaces:
   python: 3
@@ -9,8 +13,8 @@ interfaces:
   skills: 2
   hook: 0
   http: 0
-tags: [scitex-db, scitex-package]
 ---
+
 
 # scitex-db
 
@@ -43,14 +47,17 @@ rule and empirical verification table.
 
 ## Sub-skills
 
-### Core
+### Mandatory
 
-* [01_quick-start](01_quick-start.md) — SQLite3 + PostgreSQL minimal examples
-* [02_python-api](02_python-api.md) — Public symbols
-* [03_mixins](03_mixins.md) — The mixin architecture (capability groups)
-* [04_numpy-blob](04_numpy-blob.md) — Storing ndarrays with compression
-* [05_maintenance](05_maintenance.md) — `check_health`, `delete_duplicates`, `inspect`
+* [01_installation](01_installation.md) — pip install + extras + verify
+* [02_quick-start](02_quick-start.md) — SQLite3 + PostgreSQL minimal examples
+* [03_python-api](03_python-api.md) — Public symbols
+* [04_cli-reference](04_cli-reference.md) — `scitex-db` console entry
 
-### Interface
+### Deep-dive
 
-* [10_cli-reference](10_cli-reference.md) — `scitex-db inspect` / `health`
+* [13_mixins](13_mixins.md) — The mixin architecture (capability groups)
+* [14_numpy-blob](14_numpy-blob.md) — Storing ndarrays with compression
+* [15_maintenance](15_maintenance.md) — `check_health`, `delete_duplicates`, `inspect`
+* [11_quick-start](11_quick-start.md), [12_python-api](12_python-api.md) — historical leaves
+* [10_cli-reference](10_cli-reference.md) — historical CLI notes
