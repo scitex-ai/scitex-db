@@ -31,15 +31,18 @@ jobs:
             sphinx-build -b html docs/sphinx docs/sphinx/_build/html
           fi
 
-      - name: Refresh src/scitex_db/_sphinx_html/ (push to default branch only)
-        if: github.event_name == 'push'
+      - name: Refresh src/scitex_db/_sphinx_html/ (develop push only)
+        # main is PR-only — its _sphinx_html/ bundle arrives via the
+        # develop -> main PR. Direct bot-pushes to main are inhibited
+        # so the branch history stays linear-via-PR.
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
         run: |
           rm -rf src/scitex_db/_sphinx_html
           cp -rf docs/sphinx/_build/html src/scitex_db/_sphinx_html
           touch src/scitex_db/_sphinx_html/.nojekyll
 
-      - name: Commit refreshed HTML if it changed
-        if: github.event_name == 'push'
+      - name: Commit refreshed HTML if it changed (develop push only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
         run: |
           if [ -n "$(git status --porcelain src/scitex_db/_sphinx_html)" ]; then
             git config user.name "github-actions[bot]"
