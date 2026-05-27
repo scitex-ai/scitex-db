@@ -34,7 +34,7 @@ with PostgreSQL(host="localhost", dbname="mydb", user="me") as db:
     rows = db.select("experiments", where="status = 'done'")
 ```
 
-Same mixin-backed API as SQLite3 (see [03_mixins.md](03_mixins.md)).
+Same mixin-backed API as SQLite3 (see [13_mixins.md](13_mixins.md)).
 
 ## Numpy arrays
 
@@ -46,7 +46,7 @@ with SQLite3("arrays.db") as db:
     db.save_array("measurements", arr, column="data")
 ```
 
-See [04_numpy-blob.md](04_numpy-blob.md).
+See [14_numpy-blob.md](14_numpy-blob.md).
 
 ## Maintenance
 

@@ -8,7 +8,7 @@ tags: [scitex-db-python-api, scitex-db]
 
 # Python API
 
-Everything re-exported from top-level `scitex_db` / `scitex.db`.
+Everything re-exported from top-level `scitex_db`.
 
 ## Classes
 
@@ -30,12 +30,11 @@ method set documented in [03_mixins.md](03_mixins.md).
 | `delete_sqlite3_duplicates` | SQLite3-specific, uses ROWID tricks                |
 | `inspect(path_or_conn)`     | Return schema as a structured dict                 |
 
-Note: `check_health` and `batch_health_check` are re-exported; only
-`check_health` appears in `__all__`, but both are importable.
+Both `check_health` and `batch_health_check` appear in `__all__`.
 
 ## Sub-packages (advanced)
 
 * `scitex_db._BaseMixins` — abstract mixin protocols
-* `scitex_db._SQLite3Mixins`, `scitex_db._postgresql._PostgreSQLMixins` — concrete implementations
+* `scitex_db._sqlite3._SQLite3Mixins`, `scitex_db._postgresql._PostgreSQLMixins` — concrete implementations
 
 Prefer the public classes; mixin modules are private.
