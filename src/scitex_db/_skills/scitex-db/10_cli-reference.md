@@ -17,33 +17,52 @@ scitex-db = "scitex_db.__main__:main"
 
 ## Sub-commands
 
-| Sub-command | Purpose                                    |
-|-------------|--------------------------------------------|
-| `inspect`   | Dump schema for a database                 |
-| `health`    | Run integrity + health checks on one or more databases |
+| Sub-command      | Purpose                                    |
+|------------------|--------------------------------------------|
+| `inspect-db`     | Inspect a database's structure (tables, schemas, row counts) |
+| `check-health`   | Check database health and optionally repair issues |
+| `list-python-apis` | List the public Python API surface of `scitex_db` |
+| `mcp`            | MCP (Model Context Protocol) server management |
+| `skills`         | List / get / install agent-facing skills |
 
-### scitex-db inspect
+### scitex-db inspect-db
 
 ```
-scitex-db inspect <db_path> [--tables TBL [TBL ...]] [--quiet]
+scitex-db inspect-db <db_path> [--tables TBL [TBL ...]] [--quiet] [--json]
 ```
 
 * `db_path` — SQLite3 file
 * `--tables` — only inspect the named tables (default: all)
 * `--quiet` — minimal output
+* `--json` — machine-readable JSON output
 
 Wraps `scitex_db.inspect()`.
 
-### scitex-db health
+### scitex-db check-health
 
 ```
-scitex-db health <db_path> [<db_path> ...] [--fix] [--quiet]
+scitex-db check-health <db_path> [<db_path> ...] [--fix] [--quiet] [--dry-run] [--json]
 ```
 
 * One path → calls `check_health(path, fix_issues=--fix)`
 * Many paths → calls `batch_health_check(paths, fix_issues=--fix)`
 * `--fix` — attempt to repair where possible
 * `--quiet` — minimal output
+* `--dry-run` — preview what --fix would do
+* `--json` — machine-readable JSON output
 
-No other sub-commands exist; running `scitex-db` with no arguments
-prints help and exits non-zero.
+### scitex-db list-python-apis
+
+```
+scitex-db list-python-apis [--json]
+```
+
+Lists the public Python API surface of `scitex_db`.
+
+### scitex-db skills
+
+```
+scitex-db skills {list|get|install}
+```
+
+Agent-facing skill management. See `scitex-db skills --help` for details.
