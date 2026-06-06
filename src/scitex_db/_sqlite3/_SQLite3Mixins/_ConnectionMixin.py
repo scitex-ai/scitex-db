@@ -35,15 +35,24 @@ import threading
 class _ConnectionMixin:
     """Connection management functionality"""
 
-    def __init__(self, db_path: str, use_temp_db: bool = False):
+    def __init__(
+        self,
+        db_path: str,
+        use_temp_db: bool = False,
+        *,
+        mode: str = "rwc",
+        timeout: float = 60.0,
+    ):
         self.lock = threading.Lock()
         self._maintenance_lock = threading.Lock()
         self.db_path = db_path
+        self.mode = mode
+        self.timeout = timeout
         self.conn = None
         self.cursor = None
         self.temp_path = None  # Initialize temp_path attribute
         if db_path:
-            self.connect(db_path, use_temp_db)
+            self.connect(db_path, use_temp_db, mode=mode, timeout=timeout)
 
     def __enter__(self):
         return self
@@ -60,7 +69,14 @@ class _ConnectionMixin:
         shutil.copy2(db_path, self.temp_path)
         return self.temp_path
 
-    def connect(self, db_path: str, use_temp_db: bool = False) -> None:
+    def connect(
+        self,
+        db_path: str,
+        use_temp_db: bool = False,
+        *,
+        mode: str = "rwc",
+        timeout: float = 60.0,
+    ) -> None:
         if self.conn:
             self.close()
 
@@ -68,21 +84,34 @@ class _ConnectionMixin:
             self._create_temp_copy(db_path) if use_temp_db else db_path
         )
 
-        self.conn = sqlite3.connect(path_to_connect, timeout=60.0)
+        # Always go through SQLite's URI form so the open mode is explicit.
+        # ``mode='rwc'`` (default) matches the previous ``sqlite3.connect(path)``
+        # behaviour of opening read-write and creating the file if missing.
+        uri = f"file:{path_to_connect}?mode={mode}"
+        self.conn = sqlite3.connect(uri, uri=True, timeout=timeout)
         self.cursor = self.conn.cursor()
 
+        # PRAGMA tuning. ``ro`` is read-only so the journal-mode write and the
+        # ``commit()`` at the bottom would error — skip them in that branch.
+        # WAL also requires write access, so we only set it for rw/rwc.
         with self.lock:
-            # WAL mode settings
-            self.cursor.execute("PRAGMA journal_mode = WAL")
-            self.cursor.execute("PRAGMA synchronous = NORMAL")
-            self.cursor.execute("PRAGMA busy_timeout = 300000")  # 5 minutes
-            self.cursor.execute("PRAGMA mmap_size = 30000000000")
-            self.cursor.execute("PRAGMA temp_store = MEMORY")
-            self.cursor.execute("PRAGMA cache_size = -2000")
-            self.cursor.execute(
-                "PRAGMA wal_autocheckpoint = 1000"
-            )  # Auto-checkpoint
-            self.conn.commit()
+            if mode != "ro":
+                # WAL mode settings (write-only)
+                self.cursor.execute("PRAGMA journal_mode = WAL")
+                self.cursor.execute("PRAGMA synchronous = NORMAL")
+                self.cursor.execute("PRAGMA busy_timeout = 300000")  # 5 minutes
+                self.cursor.execute("PRAGMA mmap_size = 30000000000")
+                self.cursor.execute("PRAGMA temp_store = MEMORY")
+                self.cursor.execute("PRAGMA cache_size = -2000")
+                self.cursor.execute(
+                    "PRAGMA wal_autocheckpoint = 1000"
+                )  # Auto-checkpoint
+                self.conn.commit()
+            else:
+                # Read-only: only set tunings safe under query_only.
+                self.cursor.execute("PRAGMA query_only = ON")
+                self.cursor.execute("PRAGMA temp_store = MEMORY")
+                self.cursor.execute("PRAGMA cache_size = -2000")
 
     def close(self) -> None:
         if self.cursor:
