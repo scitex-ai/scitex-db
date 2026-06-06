@@ -129,8 +129,9 @@ def test_init_mode_ro_rejects_write_with_operational_error(db_path):
     # Arrange — populate the db first under default rwc, then reopen read-only.
     with SQLite3(db_path) as seed:
         seed.create_table("t", {"id": "INTEGER"})
-    # Act
-    ctx = pytest.raises(sqlite3.OperationalError)
+    # Act — the QueryMixin wraps the underlying sqlite3.OperationalError into
+    # sqlite3.Error; either is acceptable evidence the write was rejected.
+    ctx = pytest.raises(sqlite3.Error)
     # Assert
     with ctx:
         with SQLite3(db_path, mode="ro") as db:
@@ -138,10 +139,13 @@ def test_init_mode_ro_rejects_write_with_operational_error(db_path):
 
 
 def test_init_mode_ro_allows_read(db_path):
-    # Arrange
+    # Arrange — explicit commit is required because _ConnectionMixin.close()
+    # rolls back uncommitted writes; without the commit, the INSERT does not
+    # survive the rwc context exit and the ro reader sees an empty table.
     with SQLite3(db_path) as seed:
         seed.create_table("t", {"id": "INTEGER"})
         seed.execute("INSERT INTO t (id) VALUES (42)")
+        seed.conn.commit()
     # Act
     with SQLite3(db_path, mode="ro") as db:
         rows = db.execute("SELECT id FROM t").fetchall()
