@@ -33,20 +33,20 @@ db = scitex_db.SQLite3("trials.db")
 # Schema
 db.create_table(name, schema_or_df)
 db.drop_table(name)
-db.list_tables()
+db.get_tables()
 
 # Rows
 db.insert(df_or_rows, table)
-db.read_table(table) -> pd.DataFrame
+db.select(table, where=...) -> list of dicts
 db.execute(sql, params=...)
 
 # numpy blobs
 db.save_array(key, arr)
 db.load_array(key) -> ndarray
 
-# Maintenance
-db.health_check()
-db.vacuum()
+# Transactions
+with db.transaction():
+    db.insert("t", {...})
 ```
 
 See [13_mixins.md](13_mixins.md) for the full per-mixin breakdown.

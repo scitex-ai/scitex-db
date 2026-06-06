@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>scitex_db &mdash; SciTeX DB v0.1.11</title>
+  <title>scitex_db &mdash; SciTeX DB v0.1.12</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
@@ -14,7 +14,7 @@
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=1e825a29"></script>
+      <script src="../_static/documentation_options.js?v=297ad043"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
@@ -107,7 +107,7 @@ symbols are imported lazily via PEP 562 <code class="docutils literal notranslat
 runs the CLI once per Tab press, and slow imports break tab-completion.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="scitex_db.SQLite3">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">scitex_db.</span></span><span class="sig-name descname"><span class="pre">SQLite3</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">db_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_temp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">compress_by_default</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">autocommit</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/scitex_db/_sqlite3/_SQLite3.html#SQLite3"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scitex_db.SQLite3" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">scitex_db.</span></span><span class="sig-name descname"><span class="pre">SQLite3</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">db_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_temp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">compress_by_default</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">autocommit</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'rwc'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">60.0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/scitex_db/_sqlite3/_SQLite3.html#SQLite3"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scitex_db.SQLite3" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">_ArrayMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_ConnectionMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_QueryMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_TransactionMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_ColumnMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_TableMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_IndexMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_RowMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_BatchMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_BlobMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_ImportExportMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_MaintenanceMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_GitMixin</span></code></p>
 <p>SQLite database manager with automatic metadata handling, numpy array storage, and compression.</p>
 <p>This class provides a comprehensive interface for SQLite database operations with
@@ -166,7 +166,7 @@ automatic compression, thread-safe operations, and specialized numpy array handl
 </div>
 <dl class="py method">
 <dt class="sig sig-object py" id="scitex_db.SQLite3.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">db_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_temp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">compress_by_default</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">autocommit</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/scitex_db/_sqlite3/_SQLite3.html#SQLite3.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scitex_db.SQLite3.__init__" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">db_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_temp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">compress_by_default</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">autocommit</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'rwc'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">60.0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/scitex_db/_sqlite3/_SQLite3.html#SQLite3.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scitex_db.SQLite3.__init__" title="Link to this definition"></a></dt>
 <dd><p>Initialize SQLite database manager.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -175,6 +175,15 @@ automatic compression, thread-safe operations, and specialized numpy array handl
 <li><p><strong>use_temp</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>optional</em>) – Whether to use a temporary copy of the database, by default False</p></li>
 <li><p><strong>compress_by_default</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>optional</em>) – Whether to compress BLOB data by default when not explicitly specified, by default False</p></li>
 <li><p><strong>autocommit</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>optional</em>) – Whether to automatically commit transactions, by default False</p></li>
+<li><p><strong>mode</strong> (<em>{&quot;ro&quot;</em><em>, </em><em>&quot;rw&quot;</em><em>, </em><em>&quot;rwc&quot;}</em><em>, </em><em>optional</em>) – SQLite URI open mode, by default <code class="docutils literal notranslate"><span class="pre">&quot;rwc&quot;</span></code> — opens existing files
+for read-write and creates the file if missing. This preserves the
+previous behaviour (<code class="docutils literal notranslate"><span class="pre">sqlite3.connect(path)</span></code> without URI auto-created
+missing files). <code class="docutils literal notranslate"><span class="pre">&quot;rw&quot;</span></code> is the same minus auto-create (file must
+already exist). <code class="docutils literal notranslate"><span class="pre">&quot;ro&quot;</span></code> is read-only — useful when scanning
+inventory databases that must not be mutated.</p></li>
+<li><p><strong>timeout</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>optional</em>) – <code class="docutils literal notranslate"><span class="pre">sqlite3.connect</span></code> <code class="docutils literal notranslate"><span class="pre">timeout=</span></code> value (seconds), by default <code class="docutils literal notranslate"><span class="pre">60.0</span></code>
+(the previous hardcoded value). Use a smaller value when probing many
+DBs and you’d rather fail fast than wait on a lock.</p></li>
 </ul>
 </dd>
 </dl>
@@ -185,6 +194,11 @@ automatic compression, thread-safe operations, and specialized numpy array handl
 </dd>
 </dl>
 </div>
+<dl class="field-list simple">
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If <code class="docutils literal notranslate"><span class="pre">mode</span></code> is not one of <code class="docutils literal notranslate"><span class="pre">{&quot;ro&quot;,</span> <span class="pre">&quot;rw&quot;,</span> <span class="pre">&quot;rwc&quot;}</span></code>.</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">

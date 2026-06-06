@@ -98,6 +98,72 @@ def test_init_with_use_temp_keeps_connection_open(temp_dir):
 
 
 # ----------------------------------------------------------------------------
+# Open mode (URI mode= flag): rwc default / rw / ro
+# ----------------------------------------------------------------------------
+
+
+def test_init_default_mode_rwc_creates_missing_file(temp_dir):
+    # Arrange — preserves the pre-kwarg behaviour where a fresh path was
+    # transparently created on connect.
+    missing_path = os.path.join(temp_dir, "fresh.db")
+    # Act
+    with SQLite3(missing_path) as db:
+        del db
+    # Assert
+    assert os.path.exists(missing_path)
+
+
+def test_init_mode_rw_against_existing_file_opens_for_write(db_path):
+    # Arrange
+    with SQLite3(db_path) as preexisting:
+        preexisting.create_table("t", {"id": "INTEGER"})
+    # Act
+    with SQLite3(db_path, mode="rw") as db:
+        db.execute("INSERT INTO t (id) VALUES (1)")
+        rows = db.execute("SELECT id FROM t").fetchall()
+    # Assert
+    assert rows == [(1,)]
+
+
+def test_init_mode_ro_rejects_write_with_operational_error(db_path):
+    # Arrange — populate the db first under default rwc, then reopen read-only.
+    with SQLite3(db_path) as seed:
+        seed.create_table("t", {"id": "INTEGER"})
+    # Act — the QueryMixin wraps the underlying sqlite3.OperationalError into
+    # sqlite3.Error; either is acceptable evidence the write was rejected.
+    ctx = pytest.raises(sqlite3.Error)
+    # Assert
+    with ctx:
+        with SQLite3(db_path, mode="ro") as db:
+            db.execute("INSERT INTO t (id) VALUES (1)")
+
+
+def test_init_mode_ro_allows_read(db_path):
+    # Arrange — explicit commit is required because _ConnectionMixin.close()
+    # rolls back uncommitted writes; without the commit, the INSERT does not
+    # survive the rwc context exit and the ro reader sees an empty table.
+    with SQLite3(db_path) as seed:
+        seed.create_table("t", {"id": "INTEGER"})
+        seed.execute("INSERT INTO t (id) VALUES (42)")
+        seed.conn.commit()
+    # Act
+    with SQLite3(db_path, mode="ro") as db:
+        rows = db.execute("SELECT id FROM t").fetchall()
+    # Assert
+    assert rows == [(42,)]
+
+
+def test_init_invalid_mode_raises_value_error(db_path):
+    # Arrange
+    bad_mode = "rwx"
+    # Act
+    ctx = pytest.raises(ValueError, match="mode must be one of")
+    # Assert
+    with ctx:
+        SQLite3(db_path, mode=bad_mode)
+
+
+# ----------------------------------------------------------------------------
 # Context manager
 # ----------------------------------------------------------------------------
 
