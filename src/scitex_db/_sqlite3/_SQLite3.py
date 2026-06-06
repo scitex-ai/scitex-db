@@ -99,6 +99,8 @@ class SQLite3(
         use_temp: bool = False,
         compress_by_default: bool = False,
         autocommit: bool = False,
+        mode: str = "rwc",
+        timeout: float = 60.0,
     ):
         """Initialize SQLite database manager.
 
@@ -112,17 +114,44 @@ class SQLite3(
             Whether to compress BLOB data by default when not explicitly specified, by default False
         autocommit : bool, optional
             Whether to automatically commit transactions, by default False
+        mode : {"ro", "rw", "rwc"}, optional
+            SQLite URI open mode, by default ``"rwc"`` — opens existing files
+            for read-write and creates the file if missing. This preserves the
+            previous behaviour (``sqlite3.connect(path)`` without URI auto-created
+            missing files). ``"rw"`` is the same minus auto-create (file must
+            already exist). ``"ro"`` is read-only — useful when scanning
+            inventory databases that must not be mutated.
+        timeout : float, optional
+            ``sqlite3.connect`` ``timeout=`` value (seconds), by default ``60.0``
+            (the previous hardcoded value). Use a smaller value when probing many
+            DBs and you'd rather fail fast than wait on a lock.
 
         Warnings
         --------
         UserWarning
             If not used with context manager, warns about potential resource leaks
+
+        Raises
+        ------
+        ValueError
+            If ``mode`` is not one of ``{"ro", "rw", "rwc"}``.
         """
+        if mode not in {"ro", "rw", "rwc"}:
+            raise ValueError(
+                f"mode must be one of 'ro', 'rw', 'rwc'; got {mode!r}"
+            )
 
-        if not os.path.exists(db_path):
-            os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        # ``rwc`` is "create-if-missing"; ``rw`` requires the file to exist.
+        # ``ro`` is read-only and must not auto-create. Only ``rwc`` should
+        # touch the filesystem before connecting.
+        if mode == "rwc" and not os.path.exists(db_path):
+            parent = os.path.dirname(db_path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
 
-        _ConnectionMixin.__init__(self, db_path, use_temp)
+        _ConnectionMixin.__init__(
+            self, db_path, use_temp, mode=mode, timeout=timeout
+        )
         self.compress_by_default = compress_by_default
         self.autocommit = autocommit
         self._context_manager_used = False
