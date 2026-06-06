@@ -202,6 +202,8 @@
         <span class="n">use_temp</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">compress_by_default</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">autocommit</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;rwc&quot;</span><span class="p">,</span>
+        <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">60.0</span><span class="p">,</span>
     <span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize SQLite database manager.</span>
 
@@ -215,17 +217,44 @@
 <span class="sd">            Whether to compress BLOB data by default when not explicitly specified, by default False</span>
 <span class="sd">        autocommit : bool, optional</span>
 <span class="sd">            Whether to automatically commit transactions, by default False</span>
+<span class="sd">        mode : {&quot;ro&quot;, &quot;rw&quot;, &quot;rwc&quot;}, optional</span>
+<span class="sd">            SQLite URI open mode, by default ``&quot;rwc&quot;`` — opens existing files</span>
+<span class="sd">            for read-write and creates the file if missing. This preserves the</span>
+<span class="sd">            previous behaviour (``sqlite3.connect(path)`` without URI auto-created</span>
+<span class="sd">            missing files). ``&quot;rw&quot;`` is the same minus auto-create (file must</span>
+<span class="sd">            already exist). ``&quot;ro&quot;`` is read-only — useful when scanning</span>
+<span class="sd">            inventory databases that must not be mutated.</span>
+<span class="sd">        timeout : float, optional</span>
+<span class="sd">            ``sqlite3.connect`` ``timeout=`` value (seconds), by default ``60.0``</span>
+<span class="sd">            (the previous hardcoded value). Use a smaller value when probing many</span>
+<span class="sd">            DBs and you&#39;d rather fail fast than wait on a lock.</span>
 
 <span class="sd">        Warnings</span>
 <span class="sd">        --------</span>
 <span class="sd">        UserWarning</span>
 <span class="sd">            If not used with context manager, warns about potential resource leaks</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        ValueError</span>
+<span class="sd">            If ``mode`` is not one of ``{&quot;ro&quot;, &quot;rw&quot;, &quot;rwc&quot;}``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">mode</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;ro&quot;</span><span class="p">,</span> <span class="s2">&quot;rw&quot;</span><span class="p">,</span> <span class="s2">&quot;rwc&quot;</span><span class="p">}:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;mode must be one of &#39;ro&#39;, &#39;rw&#39;, &#39;rwc&#39;; got </span><span class="si">{</span><span class="n">mode</span><span class="si">!r}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
 
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">db_path</span><span class="p">):</span>
-            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">db_path</span><span class="p">),</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="c1"># ``rwc`` is &quot;create-if-missing&quot;; ``rw`` requires the file to exist.</span>
+        <span class="c1"># ``ro`` is read-only and must not auto-create. Only ``rwc`` should</span>
+        <span class="c1"># touch the filesystem before connecting.</span>
+        <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;rwc&quot;</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">db_path</span><span class="p">):</span>
+            <span class="n">parent</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">db_path</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">parent</span><span class="p">:</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">parent</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-        <span class="n">_ConnectionMixin</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">db_path</span><span class="p">,</span> <span class="n">use_temp</span><span class="p">)</span>
+        <span class="n">_ConnectionMixin</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="n">db_path</span><span class="p">,</span> <span class="n">use_temp</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span>
+        <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">compress_by_default</span> <span class="o">=</span> <span class="n">compress_by_default</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">autocommit</span> <span class="o">=</span> <span class="n">autocommit</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_context_manager_used</span> <span class="o">=</span> <span class="kc">False</span></div>
