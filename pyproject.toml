@@ -79,6 +79,9 @@ scitex-db = "scitex_db"
 [project.entry-points."scitex_dev.skills"]
 scitex-db = "scitex_db"
 
+[project.entry-points."scitex_dev.linter.plugins"]
+db = "scitex_db._linter_plugin:get_plugin"
+
 [project.urls]
 Homepage = "https://github.com/ywatanabe1989/scitex-db"
 Repository = "https://github.com/ywatanabe1989/scitex-db.git"
