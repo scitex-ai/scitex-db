@@ -28,15 +28,19 @@ by the checksum comparison, so it is worth not creating in the first place.
 from __future__ import annotations
 
 import sqlite3
+from dataclasses import dataclass
 from typing import Any, Iterator, Sequence
 
 from ._ddl import Column
 
 __all__ = [
     "IntrospectionError",
+    "SchemaObject",
     "columns_with_nul",
     "connect_readonly",
+    "list_indexes",
     "list_tables",
+    "list_triggers",
     "primary_key_columns",
     "read_columns",
     "read_rows",
@@ -82,6 +86,61 @@ def list_tables(conn: sqlite3.Connection) -> tuple[str, ...]:
     return tuple(
         r["name"] for r in rows if not str(r["name"]).startswith(_INTERNAL_PREFIX)
     )
+
+
+@dataclass(frozen=True)
+class SchemaObject:
+    """A non-table schema object: a trigger or an index, with its source SQL.
+
+    Carried as a named type rather than a bare string because the migration's
+    job is to account for it EXPLICITLY -- either translate it or refuse -- and
+    a name alone cannot be translated.
+    """
+
+    name: str
+    table: str
+    kind: str
+    sql: str
+
+
+def _list_schema_objects(conn: sqlite3.Connection, kind: str) -> tuple[SchemaObject, ...]:
+    rows = conn.execute(
+        "SELECT name, tbl_name, sql FROM sqlite_master "
+        "WHERE type = ? AND sql IS NOT NULL ORDER BY name",
+        (kind,),
+    ).fetchall()
+    return tuple(
+        SchemaObject(name=r["name"], table=r["tbl_name"], kind=kind, sql=r["sql"])
+        for r in rows
+        if not str(r["name"]).startswith(_INTERNAL_PREFIX)
+    )
+
+
+def list_triggers(conn: sqlite3.Connection) -> tuple[SchemaObject, ...]:
+    """Triggers defined in the source, with their SQL.
+
+    These are not decoration. On the scitex-cards store they ARE the
+    append-only invariant: four ``BEFORE DELETE`` triggers that
+    ``RAISE(ABORT, ...)`` so a row can never be removed, and one
+    ``BEFORE UPDATE`` that makes message rows immutable except for their
+    tombstone columns. A destination without them accepts the very DELETE
+    the source refuses.
+
+    Enumerated so the migration can ACCOUNT for them. A row-for-row
+    verification cannot see their absence -- every row can match perfectly
+    while the destination has lost the guarantee that rows stay.
+    """
+    return _list_schema_objects(conn, "trigger")
+
+
+def list_indexes(conn: sqlite3.Connection) -> tuple[SchemaObject, ...]:
+    """Explicitly-created indexes (those with SQL; implicit ones have none).
+
+    Performance rather than correctness, but enumerated for the same reason:
+    silently arriving without them is a destination that differs from the
+    source in a way nobody declared.
+    """
+    return _list_schema_objects(conn, "index")
 
 
 def read_columns(conn: sqlite3.Connection, table: str) -> tuple[Column, ...]:

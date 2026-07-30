@@ -52,6 +52,7 @@ __all__ = [
     "MigrationRefused",
     "Quiescence",
     "MigrationResult",
+    "apply_schema_objects",
     "destination_is_usable",
     "read_marker",
 ]
@@ -176,6 +177,39 @@ def destination_is_usable(fetch: Callable[[str], Iterable[Sequence[Any]]]) -> bo
     connecting and serving would look like success.
     """
     return read_marker(fetch) is not None
+
+
+def apply_schema_objects(
+    objects: Sequence[Any],
+    write: Callable[[str, Sequence[Any]], None],
+) -> tuple[str, ...]:
+    """Create the translated triggers and indexes on the destination.
+
+    ORDER IS LOAD-BEARING AND IS NOT THE SOURCE'S ORDER. Indexes are created
+    before triggers, and BOTH are created after the rows have been copied:
+
+    * After the rows, because building an index once over a populated table is
+      far cheaper than maintaining it across every insert -- and because a
+      guard trigger meant for normal operation has no business adjudicating
+      the migration's own writes. A ``BEFORE UPDATE`` immutability guard
+      installed early would be evaluating the copier, not the application.
+    * Indexes before triggers so that if a trigger body references an index by
+      name, the reference resolves.
+
+    Returns the names applied, in order, so the caller can report what it did
+    rather than assert that it did something. Nothing is swallowed: a failure
+    here propagates, because a destination with some of its triggers is more
+    dangerous than one with none -- the missing ones are invisible while the
+    present ones make it look protected.
+    """
+    from ._triggers import translate_schema_object
+
+    applied = []
+    ordered = sorted(objects, key=lambda o: (o.kind != "index", o.name))
+    for obj in ordered:
+        write(translate_schema_object(obj), ())
+        applied.append(obj.name)
+    return tuple(applied)
 
 
 def verify_plan(

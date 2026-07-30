@@ -260,6 +260,100 @@ def test_preflight_raises_when_a_source_table_has_no_disposition(store):
 # ----------------------------------------------------------------------------
 
 
+def _store_with_trigger(trigger_sql):
+    """A one-table store carrying `trigger_sql`, returned as (path, tmpdir)."""
+    tmpdir = tempfile.mkdtemp()
+    path = os.path.join(tmpdir, "trig.db")
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE good (id TEXT PRIMARY KEY, title TEXT)")
+    conn.execute("INSERT INTO good VALUES ('g1', 'x')")
+    conn.execute(trigger_sql)
+    conn.commit()
+    conn.close()
+    return path, tmpdir
+
+
+#: A guard in the shape the live store uses -- the translator handles this.
+_TRANSLATABLE = (
+    "CREATE TRIGGER good_no_delete BEFORE DELETE ON good BEGIN "
+    "SELECT RAISE(ABORT, 'append-only'); END"
+)
+#: A body that does real work; no faithful translation is known for it.
+_UNTRANSLATABLE = (
+    "CREATE TRIGGER good_audit AFTER INSERT ON good BEGIN "
+    "INSERT INTO good (id, title) VALUES ('audit', 'x'); END"
+)
+
+
+def test_a_translatable_trigger_is_reported_as_carried():
+    # Arrange -- the append-only guards DO have a faithful translation, so they
+    # must not block: "we can move this" and "nobody decided" are different
+    # states and collapsing them would block a migration that is actually safe
+    path, tmpdir = _store_with_trigger(_TRANSLATABLE)
+    dispositions = {"good": TablePlan("good", Disposition.MIGRATE)}
+    # Act
+    report = preflight(path, dispositions)
+    shutil.rmtree(tmpdir, ignore_errors=True)
+    # Assert
+    assert [o.name for o in report.carried] == ["good_no_delete"]
+
+
+def test_a_store_whose_objects_all_translate_is_ready():
+    # Arrange
+    path, tmpdir = _store_with_trigger(_TRANSLATABLE)
+    dispositions = {"good": TablePlan("good", Disposition.MIGRATE)}
+    # Act
+    report = preflight(path, dispositions)
+    shutil.rmtree(tmpdir, ignore_errors=True)
+    # Assert
+    assert report.ok is True
+
+
+def test_preflight_reports_a_trigger_it_cannot_carry():
+    # Arrange -- a body outside the recognised forms
+    path, tmpdir = _store_with_trigger(_UNTRANSLATABLE)
+    dispositions = {"good": TablePlan("good", Disposition.MIGRATE)}
+    # Act
+    report = preflight(path, dispositions)
+    shutil.rmtree(tmpdir, ignore_errors=True)
+    # Assert
+    assert [o.name for o in report.uncarried] == ["good_audit"]
+
+
+def test_a_store_with_an_uncarried_trigger_is_not_ready():
+    # Arrange -- THE REGRESSION TEST. Before this gate existed, every table was
+    # "ready" and the whole report said READY while the destination would
+    # silently lose a trigger the source relies on.
+    path, tmpdir = _store_with_trigger(_UNTRANSLATABLE)
+    dispositions = {"good": TablePlan("good", Disposition.MIGRATE)}
+    # Act
+    report = preflight(path, dispositions)
+    shutil.rmtree(tmpdir, ignore_errors=True)
+    # Assert
+    assert report.ok is False
+
+
+def test_preflight_summary_names_the_uncarried_object():
+    # Arrange -- the omission has to be readable, not merely counted
+    path, tmpdir = _store_with_trigger(_UNTRANSLATABLE)
+    dispositions = {"good": TablePlan("good", Disposition.MIGRATE)}
+    # Act
+    summary = preflight(path, dispositions).summary()
+    shutil.rmtree(tmpdir, ignore_errors=True)
+    # Assert
+    assert "good_audit" in summary
+
+
+def test_a_store_with_no_extra_schema_objects_reports_none_uncarried(store):
+    # Arrange -- the fixture store has no triggers or explicit indexes, so a
+    # clean store must not be penalised by the new gate
+    source = store
+    # Act
+    report = preflight(source, DISPOSITIONS)
+    # Assert
+    assert report.uncarried == ()
+
+
 def test_preflight_does_not_modify_the_source(store):
     # Arrange
     before = os.path.getmtime(store)
