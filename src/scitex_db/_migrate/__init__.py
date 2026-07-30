@@ -30,6 +30,12 @@ from __future__ import annotations
 from ._copy import MigrationRefused, MigrationResult, Quiescence
 from ._preflight import PreflightReport, preflight
 from ._run import Destination, RunReport, migrate
+from ._transform import (
+    NulEscape,
+    TransformationError,
+    Transformations,
+    plan_nul_escapes,
+)
 from ._verify import (
     MigrationVerificationError,
     VerificationReport,
@@ -48,6 +54,13 @@ __all__ = [
     "migrate",
     "Destination",
     "Quiescence",
+    # The declared-exception path: `plan_nul_escapes` enumerates what would be
+    # changed, and the resulting `Transformations` must be passed explicitly.
+    # Without one, a NUL column stays a blocker.
+    "plan_nul_escapes",
+    "Transformations",
+    "NulEscape",
+    "TransformationError",
     # Results.
     "PreflightReport",
     "RunReport",
