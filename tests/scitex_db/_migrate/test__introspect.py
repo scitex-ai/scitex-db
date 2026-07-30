@@ -22,6 +22,7 @@ import pytest
 
 from scitex_db._migrate._introspect import (
     IntrospectionError,
+    columns_with_nul,
     connect_readonly,
     list_tables,
     primary_key_columns,
@@ -304,6 +305,61 @@ def test_read_rows_refuses_a_zero_batch_size(store):
     # Assert
     with pytest.raises(IntrospectionError, match="at least 1"):
         list(read_rows(conn, "tasks", columns, ("id",), batch_size=0))
+
+
+# ----------------------------------------------------------------------------
+# columns_with_nul -- the cross-backend NUL-byte incompatibility
+# ----------------------------------------------------------------------------
+
+
+@pytest.fixture
+def nul_store():
+    """A real store whose TEXT column holds a NUL byte, as SQLite permits."""
+    tmpdir = tempfile.mkdtemp()
+    path = os.path.join(tmpdir, "nul.db")
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE t (id TEXT PRIMARY KEY, body TEXT, n INTEGER)")
+    conn.execute("INSERT INTO t VALUES ('clean', 'ordinary text', 1)")
+    conn.execute("INSERT INTO t VALUES ('dirty', 'has a ' || char(0) || ' nul', 2)")
+    conn.commit()
+    conn.close()
+    yield path
+    shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_columns_with_nul_flags_a_text_column_holding_a_nul(nul_store):
+    # Arrange -- SQLite stored it; PostgreSQL text will reject it
+    conn = connect_readonly(nul_store)
+    # Act
+    result = columns_with_nul(conn, "t", read_columns(conn, "t"))
+    # Assert
+    assert result == ("body",)
+
+
+def test_columns_with_nul_ignores_a_clean_text_column():
+    # Arrange -- a store with no NUL anywhere
+    tmpdir = tempfile.mkdtemp()
+    path = os.path.join(tmpdir, "clean.db")
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE t (id TEXT PRIMARY KEY, body TEXT)")
+    conn.execute("INSERT INTO t VALUES ('a', 'fine')")
+    conn.commit()
+    conn.close()
+    ro = connect_readonly(path)
+    # Act
+    result = columns_with_nul(ro, "t", read_columns(ro, "t"))
+    shutil.rmtree(tmpdir, ignore_errors=True)
+    # Assert
+    assert result == ()
+
+
+def test_columns_with_nul_does_not_scan_integer_columns(nul_store):
+    # Arrange -- INTEGER affinity cannot hold a NUL, so it is not scanned
+    conn = connect_readonly(nul_store)
+    # Act
+    result = columns_with_nul(conn, "t", read_columns(conn, "t"))
+    # Assert
+    assert "n" not in result
 
 
 # EOF

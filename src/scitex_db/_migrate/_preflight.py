@@ -35,6 +35,7 @@ from typing import Mapping, Sequence
 
 from ._ddl import Column, create_table_ddl, unstorable_columns
 from ._introspect import (
+    columns_with_nul,
     connect_readonly,
     list_tables,
     primary_key_columns,
@@ -57,10 +58,15 @@ class TablePreflight:
     row_count: int
     unstorable: tuple[str, ...]
     ddl: str
+    nul_columns: tuple[str, ...] = ()
 
     @property
     def ok(self) -> bool:
-        return not self.unstorable and bool(self.key_columns)
+        return (
+            not self.unstorable
+            and not self.nul_columns
+            and bool(self.key_columns)
+        )
 
     @property
     def blockers(self) -> tuple[str, ...]:
@@ -78,6 +84,14 @@ class TablePreflight:
                 f"would reject, because SQLite's declared type is an affinity "
                 f"rather than a constraint. Fix the data or widen the target "
                 f"type before migrating."
+            )
+        if self.nul_columns:
+            reasons.append(
+                f"column(s) {list(self.nul_columns)} contain a NUL (0x00) byte, "
+                f"which SQLite text stores but PostgreSQL text rejects. psycopg2 "
+                f"raises mid-copy on the first such row. Decide how to handle the "
+                f"NUL (strip, or store as bytea) before migrating -- this tool "
+                f"will not alter a stored value on its own."
             )
         return tuple(reasons)
 
@@ -156,6 +170,7 @@ def preflight(
             columns = read_columns(conn, table)
             keys = primary_key_columns(columns)
             bad = unstorable_columns(table, columns, stored_types(conn, table, columns))
+            nul = columns_with_nul(conn, table, columns)
             count = conn.execute(f'SELECT COUNT(*) AS n FROM "{table}"').fetchone()["n"]
             entries.append(
                 TablePreflight(
@@ -165,6 +180,7 @@ def preflight(
                     row_count=int(count),
                     unstorable=bad,
                     ddl=create_table_ddl(table, columns),
+                    nul_columns=nul,
                 )
             )
         return PreflightReport(

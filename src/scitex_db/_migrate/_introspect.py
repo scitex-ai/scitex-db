@@ -34,6 +34,7 @@ from ._ddl import Column
 
 __all__ = [
     "IntrospectionError",
+    "columns_with_nul",
     "connect_readonly",
     "list_tables",
     "primary_key_columns",
@@ -141,6 +142,44 @@ def stored_types(
         ).fetchall()
         result[col.name] = tuple(sorted(str(r["t"]) for r in rows))
     return result
+
+
+def columns_with_nul(
+    conn: sqlite3.Connection, table: str, columns: Sequence[Column]
+) -> tuple[str, ...]:
+    """Text/blob columns holding a NUL (0x00) byte, which PostgreSQL text rejects.
+
+    A genuine cross-backend incompatibility that no amount of SQLite-to-SQLite
+    testing surfaces, and that neither the declared type nor ``typeof()`` shows:
+    SQLite stores a NUL inside a TEXT value happily and reports the storage
+    class as ``text``, so it looks perfectly migratable right up until psycopg2
+    raises ``ValueError: A string literal cannot contain NUL (0x00) characters``
+    partway through the copy. Found on the live store 2026-07-30 -- two rows in
+    ``messages.body`` -- by running the migration against a real PostgreSQL.
+
+    Detected by asking the data (``instr(col, char(0)) > 0``), not the schema,
+    for the same reason as :func:`._ddl.unstorable_columns`: the schema cannot
+    answer a question about byte content. Reported as a preflight finding rather
+    than raised, so every affected column is named in one pass and a human
+    decides what to do -- stripping a NUL changes a stored value, which is not a
+    call this tool makes silently.
+
+    Only columns with TEXT or NUMERIC affinity are scanned. A BLOB column can
+    hold 0x00 legitimately and migrates to ``BYTEA``, which accepts it; INTEGER
+    and REAL cannot contain one.
+    """
+    from ._ddl import sqlite_affinity
+
+    offenders = []
+    for col in columns:
+        if sqlite_affinity(col.declared_type) not in ("TEXT", "NUMERIC"):
+            continue
+        found = conn.execute(
+            f'SELECT 1 FROM "{table}" WHERE instr("{col.name}", char(0)) > 0 LIMIT 1'
+        ).fetchone()
+        if found is not None:
+            offenders.append(col.name)
+    return tuple(offenders)
 
 
 def read_rows(

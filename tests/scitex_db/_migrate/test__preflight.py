@@ -27,6 +27,7 @@ DISPOSITIONS = {
     "keyless": TablePlan("keyless", Disposition.MIGRATE),
     "mixed": TablePlan("mixed", Disposition.MIGRATE),
     "empty": TablePlan("empty", Disposition.MIGRATE),
+    "nul": TablePlan("nul", Disposition.MIGRATE),
     "skipped": TablePlan("skipped", Disposition.EXCLUDE, "deliberately not carried"),
 }
 
@@ -42,12 +43,15 @@ def store():
     conn.execute("CREATE TABLE mixed (id TEXT PRIMARY KEY, n INTEGER)")
     conn.execute("CREATE TABLE empty (id TEXT PRIMARY KEY)")
     conn.execute("CREATE TABLE skipped (id TEXT PRIMARY KEY)")
+    conn.execute("CREATE TABLE nul (id TEXT PRIMARY KEY, body TEXT)")
     conn.execute("INSERT INTO good VALUES ('g1', 'x')")
     conn.execute("INSERT INTO good VALUES ('g2', 'y')")
     conn.execute("INSERT INTO keyless VALUES ('a', 'b')")
     # SQLite accepts text in an INTEGER column; PostgreSQL will not.
     conn.execute("INSERT INTO mixed VALUES ('m1', 1)")
     conn.execute("INSERT INTO mixed VALUES ('m2', 'not a number')")
+    # SQLite stores a NUL in TEXT; PostgreSQL text rejects it.
+    conn.execute("INSERT INTO nul VALUES ('n1', 'body with ' || char(0) || ' nul')")
     conn.commit()
     conn.close()
     yield path
@@ -73,12 +77,12 @@ def test_preflight_is_not_ok_when_any_table_is_blocked(store):
 
 
 def test_preflight_counts_rows_only_for_migrated_tables(store):
-    # Arrange -- good 2 + keyless 1 + mixed 2 + empty 0; `skipped` excluded
+    # Arrange -- good 2 + keyless 1 + mixed 2 + empty 0 + nul 1; `skipped` excluded
     source = store
     # Act
     report = preflight(source, DISPOSITIONS)
     # Assert
-    assert report.total_rows == 5
+    assert report.total_rows == 6
 
 
 def test_preflight_omits_excluded_tables_from_the_table_list(store):
@@ -147,6 +151,33 @@ def test_a_table_with_unstorable_data_is_not_ready(store):
     report = preflight(source, DISPOSITIONS)
     # Assert
     assert _table(report, "mixed").ok is False
+
+
+def test_preflight_flags_a_text_column_containing_a_nul_byte(store):
+    # Arrange -- SQLite stored the NUL; PostgreSQL text will reject it mid-copy
+    source = store
+    # Act
+    report = preflight(source, DISPOSITIONS)
+    # Assert
+    assert _table(report, "nul").nul_columns == ("body",)
+
+
+def test_a_table_with_a_nul_byte_is_not_ready(store):
+    # Arrange
+    source = store
+    # Act
+    report = preflight(source, DISPOSITIONS)
+    # Assert
+    assert _table(report, "nul").ok is False
+
+
+def test_a_nul_table_explains_the_incompatibility(store):
+    # Arrange
+    source = store
+    # Act
+    report = preflight(source, DISPOSITIONS)
+    # Assert
+    assert "NUL" in " ".join(_table(report, "nul").blockers)
 
 
 def test_a_well_formed_table_is_ready(store):
