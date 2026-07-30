@@ -307,6 +307,72 @@ def test_marker_records_rows_compared_per_table(destination):
 # ----------------------------------------------------------------------------
 
 
+def test_apply_schema_objects_creates_indexes_before_triggers():
+    # Arrange -- order is load-bearing: if a trigger body references an index
+    # by name the reference must resolve, so indexes go first
+    from scitex_db._migrate._copy import apply_schema_objects
+    from scitex_db._migrate._introspect import SchemaObject
+
+    objs = [
+        SchemaObject(
+            "t_guard",
+            "t",
+            "trigger",
+            "CREATE TRIGGER t_guard BEFORE DELETE ON t BEGIN "
+            "SELECT RAISE(ABORT, 'no'); END",
+        ),
+        SchemaObject("idx_t", "t", "index", "CREATE INDEX idx_t ON t (id)"),
+    ]
+    # Act
+    applied = apply_schema_objects(objs, lambda sql, params=(): None)
+    # Assert
+    assert applied == ("idx_t", "t_guard")
+
+
+def test_apply_schema_objects_emits_translated_sql_not_the_source():
+    # Arrange -- the destination must receive PostgreSQL, not SQLite
+    from scitex_db._migrate._copy import apply_schema_objects
+    from scitex_db._migrate._introspect import SchemaObject
+
+    seen = []
+    objs = [
+        SchemaObject(
+            "t_guard",
+            "t",
+            "trigger",
+            "CREATE TRIGGER t_guard BEFORE DELETE ON t BEGIN "
+            "SELECT RAISE(ABORT, 'no'); END",
+        )
+    ]
+    # Act
+    apply_schema_objects(objs, lambda sql, params=(): seen.append(sql))
+    # Assert
+    assert "RAISE EXCEPTION" in seen[0]
+
+
+def test_apply_schema_objects_propagates_a_translation_failure():
+    # Arrange -- a destination with SOME of its triggers is more dangerous than
+    # one with none: the missing ones are invisible while the present ones make
+    # it look protected. So nothing is swallowed.
+    from scitex_db._migrate._copy import apply_schema_objects
+    from scitex_db._migrate._introspect import SchemaObject
+    from scitex_db._migrate._triggers import TriggerTranslationError
+
+    objs = [
+        SchemaObject(
+            "t_odd",
+            "t",
+            "trigger",
+            "CREATE TRIGGER t_odd AFTER INSERT ON t BEGIN SELECT custom(); END",
+        )
+    ]
+    # Act
+    writer = lambda sql, params=(): None  # noqa: E731
+    # Assert
+    with pytest.raises(TriggerTranslationError):
+        apply_schema_objects(objs, writer)
+
+
 def test_verify_plan_refuses_a_table_with_no_key_columns():
     # Arrange
     rows = {"tasks": [{"id": "1"}]}
