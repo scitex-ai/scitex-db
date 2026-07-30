@@ -52,8 +52,10 @@ __all__ = [
     "MigrationRefused",
     "Quiescence",
     "MigrationResult",
+    "StoreScope",
     "apply_schema_objects",
     "destination_is_usable",
+    "destination_is_whole_store",
     "read_marker",
 ]
 
@@ -106,6 +108,73 @@ class Quiescence:
                 "asserted it, because this claim is the one thing the "
                 "migration cannot verify for itself."
             )
+
+
+@dataclass(frozen=True)
+class StoreScope:
+    """The caller's statement of whether this DATABASE is the whole STORE.
+
+    THIS EXISTS BECAUSE THE TOOL CANNOT ANSWER IT, and on 2026-07-30 it reported
+    an answer anyway. A migration of the scitex-cards store copied 12 tables,
+    verified every row, and reported success -- while 2,536 of 3,446 DM messages
+    and 47 attachments sat in ``threads.json`` and ``attachments/`` NEXT TO the
+    database. The copy was faithful. The claim "the entire store" was not, and
+    both were said in the same sentence.
+
+    The blind spot is structural rather than careless: :func:`._preflight.preflight`
+    enumerates tables from ``sqlite_master``, so it cannot see a file beside the
+    database. Every exclusion this package prints is a TABLE. There was no line
+    it could emit that would have said "and three quarters of the DM history is
+    in a JSON file next to this one."
+
+    So the question is moved to whoever can answer it. ``database_is_whole_store``
+    is a claim the caller makes and the marker records, exactly like
+    :class:`Quiescence` -- a thing the migration depends on, cannot verify, and
+    must therefore attribute rather than assume.
+
+    ``outside_the_database`` NAMES what is not being carried when the answer is
+    no. Required in that case, because "this is partial" without saying what is
+    missing is a warning nobody can act on -- and because naming them is what
+    turns a vague doubt into scitex-cards' next card.
+    """
+
+    database_is_whole_store: bool
+    stated_by: str
+    outside_the_database: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not self.stated_by.strip():
+            raise MigrationRefused(
+                "store scope claimed by nobody. Whether this database is the "
+                "whole store is something the migration cannot check, so the "
+                "marker records who said it."
+            )
+        if self.database_is_whole_store and self.outside_the_database:
+            raise MigrationRefused(
+                f"contradictory store scope: the database is claimed to be the "
+                f"whole store, yet {list(self.outside_the_database)} are named "
+                f"as living outside it. One of the two is wrong."
+            )
+        if not self.database_is_whole_store and not self.outside_the_database:
+            raise MigrationRefused(
+                "the database is claimed NOT to be the whole store, but "
+                "nothing is named as living outside it. 'Partial' without "
+                "saying what is missing is a warning nobody can act on -- name "
+                "the files, directories or sidecar stores that are not being "
+                "carried."
+            )
+
+    def summary(self) -> str:
+        if self.database_is_whole_store:
+            return (
+                f"store scope: this database IS the whole store "
+                f"(stated by {self.stated_by})"
+            )
+        return (
+            f"store scope: PARTIAL -- this database is NOT the whole store "
+            f"(stated by {self.stated_by}). NOT CARRIED BY THIS MIGRATION: "
+            f"{', '.join(self.outside_the_database)}"
+        )
 
 
 @dataclass(frozen=True)
@@ -177,6 +246,28 @@ def destination_is_usable(fetch: Callable[[str], Iterable[Sequence[Any]]]) -> bo
     connecting and serving would look like success.
     """
     return read_marker(fetch) is not None
+
+
+def destination_is_whole_store(fetch: Callable[[str], Iterable[Sequence[Any]]]) -> bool:
+    """Whether the copied database was the WHOLE store, per the run's marker.
+
+    A SECOND question, deliberately not folded into
+    :func:`destination_is_usable`. That one answers "was this migration
+    completed and verified"; this one answers "is this everything". Both were
+    true of the same destination on 2026-07-30 while 2,536 DM messages sat in a
+    file beside the source, and the reason nobody noticed is that only the first
+    question was ever asked.
+
+    A cutover must consult BOTH. Serving from a verified-but-partial copy is
+    precisely the failure that a completion marker looks like it prevents.
+
+    Returns False for an absent or unparseable marker, and False for a marker
+    written before this field existed -- "I could not tell" is not "yes".
+    """
+    marker = read_marker(fetch)
+    if marker is None:
+        return False
+    return marker.get("database_is_whole_store") is True
 
 
 def apply_schema_objects(
@@ -263,6 +354,7 @@ def finalize(
     source_identity: str,
     completed_at: str,
     store_identity: str | None,
+    store_scope: "StoreScope",
     placeholder: str = "?",
     transformations: Any = None,
 ) -> MigrationResult:
@@ -330,6 +422,14 @@ def finalize(
             "mechanism": quiescence.mechanism,
             "stated_by": quiescence.stated_by,
         },
+        # Whether this database was the whole store. Recorded because
+        # `destination_is_usable` answers "was this migration completed and
+        # verified", which is NOT the same question as "is this everything" --
+        # and collapsing the two is exactly how 2,536 messages nearly went
+        # missing behind a green report.
+        "database_is_whole_store": store_scope.database_is_whole_store,
+        "outside_the_database": list(store_scope.outside_the_database),
+        "store_scope_stated_by": store_scope.stated_by,
         "tables": {r.table: r.rows_compared for r in reports},
         "excluded": {p.table: p.reason for p in exclusions(plan)},
         # The manifest of every value this migration changed, with the original
