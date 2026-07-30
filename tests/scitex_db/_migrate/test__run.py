@@ -163,6 +163,7 @@ def _run(source, destination):
         QUIET,
         source_identity="test-store",
         completed_at="2026-07-30T00:00:00Z",
+        store_identity=None,
         dispositions=DISPOSITIONS,
     )
 

@@ -255,6 +255,7 @@ def migrate(
     *,
     source_identity: str,
     completed_at: str,
+    store_identity: str | None,
     dispositions: Mapping[str, TablePlan] = CARDS_STORE_DISPOSITIONS,
     batch_size: int = 1000,
     transformations: Any = None,
@@ -268,6 +269,18 @@ def migrate(
     ``completed_at`` is supplied rather than read from the clock, so the marker
     records the run the operator believes they performed and a test's marker is
     deterministic.
+
+    ``store_identity`` is keyword-only with no default and may be ``None``. It
+    goes into the marker so a reader can ask the destination WHICH store it is,
+    not merely whether it is complete. See :func:`._copy.finalize` for why an
+    address cannot serve as an identity, and for why identity alone does not
+    make a destination authoritative.
+
+    This function does NOT read the identity out of the source. The package
+    hardcodes no table or column name -- tables come from the plan and columns
+    from ``PRAGMA table_info`` -- and ``schema_meta.store_uuid`` is a fact about
+    scitex-cards' schema, not about migrations. The caller knows where its own
+    identity lives; this records what it is told.
 
     Raises :class:`._copy.MigrationRefused` before touching the destination if
     the preflight is not READY, or if the destination already carries a
@@ -382,6 +395,7 @@ def migrate(
             destination.execute,
             source_identity=source_identity,
             completed_at=completed_at,
+            store_identity=store_identity,
             placeholder=destination.placeholder,
             transformations=transformations,
         )
