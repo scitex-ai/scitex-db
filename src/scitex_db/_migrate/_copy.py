@@ -262,6 +262,7 @@ def finalize(
     *,
     source_identity: str,
     completed_at: str,
+    store_identity: str | None,
     placeholder: str = "?",
     transformations: Any = None,
 ) -> MigrationResult:
@@ -270,6 +271,33 @@ def finalize(
     ``completed_at`` is supplied by the caller rather than read from the clock
     here, so the marker a test writes is deterministic and the timestamp comes
     from whoever actually knows what run this was.
+
+    ``store_identity`` IS WHAT LETS A READER ASK "IS THIS *THE* STORE", rather
+    than only "is this *a* complete store". Those are different questions and
+    only the second was answerable before. A canonical-store guard needs the
+    first, and it cannot key on the ADDRESS used to reach a database: the same
+    file is reachable by more than one spelling, measured on scitex-cards' live
+    store where ``schema_meta.store_path`` says ``/home/agent/...`` while this
+    package reaches the identical inode as ``/home/ywatanabe/...``. Both are
+    correct; neither is an identity. scitex-cards keys theirs on a ``store_uuid``
+    held INSIDE the store, and that is the value this carries across.
+
+    IDENTITY IS NECESSARY AND NOT SUFFICIENT, which is worth stating here
+    because this field alone invites the opposite conclusion. After a verified
+    copy there are TWO stores carrying the same identity -- the source and the
+    destination -- both complete, both legitimately that workspace's store. What
+    distinguishes them is a statement of which is CURRENT, and moving that
+    statement is what a cutover actually is. That statement lives in the source
+    (scitex-cards' ``store_status`` / ``retired_in_favour_of``), not here: this
+    marker can say what the destination IS, never that it is the one to use.
+
+    Keyword-only with NO DEFAULT, and may be ``None``. Required-but-nullable so
+    a caller must DECIDE rather than forget; ``None`` is the explicit claim
+    "this store declares no identity", which a generic store may legitimately
+    be. It is recorded as an explicit null rather than by omitting the key,
+    because an absent key is ambiguous -- older marker format, erased, or never
+    set -- while an explicit null is a fact. This package argues that about
+    other people's data often enough that it should hold in its own payload.
 
     ``placeholder`` is the destination driver's parameter marker: ``"?"`` for
     sqlite3, ``"%s"`` for psycopg2. It is a parameter rather than a hardcoded
@@ -296,6 +324,7 @@ def finalize(
 
     payload = {
         "source": source_identity,
+        "store_identity": store_identity,
         "completed_at": completed_at,
         "quiescence": {
             "mechanism": quiescence.mechanism,

@@ -189,9 +189,51 @@ def test_finalize_writes_the_marker_when_every_table_verified(destination):
         _write(destination),
         source_identity="cards.db",
         completed_at="2026-07-30T02:00:00Z",
+        store_identity=None,
     )
     # Assert
     assert destination_is_usable(_fetch(destination)) is True
+
+
+def test_the_marker_carries_the_store_identity(destination):
+    # This is what lets a reader ask "is this THE store", not merely "is this a
+    # complete store". A canonical-store guard needs the first question.
+    # Arrange
+    reports = [_clean()]
+    # Act
+    finalize(
+        PLAN,
+        reports,
+        QUIET,
+        _write(destination),
+        source_identity="cards.db",
+        completed_at="2026-07-30T02:00:00Z",
+        store_identity="0bb1395b-6f19-4a2d-9782-7dd4d296f2a0",
+    )
+    # Assert
+    assert read_marker(_fetch(destination))["store_identity"] == (
+        "0bb1395b-6f19-4a2d-9782-7dd4d296f2a0"
+    )
+
+
+def test_an_absent_store_identity_is_recorded_as_an_explicit_null(destination):
+    # An ABSENT key is ambiguous -- older marker format, erased, or never set --
+    # while an explicit null is a fact. The same argument this package makes
+    # about other people's data, applied to its own payload.
+    # Arrange
+    reports = [_clean()]
+    # Act
+    finalize(
+        PLAN,
+        reports,
+        QUIET,
+        _write(destination),
+        source_identity="cards.db",
+        completed_at="2026-07-30T02:00:00Z",
+        store_identity=None,
+    )
+    # Assert
+    assert "store_identity" in read_marker(_fetch(destination))
 
 
 def test_finalize_refuses_when_a_table_failed_verification(destination):
@@ -208,6 +250,7 @@ def test_finalize_refuses_when_a_table_failed_verification(destination):
             write,
             source_identity="cards.db",
             completed_at="2026-07-30T02:00:00Z",
+            store_identity=None,
         )
 
 
@@ -226,6 +269,7 @@ def test_a_failed_migration_leaves_the_destination_unusable(destination):
             _write(destination),
             source_identity="cards.db",
             completed_at="2026-07-30T02:00:00Z",
+            store_identity=None,
         )
     # Assert
     assert destination_is_usable(_fetch(destination)) is False
@@ -242,6 +286,7 @@ def test_marker_records_the_quiescence_mechanism(destination):
         _write(destination),
         source_identity="cards.db",
         completed_at="2026-07-30T02:00:00Z",
+        store_identity=None,
     )
     # Assert
     assert read_marker(_fetch(destination))["quiescence"]["mechanism"] == "operator"
@@ -258,6 +303,7 @@ def test_marker_records_the_excluded_tables_and_why(destination):
         _write(destination),
         source_identity="cards.db",
         completed_at="2026-07-30T02:00:00Z",
+        store_identity=None,
     )
     # Assert
     assert "mirror_hashes" in read_marker(_fetch(destination))["excluded"]
@@ -280,6 +326,7 @@ def test_finalize_uses_the_placeholder_the_destination_driver_wants(destination)
         capture,
         source_identity="cards.db",
         completed_at="2026-07-30T02:00:00Z",
+        store_identity=None,
         placeholder="%s",
     )
     # Assert
@@ -297,6 +344,7 @@ def test_marker_records_rows_compared_per_table(destination):
         _write(destination),
         source_identity="cards.db",
         completed_at="2026-07-30T02:00:00Z",
+        store_identity=None,
     )
     # Assert
     assert read_marker(_fetch(destination))["tables"]["tasks"] == 2872
