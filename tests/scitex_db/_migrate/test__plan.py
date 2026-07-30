@@ -194,9 +194,16 @@ def test_cards_store_every_exclusion_states_a_reason():
     assert all(p.reason.strip() for p in excluded)
 
 
-def test_cards_store_plan_covers_the_live_store_table_set():
-    # Arrange -- the 15 non-internal tables present on 2026-07-30
-    live_tables = [
+def test_cards_store_dispositions_cover_the_recorded_table_snapshot():
+    # Arrange -- the 15 non-internal tables RECORDED on 2026-07-30. This is a
+    # snapshot, not the live store: the test never opens a database, so it
+    # cannot detect a table added after that date. Real drift detection lives
+    # in `build_plan`, which RAISES on a source table with no disposition --
+    # that is the check with teeth, and it runs against the actual store.
+    # Named for what it asserts rather than for the live store, because a test
+    # whose name promises live-store coverage while reading a literal list is
+    # exactly the kind of check that passes without checking.
+    recorded_tables = [
         "tasks",
         "task_comments",
         "task_edges",
@@ -214,18 +221,20 @@ def test_cards_store_plan_covers_the_live_store_table_set():
         "dm_receipts",
     ]
     # Act
-    plan = build_plan(live_tables)
+    plan = build_plan(recorded_tables)
     # Assert
     assert len(plan) == 15
 
 
-def test_cards_store_plan_migrates_twelve_of_fifteen_tables():
-    # Arrange -- three excluded: mirror_hashes, users, user_names
-    live_tables = list(CARDS_STORE_DISPOSITIONS)
+def test_cards_store_dispositions_exclude_exactly_three_tables():
+    # Arrange -- mirror_hashes, users, user_names. Derived from the disposition
+    # map itself, so this records the EXCLUSION DECISION rather than the store's
+    # shape; a table added to the store does not reach this test.
+    planned_tables = list(CARDS_STORE_DISPOSITIONS)
     # Act
-    plan = build_plan(live_tables)
+    plan = build_plan(planned_tables)
     # Assert
-    assert len(tables_to_migrate(plan)) == 12
+    assert len(tables_to_migrate(plan)) == len(planned_tables) - 3
 
 
 # EOF
