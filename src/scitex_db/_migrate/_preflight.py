@@ -35,9 +35,12 @@ from typing import Mapping, Sequence
 
 from ._ddl import Column, create_table_ddl, unstorable_columns
 from ._introspect import (
+    SchemaObject,
     columns_with_nul,
     connect_readonly,
+    list_indexes,
     list_tables,
+    list_triggers,
     primary_key_columns,
     read_columns,
     stored_types,
@@ -103,10 +106,27 @@ class PreflightReport:
     source: str
     tables: tuple[TablePreflight, ...]
     excluded: tuple[TablePlan, ...] = field(default_factory=tuple)
+    uncarried: tuple[SchemaObject, ...] = field(default_factory=tuple)
 
     @property
     def ok(self) -> bool:
-        return all(t.ok for t in self.tables)
+        """Ready only if every table is ready AND nothing is left uncarried.
+
+        `uncarried` gates the verdict deliberately. The DDL translator emits
+        columns, NOT NULL and PRIMARY KEY -- it does not carry TRIGGERS or
+        INDEXES. On the scitex-cards store the triggers ARE the append-only
+        invariant (four `BEFORE DELETE` that RAISE(ABORT), one immutability
+        guard), so a destination without them accepts the DELETE the source
+        refuses. A row-for-row verification cannot see that: every row matches
+        while the guarantee is gone.
+
+        So an uncarried object makes the preflight NOT READY rather than
+        producing a destination that verifies clean and is quietly weaker
+        than its source. Same rule the table plan already enforces -- account
+        for it explicitly or fail -- applied to the objects that are not
+        tables.
+        """
+        return all(t.ok for t in self.tables) and not self.uncarried
 
     @property
     def total_rows(self) -> int:
@@ -138,10 +158,18 @@ class PreflightReport:
                 lines.append(f"      - {reason}")
         for plan in self.excluded:
             lines.append(f"  {plan.table}: NOT MIGRATED -- {plan.reason}")
+        for obj in self.uncarried:
+            lines.append(
+                f"  {obj.kind} {obj.name} on {obj.table}: CANNOT BE CARRIED "
+                f"-- the DDL translator emits columns, NOT NULL and PRIMARY KEY "
+                f"only. Translate it or drop it deliberately; it will not "
+                f"arrive on its own."
+            )
         lines.append(
             f"verdict: {'READY' if self.ok else 'NOT READY'} "
             f"-- {len(self.tables)} table(s) to migrate, "
-            f"{self.total_rows} row(s), {len(self.excluded)} excluded"
+            f"{self.total_rows} row(s), {len(self.excluded)} excluded, "
+            f"{len(self.uncarried)} uncarried schema object(s)"
         )
         return "\n".join(lines)
 
@@ -187,6 +215,7 @@ def preflight(
             source=source_path,
             tables=tuple(entries),
             excluded=exclusions(plan),
+            uncarried=list_triggers(conn) + list_indexes(conn),
         )
     finally:
         conn.close()

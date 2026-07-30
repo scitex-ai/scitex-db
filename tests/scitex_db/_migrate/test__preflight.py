@@ -260,6 +260,79 @@ def test_preflight_raises_when_a_source_table_has_no_disposition(store):
 # ----------------------------------------------------------------------------
 
 
+def test_preflight_reports_a_trigger_it_cannot_carry():
+    # Arrange -- a store whose append-only guarantee lives in a trigger, the
+    # exact shape the live cards store uses (RAISE(ABORT) on DELETE)
+    tmpdir = tempfile.mkdtemp()
+    path = os.path.join(tmpdir, "trig.db")
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE good (id TEXT PRIMARY KEY, title TEXT)")
+    conn.execute("INSERT INTO good VALUES ('g1', 'x')")
+    conn.execute(
+        "CREATE TRIGGER good_no_delete BEFORE DELETE ON good BEGIN "
+        "SELECT RAISE(ABORT, 'append-only'); END"
+    )
+    conn.commit()
+    conn.close()
+    dispositions = {"good": TablePlan("good", Disposition.MIGRATE)}
+    # Act
+    report = preflight(path, dispositions)
+    shutil.rmtree(tmpdir, ignore_errors=True)
+    # Assert
+    assert [o.name for o in report.uncarried] == ["good_no_delete"]
+
+
+def test_a_store_with_an_uncarried_trigger_is_not_ready():
+    # Arrange -- THE REGRESSION TEST. Before this, every table was "ready" and
+    # the whole report said READY while the destination would silently lose
+    # the trigger enforcing that rows are never removed.
+    tmpdir = tempfile.mkdtemp()
+    path = os.path.join(tmpdir, "trig.db")
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE good (id TEXT PRIMARY KEY, title TEXT)")
+    conn.execute("INSERT INTO good VALUES ('g1', 'x')")
+    conn.execute(
+        "CREATE TRIGGER good_no_delete BEFORE DELETE ON good BEGIN "
+        "SELECT RAISE(ABORT, 'append-only'); END"
+    )
+    conn.commit()
+    conn.close()
+    dispositions = {"good": TablePlan("good", Disposition.MIGRATE)}
+    # Act
+    report = preflight(path, dispositions)
+    shutil.rmtree(tmpdir, ignore_errors=True)
+    # Assert
+    assert report.ok is False
+
+
+def test_preflight_summary_names_the_uncarried_object():
+    # Arrange -- the omission has to be readable, not merely counted
+    tmpdir = tempfile.mkdtemp()
+    path = os.path.join(tmpdir, "trig.db")
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE good (id TEXT PRIMARY KEY)")
+    conn.execute("INSERT INTO good VALUES ('g1')")
+    conn.execute("CREATE INDEX idx_good_id ON good (id)")
+    conn.commit()
+    conn.close()
+    dispositions = {"good": TablePlan("good", Disposition.MIGRATE)}
+    # Act
+    summary = preflight(path, dispositions).summary()
+    shutil.rmtree(tmpdir, ignore_errors=True)
+    # Assert
+    assert "idx_good_id" in summary
+
+
+def test_a_store_with_no_extra_schema_objects_reports_none_uncarried(store):
+    # Arrange -- the fixture store has no triggers or explicit indexes, so a
+    # clean store must not be penalised by the new gate
+    source = store
+    # Act
+    report = preflight(source, DISPOSITIONS)
+    # Assert
+    assert report.uncarried == ()
+
+
 def test_preflight_does_not_modify_the_source(store):
     # Arrange
     before = os.path.getmtime(store)
