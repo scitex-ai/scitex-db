@@ -383,4 +383,45 @@ def test_report_summary_says_mismatch_when_rows_differ():
     assert "MISMATCH" in summary
 
 
+# ----------------------------------------------------------------------------
+# Framing: a value must not be able to forge a field boundary
+# ----------------------------------------------------------------------------
+
+
+def test_row_checksum_does_not_collide_when_a_value_carries_the_old_delimiters():
+    # These exact two rows collided under the previous delimiter framing
+    # (`\x00` before the name, `\x01` before the value), measured 2026-07-30.
+    # The pair is kept verbatim so the regression is the real one, not a
+    # paraphrase of it.
+    # Arrange
+    crafted = ({"a": "X", "b": "\x00b\x01S:Y"}, {"a": "X\x00b\x01S:", "b": "Y"})
+    # Act
+    digests = {row_checksum(row, ["a", "b"]) for row in crafted}
+    # Assert
+    assert len(digests) == 2
+
+
+def test_row_checksum_distinguishes_a_body_that_contains_a_nul_byte():
+    # Not a crafted case: the card store holds NUL bytes inside TEXT message
+    # bodies, so a value carrying the old delimiter is real data rather than an
+    # adversarial input.
+    # Arrange
+    rows = ({"body": "review posted\x00 one byte wide"}, {"body": "review posted one byte wide"})
+    # Act
+    digests = {row_checksum(row, ["body"]) for row in rows}
+    # Assert
+    assert len(digests) == 2
+
+
+def test_row_checksum_still_matches_for_two_equal_rows():
+    # The framing change must not have made the digest unstable: equal rows
+    # still have to agree, or every migration would report total mismatch.
+    # Arrange
+    row = {"id": "t1", "title": "first", "revision": 4}
+    # Act
+    digests = {row_checksum(dict(row), ["id", "title", "revision"]) for _ in range(2)}
+    # Assert
+    assert len(digests) == 1
+
+
 # EOF

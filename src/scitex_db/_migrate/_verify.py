@@ -120,6 +120,21 @@ def _canonical(value: Any) -> str:
     return "J:" + json.dumps(value, sort_keys=True, default=str)
 
 
+def _absorb(h: "hashlib._Hash", field: bytes) -> None:
+    """Feed one field into ``h``, prefixed by its length.
+
+    LENGTH-PREFIXED, NOT DELIMITED, and that distinction is the whole point.
+    A delimiter is a byte the data is free to contain, so a value holding the
+    delimiter can forge a field boundary and two different rows can hash the
+    same. A declared length cannot be forged by content: the framing is fixed
+    before any byte of the field is read, so every possible value -- including
+    one made entirely of delimiters -- encodes to exactly one sequence.
+    """
+    h.update(str(len(field)).encode("ascii"))
+    h.update(b":")
+    h.update(field)
+
+
 def row_checksum(row: Mapping[str, Any], columns: Sequence[str]) -> str:
     """Hash of ``row`` restricted to ``columns``, in ``columns`` order.
 
@@ -131,13 +146,31 @@ def row_checksum(row: Mapping[str, Any], columns: Sequence[str]) -> str:
 
     Column NAMES are hashed alongside the values, so renaming a column is a
     mismatch even when every value moved across intact.
+
+    THIS FUNCTION USED TO BE FORGEABLE, and the fix is worth understanding
+    rather than just reading. Fields were framed with delimiters -- ``\\x00``
+    before the name, ``\\x01`` before the value -- and a value is free to
+    contain both. Measured on 2026-07-30, these two DIFFERENT rows produced
+    the SAME digest:
+
+        cols = ['a', 'b']
+        {'a': 'X',            'b': '\\x00b\\x01S:Y'}
+        {'a': 'X\\x00b\\x01S:', 'b': 'Y'}
+
+    A crafted value was needed, so accidental corruption would never have hit
+    it -- but the delimiter was ``\\x00``, and this store demonstrably holds
+    ``\\x00`` inside TEXT message bodies. The byte the framing depended on
+    being absent is a byte the data actually contains.
+
+    It mattered because of where this sits: :func:`._copy.finalize` refuses to
+    write the completion marker unless every report is clean, so this digest is
+    the last thing standing between a bad copy and a destination that claims to
+    have been verified. A gate with a known hole is not a gate.
     """
     h = hashlib.sha256()
     for name in columns:
-        h.update(b"\x00")
-        h.update(name.encode("utf-8"))
-        h.update(b"\x01")
-        h.update(_canonical(normalize_value(row.get(name))).encode("utf-8"))
+        _absorb(h, name.encode("utf-8"))
+        _absorb(h, _canonical(normalize_value(row.get(name))).encode("utf-8"))
     return h.hexdigest()
 
 
