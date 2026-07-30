@@ -47,6 +47,7 @@ from ._introspect import (
 )
 from ._plan import CARDS_STORE_DISPOSITIONS, TablePlan, build_plan, exclusions
 from ._plan import tables_to_migrate
+from ._triggers import TriggerTranslationError, translate_schema_object
 
 __all__ = ["PreflightReport", "TablePreflight", "preflight"]
 
@@ -107,24 +108,24 @@ class PreflightReport:
     tables: tuple[TablePreflight, ...]
     excluded: tuple[TablePlan, ...] = field(default_factory=tuple)
     uncarried: tuple[SchemaObject, ...] = field(default_factory=tuple)
+    carried: tuple[SchemaObject, ...] = field(default_factory=tuple)
 
     @property
     def ok(self) -> bool:
         """Ready only if every table is ready AND nothing is left uncarried.
 
-        `uncarried` gates the verdict deliberately. The DDL translator emits
-        columns, NOT NULL and PRIMARY KEY -- it does not carry TRIGGERS or
-        INDEXES. On the scitex-cards store the triggers ARE the append-only
-        invariant (four `BEFORE DELETE` that RAISE(ABORT), one immutability
-        guard), so a destination without them accepts the DELETE the source
-        refuses. A row-for-row verification cannot see that: every row matches
-        while the guarantee is gone.
+        `uncarried` gates the verdict deliberately. A table's columns are not
+        the whole of what a store guarantees: on the scitex-cards store the
+        TRIGGERS ARE the append-only invariant (four `BEFORE DELETE` that
+        RAISE(ABORT), one immutability guard), so a destination without them
+        accepts the DELETE the source refuses. A row-for-row verification
+        cannot see that -- every row matches while the guarantee is gone.
 
-        So an uncarried object makes the preflight NOT READY rather than
-        producing a destination that verifies clean and is quietly weaker
-        than its source. Same rule the table plan already enforces -- account
-        for it explicitly or fail -- applied to the objects that are not
-        tables.
+        `carried` holds the objects that DO have a faithful translation, and
+        they do not block. The distinction is the point: "we can move this"
+        and "nobody has decided what to do about this" are different states,
+        and collapsing them would either block a migration that is actually
+        safe or wave through one that is not.
         """
         return all(t.ok for t in self.tables) and not self.uncarried
 
@@ -161,15 +162,16 @@ class PreflightReport:
         for obj in self.uncarried:
             lines.append(
                 f"  {obj.kind} {obj.name} on {obj.table}: CANNOT BE CARRIED "
-                f"-- the DDL translator emits columns, NOT NULL and PRIMARY KEY "
-                f"only. Translate it or drop it deliberately; it will not "
-                f"arrive on its own."
+                f"-- no faithful translation is known for this form. Port it "
+                f"by hand or drop it deliberately; it will not arrive on its "
+                f"own."
             )
         lines.append(
             f"verdict: {'READY' if self.ok else 'NOT READY'} "
             f"-- {len(self.tables)} table(s) to migrate, "
             f"{self.total_rows} row(s), {len(self.excluded)} excluded, "
-            f"{len(self.uncarried)} uncarried schema object(s)"
+            f"{len(self.carried)} schema object(s) carried, "
+            f"{len(self.uncarried)} uncarried"
         )
         return "\n".join(lines)
 
@@ -211,11 +213,27 @@ def preflight(
                     nul_columns=nul,
                 )
             )
+        # Classify every non-table object by asking the translator to actually
+        # produce its DDL. Attempting the translation is the check: a form
+        # listed as "supported" that turns out not to translate would be a
+        # claim without a test behind it, and the whole point of this gate is
+        # that nothing is assumed to arrive.
+        carried: list[SchemaObject] = []
+        uncarried: list[SchemaObject] = []
+        for obj in list_triggers(conn) + list_indexes(conn):
+            try:
+                translate_schema_object(obj)
+            except TriggerTranslationError:
+                uncarried.append(obj)
+            else:
+                carried.append(obj)
+
         return PreflightReport(
             source=source_path,
             tables=tuple(entries),
             excluded=exclusions(plan),
-            uncarried=list_triggers(conn) + list_indexes(conn),
+            uncarried=tuple(uncarried),
+            carried=tuple(carried),
         )
     finally:
         conn.close()

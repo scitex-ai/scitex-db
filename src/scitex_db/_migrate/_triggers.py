@@ -61,7 +61,24 @@ import re
 
 from ._introspect import SchemaObject
 
-__all__ = ["TriggerTranslationError", "translate_trigger"]
+__all__ = [
+    "TriggerTranslationError",
+    "translate_index",
+    "translate_schema_object",
+    "translate_trigger",
+]
+
+#: A plain index. SQLite and PostgreSQL agree on this syntax, including the
+#: partial-index ``WHERE`` clause, so the translation is near-identity -- but it
+#: is still MATCHED rather than passed through, so an index using anything
+#: outside this shape is refused instead of being emitted verbatim and failing
+#: at the destination.
+_INDEX_RE = re.compile(
+    r"^\s*CREATE\s+(?P<unique>UNIQUE\s+)?INDEX\s+(?P<name>\w+)\s+"
+    r"ON\s+(?P<table>\w+)\s*\((?P<cols>[^)]+)\)\s*"
+    r"(?:WHERE\s+(?P<where>.+?)\s*)?;?\s*$",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 class TriggerTranslationError(Exception):
@@ -110,6 +127,62 @@ def _translate_when(when: str) -> str:
         "IS DISTINCT FROM ",
         when,
         flags=re.IGNORECASE,
+    )
+
+
+def translate_index(obj: SchemaObject) -> str:
+    """PostgreSQL DDL for an index, or RAISE if the form is unfamiliar.
+
+    The two engines' basic ``CREATE INDEX`` syntax coincides, so this is close
+    to identity -- but the SQL is still MATCHED rather than passed through.
+    Passing an unrecognised statement through unchanged would move the failure
+    from here to the destination, where it arrives mid-migration as a syntax
+    error with no indication of which object caused it.
+
+    Identifiers are re-quoted rather than copied so an index on a column whose
+    name collides with a PostgreSQL keyword survives, and so case is preserved
+    -- the same reasoning as `_ddl.quote_identifier`.
+    """
+    if obj.kind != "index":
+        raise TriggerTranslationError(
+            f"{obj.name}: not an index (kind={obj.kind!r})."
+        )
+    match = _INDEX_RE.match(obj.sql or "")
+    if match is None:
+        raise TriggerTranslationError(
+            f"{obj.name} on {obj.table}: not a recognised index form, so it is "
+            f"NOT translated. Handled here: CREATE [UNIQUE] INDEX ... ON t "
+            f"(cols) [WHERE ...]. Anything else is passed to a human rather "
+            f"than emitted unchanged and left to fail at the destination.\n"
+            f"Original SQL:\n{obj.sql}"
+        )
+    unique = "UNIQUE " if match.group("unique") else ""
+    cols = ", ".join(
+        f'"{c.strip()}"' if c.strip().isidentifier() else c.strip()
+        for c in match.group("cols").split(",")
+    )
+    where = f" WHERE {match.group('where').strip()}" if match.group("where") else ""
+    return (
+        f'CREATE {unique}INDEX "{match.group("name")}" '
+        f'ON "{match.group("table")}" ({cols}){where};'
+    )
+
+
+def translate_schema_object(obj: SchemaObject) -> str:
+    """Translate a trigger or an index, dispatching on its kind.
+
+    The single entry point callers should use, so a new object kind fails in
+    one place with a clear message rather than being silently skipped by a
+    caller that only knew about the kinds existing when it was written.
+    """
+    if obj.kind == "trigger":
+        return translate_trigger(obj)
+    if obj.kind == "index":
+        return translate_index(obj)
+    raise TriggerTranslationError(
+        f"{obj.name}: object kind {obj.kind!r} has no translation and is not "
+        f"carried. Only triggers and indexes are translated; anything else "
+        f"must be ported by hand or deliberately dropped."
     )
 
 
