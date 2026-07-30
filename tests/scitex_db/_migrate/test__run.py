@@ -29,6 +29,7 @@ from scitex_db._migrate._copy import (
     MARKER_TABLE,
     MigrationRefused,
     Quiescence,
+    StoreScope,
     destination_is_usable,
 )
 from scitex_db._migrate._plan import Disposition, TablePlan
@@ -44,6 +45,7 @@ DISPOSITIONS = {
 }
 
 QUIET = Quiescence(mechanism="operator", stated_by="test")
+WHOLE = StoreScope(database_is_whole_store=True, stated_by="test")
 
 
 @pytest.fixture
@@ -164,6 +166,7 @@ def _run(source, destination):
         source_identity="test-store",
         completed_at="2026-07-30T00:00:00Z",
         store_identity=None,
+        store_scope=WHOLE,
         dispositions=DISPOSITIONS,
     )
 

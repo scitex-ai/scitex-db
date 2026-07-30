@@ -154,6 +154,7 @@ class RunReport:
     applied_objects: tuple[str, ...]
     result: MigrationResult
     transformations: Any = None
+    store_scope: Any = None
 
     @property
     def ok(self) -> bool:
@@ -166,7 +167,15 @@ class RunReport:
         failure. A summary listing only what it copied reads as a complete copy,
         and this migration deliberately leaves tables behind.
         """
-        lines = [f"source: {self.preflight.source}"]
+        # The scope leads. Every other line in this report is about the
+        # database, and a reader who takes "0 differing" as "nothing is missing"
+        # is making exactly the mistake that put 2,536 DM messages outside a
+        # green migration on 2026-07-30. If this copy is partial, that is the
+        # first thing to know, not a footnote.
+        lines = []
+        if self.store_scope is not None:
+            lines.append(self.store_scope.summary())
+        lines.append(f"source: {self.preflight.source}")
         for table, n in self.rows_copied.items():
             lines.append(f"  {table}: {n} row(s) copied")
         lines.append(
@@ -256,6 +265,7 @@ def migrate(
     source_identity: str,
     completed_at: str,
     store_identity: str | None,
+    store_scope: Any,
     dispositions: Mapping[str, TablePlan] = CARDS_STORE_DISPOSITIONS,
     batch_size: int = 1000,
     transformations: Any = None,
@@ -396,6 +406,7 @@ def migrate(
             source_identity=source_identity,
             completed_at=completed_at,
             store_identity=store_identity,
+            store_scope=store_scope,
             placeholder=destination.placeholder,
             transformations=transformations,
         )
@@ -408,6 +419,7 @@ def migrate(
         applied_objects=applied,
         result=result,
         transformations=transformations,
+        store_scope=store_scope,
     )
 
 
