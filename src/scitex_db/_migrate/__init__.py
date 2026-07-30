@@ -27,6 +27,9 @@ of 2872 live cards carries it, and the neighbouring shortcut of treating
 
 from __future__ import annotations
 
+from ._copy import MigrationRefused, MigrationResult, Quiescence
+from ._preflight import PreflightReport, preflight
+from ._run import Destination, RunReport, migrate
 from ._verify import (
     MigrationVerificationError,
     VerificationReport,
@@ -36,8 +39,25 @@ from ._verify import (
 )
 
 __all__ = [
-    "MigrationVerificationError",
+    # The two entry points. `preflight` writes nothing and takes no
+    # destination; `migrate` runs the whole thing and refuses unless the
+    # preflight is READY. They are separate names rather than one function with
+    # a `dry_run` flag so that neither path can be reached by forgetting an
+    # argument.
+    "preflight",
+    "migrate",
+    "Destination",
+    "Quiescence",
+    # Results.
+    "PreflightReport",
+    "RunReport",
+    "MigrationResult",
     "VerificationReport",
+    # Refusals, exported so a caller can catch them by type rather than by
+    # matching on a message.
+    "MigrationRefused",
+    "MigrationVerificationError",
+    # Comparison primitives, useful for auditing a migration by hand.
     "normalize_value",
     "row_checksum",
     "verify_table",
