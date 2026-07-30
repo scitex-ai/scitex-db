@@ -35,12 +35,13 @@ from typing import Mapping, Sequence
 
 from ._ddl import Column, create_table_ddl, unstorable_columns
 from ._introspect import (
+    NulFinding,
     SchemaObject,
-    columns_with_nul,
     connect_readonly,
     list_indexes,
     list_tables,
     list_triggers,
+    nul_findings,
     primary_key_columns,
     read_columns,
     stored_types,
@@ -63,6 +64,7 @@ class TablePreflight:
     unstorable: tuple[str, ...]
     ddl: str
     nul_columns: tuple[str, ...] = ()
+    nul_findings: tuple[NulFinding, ...] = ()
 
     @property
     def ok(self) -> bool:
@@ -90,8 +92,14 @@ class TablePreflight:
                 f"type before migrating."
             )
         if self.nul_columns:
+            # The COUNT leads, because it is what decides the remedy: 2 rows is
+            # a hand-correction with an audit trail, 2000 is something
+            # systematic, and a report naming only the column cannot tell them
+            # apart.
+            detail = "; ".join(f.describe() for f in self.nul_findings)
             reasons.append(
-                f"column(s) {list(self.nul_columns)} contain a NUL (0x00) byte, "
+                (f"{detail}. " if detail else "")
+                + f"column(s) {list(self.nul_columns)} contain a NUL (0x00) byte, "
                 f"which SQLite text stores but PostgreSQL text rejects. psycopg2 "
                 f"raises mid-copy on the first such row. Decide how to handle the "
                 f"NUL (strip, or store as bytea) before migrating -- this tool "
@@ -200,7 +208,7 @@ def preflight(
             columns = read_columns(conn, table)
             keys = primary_key_columns(columns)
             bad = unstorable_columns(table, columns, stored_types(conn, table, columns))
-            nul = columns_with_nul(conn, table, columns)
+            nul = nul_findings(conn, table, columns, keys)
             count = conn.execute(f'SELECT COUNT(*) AS n FROM "{table}"').fetchone()["n"]
             entries.append(
                 TablePreflight(
@@ -210,7 +218,8 @@ def preflight(
                     row_count=int(count),
                     unstorable=bad,
                     ddl=create_table_ddl(table, columns),
-                    nul_columns=nul,
+                    nul_columns=tuple(f.column for f in nul),
+                    nul_findings=nul,
                 )
             )
         # Classify every non-table object by asking the translator to actually

@@ -35,8 +35,11 @@ from ._ddl import Column
 
 __all__ = [
     "IntrospectionError",
+    "NUL_SAMPLE_LIMIT",
+    "NulFinding",
     "SchemaObject",
     "columns_with_nul",
+    "nul_findings",
     "connect_readonly",
     "list_indexes",
     "list_tables",
@@ -227,18 +230,91 @@ def columns_with_nul(
     hold 0x00 legitimately and migrates to ``BYTEA``, which accepts it; INTEGER
     and REAL cannot contain one.
     """
+    return tuple(f.column for f in nul_findings(conn, table, columns))
+
+
+#: How many offending keys :func:`nul_findings` samples per column. Bounded
+#: because a column with thousands of bad rows should not produce a report
+#: nobody reads -- but the count is always exact, and the sample always says
+#: whether it was truncated.
+NUL_SAMPLE_LIMIT = 5
+
+
+@dataclass(frozen=True)
+class NulFinding:
+    """One column holding NUL bytes: how many rows, and which ones.
+
+    THE COUNT IS THE POINT, and it is the thing the first version of this check
+    threw away by asking ``SELECT 1 ... LIMIT 1``. "Some rows in ``body`` hold a
+    NUL" and "2 rows do" and "2000 rows do" are three different situations
+    calling for three different remedies -- hand-correct with an audit trail,
+    versus something systematic -- and only the last two are actionable. A
+    finding without its denominator is the omission this whole package exists to
+    avoid; reporting it about someone else's data while omitting it from my own
+    report would be inconsistent.
+
+    ``example_keys`` is a SAMPLE, and :attr:`sample_is_partial` says so. A
+    truncated list that reads as exhaustive is worse than no list, because the
+    reader fixes what they can see and believes they are done.
+    """
+
+    column: str
+    row_count: int
+    example_keys: tuple[tuple[Any, ...], ...]
+
+    @property
+    def sample_is_partial(self) -> bool:
+        return self.row_count > len(self.example_keys)
+
+    def describe(self) -> str:
+        keys = ", ".join(repr(k[0] if len(k) == 1 else k) for k in self.example_keys)
+        if not keys:
+            keys = "none identifiable (table has no key columns)"
+        elif self.sample_is_partial:
+            keys = f"{keys} (first {len(self.example_keys)} of {self.row_count})"
+        return f"{self.column}: {self.row_count} row(s) -- {keys}"
+
+
+def nul_findings(
+    conn: sqlite3.Connection,
+    table: str,
+    columns: Sequence[Column],
+    key_columns: Sequence[str] = (),
+    *,
+    sample_limit: int = NUL_SAMPLE_LIMIT,
+) -> tuple[NulFinding, ...]:
+    """Per-column NUL findings: how many rows hold one, and a sample of which.
+
+    ``key_columns`` is optional because a table without a primary key is already
+    blocked by the preflight for a different reason, and refusing to report the
+    NUL count as well would hide one problem behind another. Without keys the
+    count is still exact and the sample is simply empty.
+    """
     from ._ddl import sqlite_affinity
 
-    offenders = []
+    findings = []
     for col in columns:
         if sqlite_affinity(col.declared_type) not in ("TEXT", "NUMERIC"):
             continue
-        found = conn.execute(
-            f'SELECT 1 FROM "{table}" WHERE instr("{col.name}", char(0)) > 0 LIMIT 1'
-        ).fetchone()
-        if found is not None:
-            offenders.append(col.name)
-    return tuple(offenders)
+        predicate = f'instr("{col.name}", char(0)) > 0'
+        count = conn.execute(
+            f'SELECT COUNT(*) AS n FROM "{table}" WHERE {predicate}'
+        ).fetchone()["n"]
+        if not count:
+            continue
+        keys: tuple[tuple[Any, ...], ...] = ()
+        if key_columns:
+            selected = ", ".join(f'"{k}"' for k in key_columns)
+            rows = conn.execute(
+                f'SELECT {selected} FROM "{table}" WHERE {predicate} '
+                f"ORDER BY {selected} LIMIT ?",
+                (sample_limit,),
+            ).fetchall()
+            keys = tuple(tuple(r[k] for k in key_columns) for r in rows)
+        findings.append(
+            NulFinding(column=col.name, row_count=int(count), example_keys=keys)
+        )
+    return tuple(findings)
 
 
 def read_rows(

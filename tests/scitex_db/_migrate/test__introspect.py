@@ -22,7 +22,9 @@ import pytest
 
 from scitex_db._migrate._introspect import (
     IntrospectionError,
+    NUL_SAMPLE_LIMIT,
     columns_with_nul,
+    nul_findings,
     connect_readonly,
     list_tables,
     primary_key_columns,
@@ -360,6 +362,99 @@ def test_columns_with_nul_does_not_scan_integer_columns(nul_store):
     result = columns_with_nul(conn, "t", read_columns(conn, "t"))
     # Assert
     assert "n" not in result
+
+
+# ----------------------------------------------------------------------------
+# nul_findings -- the count, which decides the remedy
+# ----------------------------------------------------------------------------
+
+
+@pytest.fixture
+def many_nul_store():
+    """Seven NUL rows, so the count exceeds the sample limit of five."""
+    tmpdir = tempfile.mkdtemp()
+    path = os.path.join(tmpdir, "many.db")
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE t (id TEXT PRIMARY KEY, body TEXT)")
+    conn.execute("INSERT INTO t VALUES ('clean', 'ordinary')")
+    for i in range(7):
+        conn.execute(
+            "INSERT INTO t VALUES (?, 'bad ' || char(0) || ' here')", (f"d{i}",)
+        )
+    conn.commit()
+    conn.close()
+    yield path
+    shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_nul_findings_counts_every_offending_row(many_nul_store):
+    # The count is exact even though the sample is capped -- 2 rows and 200
+    # rows call for different remedies, and the old LIMIT 1 check could not
+    # tell them apart.
+    # Arrange
+    conn = connect_readonly(many_nul_store)
+    # Act
+    findings = nul_findings(conn, "t", read_columns(conn, "t"), ("id",))
+    # Assert
+    assert findings[0].row_count == 7
+
+
+def test_nul_findings_caps_the_sample_at_the_limit(many_nul_store):
+    # Arrange
+    conn = connect_readonly(many_nul_store)
+    # Act
+    findings = nul_findings(conn, "t", read_columns(conn, "t"), ("id",))
+    # Assert
+    assert len(findings[0].example_keys) == NUL_SAMPLE_LIMIT
+
+
+def test_nul_findings_declares_the_sample_partial_when_it_truncated(many_nul_store):
+    # A truncated list that reads as exhaustive is worse than no list: the
+    # reader fixes what they can see and believes they are done.
+    # Arrange
+    conn = connect_readonly(many_nul_store)
+    # Act
+    findings = nul_findings(conn, "t", read_columns(conn, "t"), ("id",))
+    # Assert
+    assert findings[0].sample_is_partial is True
+
+
+def test_nul_findings_does_not_claim_partial_when_the_sample_is_complete(nul_store):
+    # Arrange -- one offending row, well under the limit
+    conn = connect_readonly(nul_store)
+    # Act
+    findings = nul_findings(conn, "t", read_columns(conn, "t"), ("id",))
+    # Assert
+    assert findings[0].sample_is_partial is False
+
+
+def test_nul_findings_names_the_offending_row(nul_store):
+    # Arrange
+    conn = connect_readonly(nul_store)
+    # Act
+    findings = nul_findings(conn, "t", read_columns(conn, "t"), ("id",))
+    # Assert
+    assert findings[0].example_keys == (("dirty",),)
+
+
+def test_nul_findings_still_counts_when_the_table_has_no_key(nul_store):
+    # A keyless table is already blocked for a different reason; refusing to
+    # report the NUL count too would hide one problem behind another.
+    # Arrange
+    conn = connect_readonly(nul_store)
+    # Act
+    findings = nul_findings(conn, "t", read_columns(conn, "t"), ())
+    # Assert
+    assert findings[0].row_count == 1
+
+
+def test_nul_findings_describe_states_the_truncation(many_nul_store):
+    # Arrange
+    conn = connect_readonly(many_nul_store)
+    # Act
+    described = nul_findings(conn, "t", read_columns(conn, "t"), ("id",))[0].describe()
+    # Assert
+    assert "first 5 of 7" in described
 
 
 # EOF

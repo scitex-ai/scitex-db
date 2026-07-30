@@ -171,6 +171,27 @@ def test_a_table_with_a_nul_byte_is_not_ready(store):
     assert _table(report, "nul").ok is False
 
 
+def test_the_nul_blocker_states_how_many_rows_are_affected(store):
+    # The count decides the remedy -- a hand-correction with an audit trail at
+    # 2 rows, something systematic at 2000 -- so a blocker naming only the
+    # column leaves the reader unable to choose.
+    # Arrange
+    source = store
+    # Act
+    blockers = " ".join(_table(preflight(source, DISPOSITIONS), "nul").blockers)
+    # Assert
+    assert "1 row(s)" in blockers
+
+
+def test_the_nul_blocker_names_the_offending_row(store):
+    # Arrange
+    source = store
+    # Act
+    blockers = " ".join(_table(preflight(source, DISPOSITIONS), "nul").blockers)
+    # Assert
+    assert "'n1'" in blockers
+
+
 def test_a_nul_table_explains_the_incompatibility(store):
     # Arrange
     source = store
