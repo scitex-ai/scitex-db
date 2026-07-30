@@ -117,6 +117,12 @@ class PreflightReport:
     excluded: tuple[TablePlan, ...] = field(default_factory=tuple)
     uncarried: tuple[SchemaObject, ...] = field(default_factory=tuple)
     carried: tuple[SchemaObject, ...] = field(default_factory=tuple)
+    #: Objects belonging to EXCLUDED tables. Not a problem and not a promise:
+    #: their table is not being migrated, so applying them would fail against a
+    #: relation that does not exist. Held separately from `carried` because
+    #: counting them there overstates what will arrive, and separately from
+    #: `uncarried` because nothing is wrong with them and they must not block.
+    skipped: tuple[SchemaObject, ...] = field(default_factory=tuple)
 
     @property
     def ok(self) -> bool:
@@ -167,6 +173,13 @@ class PreflightReport:
                 lines.append(f"      - {reason}")
         for plan in self.excluded:
             lines.append(f"  {plan.table}: NOT MIGRATED -- {plan.reason}")
+        for obj in self.skipped:
+            lines.append(
+                f"  {obj.kind} {obj.name} on {obj.table}: not applied -- its "
+                f"table is excluded from the migration, so there is nothing "
+                f"for it to attach to. Printed rather than dropped silently, "
+                f"because a silent skip here failed mid-run once."
+            )
         for obj in self.uncarried:
             lines.append(
                 f"  {obj.kind} {obj.name} on {obj.table}: CANNOT BE CARRIED "
@@ -229,7 +242,17 @@ def preflight(
         # that nothing is assumed to arrive.
         carried: list[SchemaObject] = []
         uncarried: list[SchemaObject] = []
+        skipped: list[SchemaObject] = []
+        migrating = set(tables_to_migrate(plan))
         for obj in list_triggers(conn) + list_indexes(conn):
+            # An object on an EXCLUDED table is a third thing, neither "will
+            # arrive" nor "cannot be translated". Its table is not going, so
+            # applying it would target a relation that does not exist -- which
+            # is exactly how this was found, mid-run and after every row had
+            # already been copied.
+            if obj.table not in migrating:
+                skipped.append(obj)
+                continue
             try:
                 translate_schema_object(obj)
             except TriggerTranslationError:
@@ -243,6 +266,7 @@ def preflight(
             excluded=exclusions(plan),
             uncarried=tuple(uncarried),
             carried=tuple(carried),
+            skipped=tuple(skipped),
         )
     finally:
         conn.close()

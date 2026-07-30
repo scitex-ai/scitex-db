@@ -171,6 +171,73 @@ def test_a_table_with_a_nul_byte_is_not_ready(store):
     assert _table(report, "nul").ok is False
 
 
+@pytest.fixture
+def store_with_index_on_excluded_table():
+    """An index on a table the plan EXCLUDES -- the crossing the fixtures missed.
+
+    Both cases existed separately (an excluded table, an index) and were never
+    combined, which is why this reached a real PostgreSQL before it was caught.
+    """
+    tmpdir = tempfile.mkdtemp()
+    path = os.path.join(tmpdir, "store.db")
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE good (id TEXT PRIMARY KEY, title TEXT)")
+    conn.execute("CREATE TABLE skipped (id TEXT PRIMARY KEY, name TEXT)")
+    conn.execute("CREATE INDEX idx_skipped_name ON skipped (name)")
+    conn.execute("INSERT INTO good VALUES ('g1', 'x')")
+    conn.commit()
+    conn.close()
+    yield path
+    shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+#: Only the two tables this store has -- `build_plan` refuses a plan naming
+#: tables the store lacks, which is the guard working as intended.
+CROSSED_DISPOSITIONS = {
+    "good": TablePlan("good", Disposition.MIGRATE),
+    "skipped": TablePlan("skipped", Disposition.EXCLUDE, "deliberately not carried"),
+}
+
+
+def test_an_index_on_an_excluded_table_is_not_counted_as_carried(
+    store_with_index_on_excluded_table,
+):
+    # Counting it as carried is what made `apply_schema_objects` target a
+    # relation that was never created -- after every row had already copied.
+    # Arrange
+    source = store_with_index_on_excluded_table
+    # Act
+    report = preflight(source, CROSSED_DISPOSITIONS)
+    # Assert
+    assert report.carried == ()
+
+
+def test_an_index_on_an_excluded_table_does_not_block_the_migration(
+    store_with_index_on_excluded_table,
+):
+    # It is not a problem, so it must not be `uncarried` either -- that would
+    # block a migration that is entirely correct.
+    # Arrange
+    source = store_with_index_on_excluded_table
+    # Act
+    report = preflight(source, CROSSED_DISPOSITIONS)
+    # Assert
+    assert report.ok is True
+
+
+def test_an_index_on_an_excluded_table_is_reported_rather_than_dropped(
+    store_with_index_on_excluded_table,
+):
+    # Silence is what turned this into a mid-run crash instead of a line of
+    # output.
+    # Arrange
+    source = store_with_index_on_excluded_table
+    # Act
+    summary = preflight(source, CROSSED_DISPOSITIONS).summary()
+    # Assert
+    assert "idx_skipped_name" in summary
+
+
 def test_the_nul_blocker_states_how_many_rows_are_affected(store):
     # The count decides the remedy -- a hand-correction with an audit trail at
     # 2 rows, something systematic at 2000 -- so a blocker naming only the
