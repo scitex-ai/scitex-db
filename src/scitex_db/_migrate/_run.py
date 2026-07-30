@@ -84,6 +84,31 @@ class Destination:
     should pass one. Making it optional keeps the minimal adapter to three
     callables, so writing one is not a barrier to running a migration.
 
+    ``reset`` UNDOES A FAILED PROBE, AND PostgreSQL CANNOT MIGRATE WITHOUT IT.
+    Pass ``conn.rollback`` for psycopg2; SQLite needs nothing. The reason is not
+    obvious and was found by running a real migration rather than by reading the
+    code: the first thing :func:`migrate` does is ask whether the destination
+    already carries a completion marker, which on a FRESH destination means
+    selecting from a table that does not exist. :func:`._copy.read_marker`
+    catches that and answers "no marker", which is the correct ANSWER -- but on
+    PostgreSQL a failed statement ABORTS THE ENTIRE TRANSACTION, so every
+    statement afterwards fails with ``InFailedSqlTransaction``, starting with
+    the very first ``CREATE TABLE``. Measured on PostgreSQL 16.14:
+
+        SELECT ... FROM a missing table -> UndefinedTable
+        subsequent CREATE TABLE         -> InFailedSqlTransaction
+        after conn.rollback()           -> CREATE TABLE OK
+
+    It is called immediately after the probe and before anything is written, so
+    it can never discard real work.
+
+    Left OPTIONAL rather than required, and the reasoning differs from
+    :class:`._copy.Quiescence` on purpose. Quiescence must be constructed
+    because getting it wrong loses data SILENTLY. Omitting ``reset`` fails
+    LOUDLY at the first DDL, and a loud failure does not need to be made
+    unconstructible -- it needs to be made SELF-EXPLAINING, which is why
+    :func:`migrate` re-raises that first failure with this cause named.
+
     TRANSACTIONS ARE THE CALLER'S. This module never commits or rolls back,
     because whether the whole migration is one transaction is a property of the
     destination and the operator's plan, not of the copy algorithm. The
@@ -98,6 +123,7 @@ class Destination:
     ]
     placeholder: str = "?"
     executemany: Callable[[str, Sequence[Sequence[Any]]], None] | None = None
+    reset: Callable[[], None] | None = None
 
     def write_many(self, sql: str, rows: Sequence[Sequence[Any]]) -> None:
         """Insert a batch, using the driver's batch path when it has one."""
@@ -228,7 +254,15 @@ def migrate(
             "half-populated:\n" + report.summary()
         )
 
-    if destination_is_usable(destination.fetch):
+    already_migrated = destination_is_usable(destination.fetch)
+    # The probe just SELECTed from a table that does not exist on a fresh
+    # destination. PostgreSQL treats that as aborting the transaction, so the
+    # connection has to be cleared before anything is written. Nothing has been
+    # written yet, so this can only ever discard the failed probe.
+    if destination.reset is not None:
+        destination.reset()
+
+    if already_migrated:
         raise MigrationRefused(
             "refusing to migrate: the destination already carries a completion "
             "marker, so it holds a finished migration. Copying into it would "
@@ -242,7 +276,24 @@ def migrate(
         plan = build_plan(list_tables(conn), dispositions)
 
         for entry in report.tables:
-            destination.execute(entry.ddl, ())
+            try:
+                destination.execute(entry.ddl, ())
+            except Exception as exc:
+                # The first write is where a poisoned transaction surfaces, and
+                # the driver's own message ("current transaction is aborted")
+                # names the symptom rather than the cause. Say the cause here,
+                # because the reader is looking at a CREATE TABLE that is not
+                # itself wrong.
+                raise MigrationRefused(
+                    f"{entry.table}: the destination rejected the very first "
+                    f"statement of the migration. If this is PostgreSQL and the "
+                    f"error mentions an aborted transaction, the cause is the "
+                    f"completion-marker probe that ran just before this: on a "
+                    f"fresh destination it selects from a table that does not "
+                    f"exist, which aborts the transaction. Pass "
+                    f"`Destination(reset=conn.rollback)` so it is cleared. "
+                    f"Driver error: {exc}"
+                ) from exc
 
         rows_copied = {
             entry.table: _copy_table(

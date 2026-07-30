@@ -433,6 +433,70 @@ def test_write_many_falls_back_to_execute_without_a_batch_path(workspace):
     assert conn.execute("SELECT COUNT(*) FROM t").fetchone()[0] == 2
 
 
+# ----------------------------------------------------------------------------
+# `reset` -- the hook PostgreSQL cannot migrate without
+# ----------------------------------------------------------------------------
+
+
+def test_migrate_resets_the_destination_after_probing_for_the_marker(workspace):
+    # The probe selects from a table that does not exist on a fresh
+    # destination. PostgreSQL treats that as aborting the transaction, so the
+    # hook has to fire even though the probe "succeeded" in answering no.
+    # Arrange
+    source = _make_source(workspace)
+    conn = _open_destination(workspace)
+    base = _destination(conn)
+    calls = []
+    destination = Destination(
+        execute=base.execute,
+        fetch=base.fetch,
+        read_table=base.read_table,
+        executemany=base.executemany,
+        reset=lambda: calls.append("reset"),
+    )
+    # Act
+    _run(source, destination)
+    # Assert
+    assert calls == ["reset"]
+
+
+def test_migrate_explains_a_first_statement_failure_instead_of_leaking_it(workspace):
+    # A poisoned transaction surfaces at the first CREATE TABLE, and the
+    # driver's own message names the symptom rather than the cause. The reader
+    # is looking at a statement that is not itself wrong, so the refusal has to
+    # say what actually happened.
+    # Arrange
+    source = _make_source(workspace)
+    conn = _open_destination(workspace)
+    base = _destination(conn)
+
+    def refusing_execute(sql, params):
+        raise RuntimeError("current transaction is aborted")
+
+    destination = Destination(
+        execute=refusing_execute,
+        fetch=base.fetch,
+        read_table=base.read_table,
+    )
+    # Act
+    run = _run
+    # Assert
+    with pytest.raises(MigrationRefused, match="reset=conn.rollback"):
+        run(source, destination)
+
+
+def test_migrate_works_without_a_reset_hook(workspace):
+    # SQLite needs no reset, so the hook stays optional and its absence must not
+    # change anything.
+    # Arrange
+    source = _make_source(workspace)
+    conn = _open_destination(workspace)
+    # Act
+    report = _run(source, _destination(conn))
+    # Assert
+    assert report.ok is True
+
+
 def test_destination_defaults_to_the_sqlite_placeholder(workspace):
     # The default is sqlite3's marker; a PostgreSQL caller must pass "%s", which
     # is why the placeholder travels with the driver's callables.
