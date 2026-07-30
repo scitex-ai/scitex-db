@@ -16,6 +16,28 @@ from typing import List, Tuple
 
 import pandas as pd
 
+from ..._observers import fire_post_load, fire_post_save
+
+_WRITE_KEYWORDS = (
+    "INSERT",
+    "UPDATE",
+    "DELETE",
+    "DROP",
+    "CREATE",
+    "ALTER",
+)
+
+
+def _is_write_query(sql: str) -> bool:
+    """Whether ``sql`` mutates the database.
+
+    Single source of truth for the write/read split: it gates both the
+    read-only guard (``_check_writable``) and observer dispatch, so the
+    two can never disagree about what counts as a write.
+    """
+    upper = sql.upper()
+    return any(keyword in upper for keyword in _WRITE_KEYWORDS)
+
 
 class _QueryMixin:
     """Query execution functionality"""
@@ -33,17 +55,8 @@ class _QueryMixin:
         if not self.cursor:
             raise ConnectionError("Database not connected")
 
-        if any(
-            keyword in query.upper()
-            for keyword in [
-                "INSERT",
-                "UPDATE",
-                "DELETE",
-                "DROP",
-                "CREATE",
-                "ALTER",
-            ]
-        ):
+        is_write = _is_write_query(query)
+        if is_write:
             self._check_writable()
 
         try:
@@ -53,6 +66,10 @@ class _QueryMixin:
                 self.conn.commit()
                 self.cursor.execute("PRAGMA wal_checkpoint(PASSIVE)")
                 # self.cursor.execute("PRAGMA wal_checkpoint(FULL)")
+            if is_write:
+                fire_post_save(self.db_path, query, parameters)
+            else:
+                fire_post_load(self.db_path, query, self.cursor)
             return self.cursor
         except sqlite3.IntegrityError:
             # Preserve IntegrityError so callers can catch it specifically
@@ -66,23 +83,18 @@ class _QueryMixin:
         if not self.cursor:
             raise ConnectionError("Database not connected")
 
-        if any(
-            keyword in query.upper()
-            for keyword in [
-                "INSERT",
-                "UPDATE",
-                "DELETE",
-                "DROP",
-                "CREATE",
-                "ALTER",
-            ]
-        ):
+        is_write = _is_write_query(query)
+        if is_write:
             self._check_writable()
 
         try:
             parameters = [self._sanitize_parameters(p) for p in parameters]
             self.cursor.executemany(query, parameters)
             self.conn.commit()
+            if is_write:
+                fire_post_save(self.db_path, query, parameters)
+            else:
+                fire_post_load(self.db_path, query, self.cursor)
         except sqlite3.IntegrityError:
             raise
         except sqlite3.Error as err:
@@ -93,22 +105,15 @@ class _QueryMixin:
         if not self.cursor:
             raise ConnectionError("Database not connected")
 
-        if any(
-            keyword in script.upper()
-            for keyword in [
-                "INSERT",
-                "UPDATE",
-                "DELETE",
-                "DROP",
-                "CREATE",
-                "ALTER",
-            ]
-        ):
+        is_write = _is_write_query(script)
+        if is_write:
             self._check_writable()
 
         try:
             self.cursor.executescript(script)
             self.conn.commit()
+            if is_write:
+                fire_post_save(self.db_path, script, None)
         except sqlite3.IntegrityError:
             raise
         except sqlite3.Error as err:
