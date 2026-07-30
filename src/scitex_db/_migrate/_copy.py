@@ -228,12 +228,20 @@ def finalize(
     *,
     source_identity: str,
     completed_at: str,
+    placeholder: str = "?",
 ) -> MigrationResult:
     """Write the completion marker -- ONLY if every report is clean.
 
     ``completed_at`` is supplied by the caller rather than read from the clock
     here, so the marker a test writes is deterministic and the timestamp comes
     from whoever actually knows what run this was.
+
+    ``placeholder`` is the destination driver's parameter marker: ``"?"`` for
+    sqlite3, ``"%s"`` for psycopg2. It is a parameter rather than a hardcoded
+    ``"?"`` because the destination of this migration is PostgreSQL, where
+    ``?`` is a syntax error -- so hardcoding sqlite3's marker would have made
+    the marker write, and therefore every real migration, fail at its final
+    step. Found by probing the actual driver rather than by reading the code.
 
     Raises :class:`MigrationRefused` if any table failed verification, naming
     the tables. The destination is left unmarked and therefore unusable, which
@@ -265,7 +273,10 @@ def finalize(
         f'CREATE TABLE IF NOT EXISTS "{MARKER_TABLE}" (payload TEXT NOT NULL)',
         (),
     )
-    write(f'INSERT INTO "{MARKER_TABLE}" (payload) VALUES (?)', (json.dumps(payload),))
+    write(
+        f'INSERT INTO "{MARKER_TABLE}" (payload) VALUES ({placeholder})',
+        (json.dumps(payload),),
+    )
     return MigrationResult(
         reports=tuple(reports),
         excluded=exclusions(plan),

@@ -263,6 +263,29 @@ def test_marker_records_the_excluded_tables_and_why(destination):
     assert "mirror_hashes" in read_marker(_fetch(destination))["excluded"]
 
 
+def test_finalize_uses_the_placeholder_the_destination_driver_wants(destination):
+    # Arrange -- PostgreSQL rejects `?`; psycopg2 wants `%s`. Hardcoding
+    # sqlite3's marker would fail every real migration at its final step, so
+    # the emitted SQL is captured to prove the parameter is honoured.
+    seen = []
+
+    def capture(sql, params=()):
+        seen.append(sql)
+
+    # Act
+    finalize(
+        PLAN,
+        [_clean()],
+        QUIET,
+        capture,
+        source_identity="cards.db",
+        completed_at="2026-07-30T02:00:00Z",
+        placeholder="%s",
+    )
+    # Assert
+    assert "VALUES (%s)" in seen[-1]
+
+
 def test_marker_records_rows_compared_per_table(destination):
     # Arrange -- the denominator travels with the claim
     reports = [_clean(rows=2872)]
