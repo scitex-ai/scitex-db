@@ -153,6 +153,7 @@ class RunReport:
     rows_copied: Mapping[str, int]
     applied_objects: tuple[str, ...]
     result: MigrationResult
+    transformations: Any = None
 
     @property
     def ok(self) -> bool:
@@ -171,6 +172,14 @@ class RunReport:
         lines.append(
             f"  schema objects applied: {list(self.applied_objects) or 'NONE'}"
         )
+        # Printed on success as well as failure. A destination that differs
+        # from its source in ANY way must say so in the same place it reports
+        # the successes, or the reader takes "verified" to mean "identical".
+        lines.append(
+            self.transformations.summary()
+            if self.transformations is not None
+            else "transformations: none declared (destination is byte-identical)"
+        )
         lines.append(self.result.summary())
         return "\n".join(lines)
 
@@ -182,12 +191,37 @@ def _insert_sql(entry: TablePreflight, placeholder: str) -> str:
     return f"INSERT INTO {quote_identifier(entry.table)} ({names}) VALUES ({marks})"
 
 
+def _entry_for(report: PreflightReport, table: str) -> TablePreflight:
+    return next(e for e in report.tables if e.table == table)
+
+
+def _transformed(
+    row: Mapping[str, Any], entry: TablePreflight, transformations: Any
+) -> Mapping[str, Any]:
+    """Apply the declared transformations to one row, or pass it through.
+
+    Used on BOTH the copy path and the verification's source read, from the
+    same declaration. That is what makes the check ``destination == rule(source)``
+    rather than "skip the transformed rows" -- an undeclared difference in a
+    transformed row still fails, because only the declared rule was applied to
+    the side being compared.
+    """
+    if transformations is None:
+        return row
+    key = tuple(row[k] for k in entry.key_columns)
+    return {
+        name: transformations.apply(entry.table, key, name, value)
+        for name, value in row.items()
+    }
+
+
 def _copy_table(
     conn: Any,
     entry: TablePreflight,
     destination: Destination,
     *,
     batch_size: int,
+    transformations: Any = None,
 ) -> int:
     """Copy one table's rows, returning how many were inserted.
 
@@ -202,6 +236,7 @@ def _copy_table(
     for row in read_rows(
         conn, entry.table, columns, entry.key_columns, batch_size=batch_size
     ):
+        row = _transformed(row, entry, transformations)
         batch.append(tuple(row[c] for c in columns))
         if len(batch) >= batch_size:
             destination.write_many(sql, batch)
@@ -222,6 +257,7 @@ def migrate(
     completed_at: str,
     dispositions: Mapping[str, TablePlan] = CARDS_STORE_DISPOSITIONS,
     batch_size: int = 1000,
+    transformations: Any = None,
 ) -> RunReport:
     """Migrate ``source_path`` into ``destination``, or refuse and write nothing.
 
@@ -245,7 +281,7 @@ def migrate(
     fails -- in both cases leaving the destination WITHOUT a marker, which is
     what makes it unusable rather than silently partial.
     """
-    report = preflight(source_path, dispositions)
+    report = preflight(source_path, dispositions, transformations)
     if not report.ok:
         raise MigrationRefused(
             "refusing to migrate: the preflight is NOT READY, so nothing has "
@@ -297,7 +333,11 @@ def migrate(
 
         rows_copied = {
             entry.table: _copy_table(
-                conn, entry, destination, batch_size=batch_size
+                conn,
+                entry,
+                destination,
+                batch_size=batch_size,
+                transformations=transformations,
             )
             for entry in report.tables
         }
@@ -317,8 +357,15 @@ def migrate(
         # migrated before the widening was never checked on that column.
         reports = verify_plan(
             plan,
-            lambda table: read_rows(
-                conn, table, columns[table], keys[table], batch_size=batch_size
+            lambda table: (
+                _transformed(row, _entry_for(report, table), transformations)
+                for row in read_rows(
+                    conn,
+                    table,
+                    columns[table],
+                    keys[table],
+                    batch_size=batch_size,
+                )
             ),
             lambda table: destination.read_table(
                 table, columns[table], keys[table]
@@ -336,6 +383,7 @@ def migrate(
             source_identity=source_identity,
             completed_at=completed_at,
             placeholder=destination.placeholder,
+            transformations=transformations,
         )
     finally:
         conn.close()
@@ -345,6 +393,7 @@ def migrate(
         rows_copied=rows_copied,
         applied_objects=applied,
         result=result,
+        transformations=transformations,
     )
 
 

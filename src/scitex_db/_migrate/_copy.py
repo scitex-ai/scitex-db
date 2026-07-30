@@ -263,6 +263,7 @@ def finalize(
     source_identity: str,
     completed_at: str,
     placeholder: str = "?",
+    transformations: Any = None,
 ) -> MigrationResult:
     """Write the completion marker -- ONLY if every report is clean.
 
@@ -302,6 +303,17 @@ def finalize(
         },
         "tables": {r.table: r.rows_compared for r in reports},
         "excluded": {p.table: p.reason for p in exclusions(plan)},
+        # The manifest of every value this migration changed, with the original
+        # bytes as hex. Recorded as an explicit empty list when nothing was
+        # transformed, rather than by omitting the key: an absent key is
+        # ambiguous (old marker format? nothing declared? not recorded?), while
+        # an empty list is the fact "this destination is byte-identical".
+        "transformations": (
+            transformations.manifest() if transformations is not None else []
+        ),
+        "transformations_stated_by": (
+            transformations.stated_by if transformations is not None else None
+        ),
     }
     write(
         f'CREATE TABLE IF NOT EXISTS "{MARKER_TABLE}" (payload TEXT NOT NULL)',

@@ -197,9 +197,26 @@ class PreflightReport:
         return "\n".join(lines)
 
 
+def _fully_declared(finding, table: str, transformations) -> bool:
+    """Whether EVERY affected row in this column has a declared escape.
+
+    Compared by COUNT, and the count is exact rather than sampled -- the
+    finding's ``row_count`` comes from a ``COUNT(*)``, not from the capped key
+    sample it prints for humans. Partial coverage returns False and the column
+    stays a blocker, because the undeclared remainder would raise mid-copy.
+    """
+    declared = sum(
+        1
+        for e in transformations.escapes
+        if e.table == table and e.column == finding.column
+    )
+    return declared == finding.row_count
+
+
 def preflight(
     source_path: str,
     dispositions: Mapping[str, TablePlan] = CARDS_STORE_DISPOSITIONS,
+    transformations: "Transformations | None" = None,
 ) -> PreflightReport:
     """Inspect ``source_path`` and report what a migration would do.
 
@@ -222,6 +239,16 @@ def preflight(
             keys = primary_key_columns(columns)
             bad = unstorable_columns(table, columns, stored_types(conn, table, columns))
             nul = nul_findings(conn, table, columns, keys)
+            # A NUL column stops being a blocker only when EVERY affected row
+            # has a declared escape. Partial coverage must still block: the
+            # undeclared remainder would raise mid-copy, which is the late
+            # failure this preflight exists to prevent.
+            if transformations is not None:
+                nul = tuple(
+                    f
+                    for f in nul
+                    if not _fully_declared(f, table, transformations)
+                )
             count = conn.execute(f'SELECT COUNT(*) AS n FROM "{table}"').fetchone()["n"]
             entries.append(
                 TablePreflight(
