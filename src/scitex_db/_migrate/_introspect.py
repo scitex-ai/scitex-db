@@ -163,12 +163,25 @@ def read_columns(conn: sqlite3.Connection, table: str) -> tuple[Column, ...]:
             f"failing, so this is a missing table and not a table without "
             f"columns)."
         )
+    # A rowid alias is EXACTLY `INTEGER PRIMARY KEY` on a non-composite key,
+    # and the spelling is load-bearing: `INT PRIMARY KEY` and `BIGINT PRIMARY
+    # KEY` are NOT aliases, and a composite key never is. SQLite auto-assigns
+    # only the alias, so this test decides whether the destination needs an
+    # identity -- get it wrong in the permissive direction and the migration
+    # invents an identity the source never had.
+    pk_count = sum(1 for r in rows if r["pk"])
     return tuple(
         Column(
             name=r["name"],
             declared_type=r["type"] or "",
             not_null=bool(r["notnull"]),
             primary_key=bool(r["pk"]),
+            default_expr=r["dflt_value"],
+            rowid_alias=(
+                bool(r["pk"])
+                and pk_count == 1
+                and (r["type"] or "").strip().upper() == "INTEGER"
+            ),
         )
         for r in rows
     )
