@@ -205,6 +205,17 @@ for the ones that do not. Before you rely on retirement as a fence, find out
 which of your write paths consult it — and prefer consulting the status where
 the connection is opened, so a new write path cannot silently inherit the gap.
 
+**Un-retiring is not the mirror image of retiring.** Measured 2026-07-31, when
+the cutover was reversed. The instinct is to undo what retirement did: drop the
+guard triggers, delete `retired_at` / `retired_by` / `retired_in_favour_of`. The
+store still refused — because those keys are *metadata*, the actual flag is
+`schema_meta.store_status`, and the triggers are the **guard whose presence
+proves currency**. Removing them turned "retired" into "cannot prove it is
+current", which is refused just the same.
+
+Correct order: drop the triggers, set `store_status=current`, then let
+`init_schema` re-assert the guards on the next open.
+
 ---
 
 ## 6. The successor is a NEW store, not the same store at a new address
