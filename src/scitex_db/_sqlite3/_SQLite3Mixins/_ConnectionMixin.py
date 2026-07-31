@@ -114,16 +114,53 @@ class _ConnectionMixin:
                 self.cursor.execute("PRAGMA cache_size = -2000")
 
     def close(self) -> None:
-        if self.cursor:
-            self.cursor.close()
-        if self.conn:
-            try:
-                self.conn.rollback()
-                self.conn.close()
-            except sqlite3.Error:
-                pass
-        self.cursor = None
-        self.conn = None
+        """Release the handles. Always leaves the object clean, even on failure.
+
+        EVERY STEP IS GUARDED AND THE NULLING IS UNCONDITIONAL, because it used
+        not to be: ``self.cursor.close()`` sat outside the try, so a raising
+        cursor teardown aborted the method before ``self.cursor``/``self.conn``
+        were cleared. The object was then left holding a DEAD connection --
+        ``conn is None`` was False against an already-closed database -- and
+        ``__del__`` called ``close()`` again and raised again, surfacing as
+        "Exception ignored in ``SQLite3.__del__``".
+
+        Measured 2026-07-31, reachable through the commit that ``__exit__`` now
+        performs on a clean exit:
+
+            with SQLite3(p) as db:
+                db.execute("INSERT INTO t VALUES (1)")
+                db.conn.close()          # makes the exit-commit fail
+            -> exit raised, correctly
+            -> conn is None: False, cursor is None: False   <- the defect
+
+        SWALLOWING HERE IS CORRECT, and it is the one place in this package
+        where it is. Teardown's job is to release resources; the caller has
+        already been told what actually went wrong, because ``__exit__`` raises
+        the commit failure itself. A secondary error from closing a handle that
+        is already dead adds nothing and would mask the real one.
+
+        Found by scitex-cards asking whether a failing COMMIT could leave state
+        the next context inherits. It could.
+        """
+        try:
+            if self.cursor:
+                try:
+                    self.cursor.close()
+                except sqlite3.Error:
+                    pass
+            if self.conn:
+                try:
+                    self.conn.rollback()
+                except sqlite3.Error:
+                    pass
+                try:
+                    self.conn.close()
+                except sqlite3.Error:
+                    pass
+        finally:
+            # Unconditional: no teardown failure may leave a dead handle set.
+            self.cursor = None
+            self.conn = None
 
         if (
             hasattr(self, "temp_path")
