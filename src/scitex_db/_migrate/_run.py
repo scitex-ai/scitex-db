@@ -54,9 +54,10 @@ from ._copy import (
     verify_plan,
 )
 from ._ddl import quote_identifier
-from ._introspect import connect_readonly, list_tables, read_rows
+from ._introspect import SchemaObject, connect_readonly, list_tables, read_rows
 from ._plan import CARDS_STORE_DISPOSITIONS, TablePlan, build_plan
 from ._preflight import PreflightReport, TablePreflight, preflight
+from ._triggers import translate_schema_object
 
 __all__ = ["Destination", "RunReport", "migrate"]
 
@@ -257,6 +258,62 @@ def _copy_table(
     return copied
 
 
+_PROBE = "stx_migrate_acceptance_probe"
+
+
+def _refuse_objects_the_destination_rejects(
+    objects: "Sequence[SchemaObject]", destination: "Destination"
+) -> None:
+    """Execute each object's DDL and undo it, collecting every refusal.
+
+    A SAVEPOINT, NOT A ROLLBACK, and the difference is the whole correctness of
+    this function. The `CREATE TABLE`s issued just above are still UNCOMMITTED,
+    so `destination.reset()` -- which is `conn.rollback` for every caller we
+    have -- would discard the schema this probe depends on and leave the run to
+    fail on the first insert into a table that no longer exists. A savepoint
+    undoes only the probe. `ROLLBACK TO SAVEPOINT` also recovers a PostgreSQL
+    transaction that the failed statement aborted, which is what lets the loop
+    continue to the next object instead of stopping at the first bad one.
+
+    EVERY object is probed and every refusal is collected, for the same reason
+    the preflight collects rather than raises: stopping at the first turns one
+    schema review into as many runs as there are problems.
+
+    Note this proves the destination PARSES and ACCEPTS the statement, not that
+    the resulting guard FIRES. Those are still different claims, and the second
+    one belongs to whoever owns the guard -- see the cutover runbook.
+    """
+    rejected: list[tuple[SchemaObject, str]] = []
+    for obj in objects:
+        ddl = translate_schema_object(obj)
+        destination.execute(f"SAVEPOINT {_PROBE}", ())
+        try:
+            destination.execute(ddl, ())
+        except Exception as exc:
+            rejected.append((obj, str(exc).strip().splitlines()[0]))
+        finally:
+            destination.execute(f"ROLLBACK TO SAVEPOINT {_PROBE}", ())
+            destination.execute(f"RELEASE SAVEPOINT {_PROBE}", ())
+
+    if rejected:
+        detail = "\n".join(
+            f"  {o.kind} {o.name} on {o.table}: {why}" for o, why in rejected
+        )
+        raise MigrationRefused(
+            "refusing to migrate: the destination REJECTED schema object(s) "
+            "that the preflight reported as carried. NOTHING HAS BEEN COPIED -- "
+            "this is the check running at the only point where refusing is "
+            "still free.\n"
+            f"{detail}\n"
+            "Each of these has exactly two honest outcomes: its owner ports it "
+            "by hand and someone attacks the result, or it is declined "
+            "deliberately via `excluded_objects={name: reason}` and the reason "
+            "is recorded in the completion marker. Do not translate it "
+            "approximately -- a guard that looks present and does not fire is "
+            "worse than one that is absent."
+        )
+
+
 def migrate(
     source_path: str,
     destination: Destination,
@@ -356,6 +413,27 @@ def migrate(
                     f"`Destination(reset=conn.rollback)` so it is cleared. "
                     f"Driver error: {exc}"
                 ) from exc
+
+        # PROVE THE DESTINATION ACCEPTS EVERY CARRIED OBJECT, BEFORE ANY ROW IS
+        # COPIED. The preflight classified these as `carried` on the strength of
+        # the translator PRODUCING output; nothing asked the destination whether
+        # that output is valid for it. Those are different questions, and the
+        # gap between them cost a full copy on 2026-07-31: a trigger whose WHEN
+        # clause holds a subquery is legal SQLite and translates to legal-LOOKING
+        # PostgreSQL, which PostgreSQL then refuses outright --
+        #
+        #     FeatureNotSupported: cannot use subquery in trigger WHEN condition
+        #
+        # and it refused it in `apply_schema_objects`, i.e. AFTER 21,792 rows had
+        # already been written. The destination had to be dropped and rebuilt.
+        #
+        # This runs HERE, and not in the preflight, for a reason worth stating:
+        # an index or trigger cannot be validated before its table exists, so a
+        # destination-less preflight would report every object rejected with
+        # "relation does not exist" -- a false refusal is worse than the gap it
+        # closes. After the DDL and before the copy is the first moment the
+        # question can be asked truthfully, and it is still free.
+        _refuse_objects_the_destination_rejects(report.carried, destination)
 
         rows_copied = {
             entry.table: _copy_table(

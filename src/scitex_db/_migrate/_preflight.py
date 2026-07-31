@@ -116,6 +116,14 @@ class PreflightReport:
     tables: tuple[TablePreflight, ...]
     excluded: tuple[TablePlan, ...] = field(default_factory=tuple)
     uncarried: tuple[SchemaObject, ...] = field(default_factory=tuple)
+    #: Objects the translator produced output for. THIS IS A SYNTACTIC CLAIM,
+    #: NOT A PROMISE THAT THEY WILL ARRIVE. Nothing here has asked a destination
+    #: whether the produced DDL is valid for it -- this report has no
+    #: destination, by design. A trigger with a subquery in its WHEN clause
+    #: translates cleanly and PostgreSQL refuses it outright; that gap cost a
+    #: full 21,792-row copy on 2026-07-31. Acceptance is proven in
+    #: `._run.migrate`, after the tables exist and before any row is copied,
+    #: which is the first moment the question can be asked truthfully.
     carried: tuple[SchemaObject, ...] = field(default_factory=tuple)
     #: Objects belonging to EXCLUDED tables. Not a problem and not a promise:
     #: their table is not being migrated, so applying them would fail against a
@@ -203,6 +211,16 @@ class PreflightReport:
             f"{len(self.carried)} schema object(s) carried, "
             f"{len(self.uncarried)} uncarried"
         )
+        if self.carried:
+            # Said out loud, on every report, because READY reads as "this will
+            # work" and for these objects it means only "these translated".
+            # The unstated half is where the 2026-07-31 failure lived.
+            lines.append(
+                f"note: the {len(self.carried)} carried object(s) are TRANSLATED, "
+                f"not yet ACCEPTED -- no destination has been asked whether the "
+                f"produced DDL is valid for it. `migrate()` proves that after "
+                f"the tables exist and before any row is copied."
+            )
         return "\n".join(lines)
 
 
