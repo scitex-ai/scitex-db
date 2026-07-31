@@ -24,4 +24,23 @@ jobs:
     uses: scitex-ai/.github/.github/workflows/cla.yml@main
     with:
       owner_allowlist: "bot*,ywatanabe1989,LLEmacs"
-    secrets: inherit
+    # ONE SECRET, NAMED — not `secrets: inherit`. Both triggers above are
+    # UNAUTHENTICATED: anyone with a GitHub account can start this job by
+    # typing an issue comment. `inherit` forwards EVERY secret this repo holds,
+    # and this repo holds CLAUDE_CODE_CREDENTIALS_JSON — the live fleet Claude
+    # credential — which the callee never references. Forwarding a credential
+    # into an attacker-startable job that has no use for it is cost with no
+    # benefit, so it goes.
+    #
+    # This is DEFENCE IN DEPTH, not a fix for a live hole: a secret that is
+    # never named in a step's `env:`/`with:` is not injected into that step's
+    # environment, and the third-party action is SHA-pinned. What it removes is
+    # the reach of a future change to the callee, which is pinned to `@main` --
+    # a MUTABLE ref.
+    #
+    # The callee declares this secret explicitly (`required: true`) precisely
+    # so callers can do this, and keeps accepting `inherit` from ones that have
+    # not migrated. Do NOT add secrets here speculatively: the next one added
+    # is forwarded on every issue comment forever.
+    secrets:
+      GH_PERSONAL_ACCESS_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
