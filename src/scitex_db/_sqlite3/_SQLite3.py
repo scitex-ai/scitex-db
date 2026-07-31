@@ -222,8 +222,20 @@ class SQLite3(
                 UserWarning,
                 stacklevel=2,
             )
-        if hasattr(self, "close"):
-            self.close()
+        # ``close()`` is called UNCONDITIONALLY and is required to be total.
+        #
+        # This used to read ``if hasattr(self, "close"): self.close()``, which
+        # protected nothing: ``close`` is a method on the class, so the test is
+        # True on every instance including one whose ``__init__`` raised on its
+        # first line. It read as a guard against a half-built object while
+        # answering a question that cannot come out False -- so the object it
+        # was meant to protect went straight through it into ``close()`` and
+        # raised ``AttributeError`` on ``self.cursor``.
+        #
+        # The precondition is real; the guard belongs in ``close()``, which now
+        # reads its handles with ``getattr``. Doing it here as well would put
+        # the safety back behind a class-attribute test.
+        self.close()
 
     def __call__(
         self,
