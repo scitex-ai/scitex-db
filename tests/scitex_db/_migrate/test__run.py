@@ -168,6 +168,7 @@ def _run(source, destination):
         store_identity=None,
         
         predecessor_identity="predecessor-store",store_scope=WHOLE,
+        quiescence_evidence=None,
         dispositions=DISPOSITIONS,
     )
 

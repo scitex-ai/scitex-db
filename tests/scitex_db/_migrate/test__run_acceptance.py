@@ -111,6 +111,7 @@ def _run(tmpdir, *, with_trigger):
             store_identity="test-store",
             
             predecessor_identity="predecessor-store",store_scope=WHOLE,
+            quiescence_evidence=None,
             dispositions=DISPOSITIONS,
         )
         # COMMIT before closing, or the assertions read an empty database and

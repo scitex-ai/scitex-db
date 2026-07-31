@@ -54,85 +54,17 @@ from ._copy import (
     verify_plan,
 )
 from ._ddl import quote_identifier
+# Re-exported below rather than moved off the public surface: `from ._run import
+# Destination` appears in tests and in callers outside this repo, and a
+# migration's public surface should not churn for an internal file split.
+from ._destination import Destination
 from ._introspect import SchemaObject, connect_readonly, list_tables, read_rows
+from ._observe import QuiescenceEvidence
 from ._plan import CARDS_STORE_DISPOSITIONS, TablePlan, build_plan
 from ._preflight import PreflightReport, TablePreflight, preflight
 from ._triggers import translate_schema_object
 
 __all__ = ["Destination", "RunReport", "migrate"]
-
-
-@dataclass(frozen=True)
-class Destination:
-    """A destination database, described by what the migration needs of it.
-
-    Callables rather than a connection, so this package chooses no driver and
-    can be exercised against sqlite3 and psycopg2 alike without either being
-    stubbed out. Each entry is here because some step genuinely requires it:
-
-    * ``execute(sql, params)`` -- DDL, schema objects, and the marker write.
-    * ``fetch(sql)`` -- raw rows as sequences, used only to read the marker.
-    * ``read_table(table, columns, key_columns)`` -- rows as MAPPINGS, for
-      verification. Separate from ``fetch`` because the comparison pairs by
-      column NAME; a positional tuple would silently reorder if a SELECT ever
-      changed, and that is a defect the checksums could not catch because both
-      sides would be reordered the same way.
-    * ``placeholder`` -- the driver's parameter marker, ``?`` for sqlite3 and
-      ``%s`` for psycopg2. See the module docstring for why it lives here.
-
-    ``executemany`` is optional. Without it :meth:`write_many` loops over
-    ``execute``, which is correct but slow; a driver that has a batch path
-    should pass one. Making it optional keeps the minimal adapter to three
-    callables, so writing one is not a barrier to running a migration.
-
-    ``reset`` UNDOES A FAILED PROBE, AND PostgreSQL CANNOT MIGRATE WITHOUT IT.
-    Pass ``conn.rollback`` for psycopg2; SQLite needs nothing. The reason is not
-    obvious and was found by running a real migration rather than by reading the
-    code: the first thing :func:`migrate` does is ask whether the destination
-    already carries a completion marker, which on a FRESH destination means
-    selecting from a table that does not exist. :func:`._copy.read_marker`
-    catches that and answers "no marker", which is the correct ANSWER -- but on
-    PostgreSQL a failed statement ABORTS THE ENTIRE TRANSACTION, so every
-    statement afterwards fails with ``InFailedSqlTransaction``, starting with
-    the very first ``CREATE TABLE``. Measured on PostgreSQL 16.14:
-
-        SELECT ... FROM a missing table -> UndefinedTable
-        subsequent CREATE TABLE         -> InFailedSqlTransaction
-        after conn.rollback()           -> CREATE TABLE OK
-
-    It is called immediately after the probe and before anything is written, so
-    it can never discard real work.
-
-    Left OPTIONAL rather than required, and the reasoning differs from
-    :class:`._copy.Quiescence` on purpose. Quiescence must be constructed
-    because getting it wrong loses data SILENTLY. Omitting ``reset`` fails
-    LOUDLY at the first DDL, and a loud failure does not need to be made
-    unconstructible -- it needs to be made SELF-EXPLAINING, which is why
-    :func:`migrate` re-raises that first failure with this cause named.
-
-    TRANSACTIONS ARE THE CALLER'S. This module never commits or rolls back,
-    because whether the whole migration is one transaction is a property of the
-    destination and the operator's plan, not of the copy algorithm. The
-    marker-last ordering holds either way: under autocommit it is the last thing
-    made durable, and under a single transaction it is the last thing written.
-    """
-
-    execute: Callable[[str, Sequence[Any]], None]
-    fetch: Callable[[str], Iterable[Sequence[Any]]]
-    read_table: Callable[
-        [str, Sequence[str], Sequence[str]], Iterable[Mapping[str, Any]]
-    ]
-    placeholder: str = "?"
-    executemany: Callable[[str, Sequence[Sequence[Any]]], None] | None = None
-    reset: Callable[[], None] | None = None
-
-    def write_many(self, sql: str, rows: Sequence[Sequence[Any]]) -> None:
-        """Insert a batch, using the driver's batch path when it has one."""
-        if self.executemany is not None:
-            self.executemany(sql, rows)
-            return
-        for row in rows:
-            self.execute(sql, row)
 
 
 @dataclass(frozen=True)
@@ -324,6 +256,7 @@ def migrate(
     store_identity: str | None,
     predecessor_identity: str | None,
     store_scope: Any,
+    quiescence_evidence: QuiescenceEvidence | None,
     dispositions: Mapping[str, TablePlan] = CARDS_STORE_DISPOSITIONS,
     batch_size: int = 1000,
     transformations: Any = None,
@@ -334,6 +267,17 @@ def migrate(
     ``quiescence`` is positional and has no default: a migration that could be
     started by forgetting an argument is one that will be. See
     :class:`._copy.Quiescence` for why it must name a mechanism.
+
+    ``quiescence_evidence`` is what was SEEN, beside ``quiescence`` which is what
+    was CLAIMED, and a caught writer REFUSES the run at the marker. Keyword-only
+    with no default and may be ``None`` -- "nobody looked" must be said, not
+    reached by forgetting an argument.
+
+    THIS FUNCTION DOES NOT OBSERVE FOR YOU, on purpose. Watching costs wall-clock
+    the caller has to agree to spend, and :func:`._observe.observe_source`
+    requires a window and an interval that only the caller can choose: the result
+    is "nothing seen in THIS window", so a window this function invented would
+    produce a negative nobody could interpret. Observe first, pass the evidence.
 
     ``completed_at`` is supplied rather than read from the clock, so the marker
     records the run the operator believes they performed and a test's marker is
@@ -490,6 +434,7 @@ def migrate(
             store_identity=store_identity,
             predecessor_identity=predecessor_identity,
             store_scope=store_scope,
+            quiescence_evidence=quiescence_evidence,
             declined_objects=report.declined,
             placeholder=destination.placeholder,
             transformations=transformations,

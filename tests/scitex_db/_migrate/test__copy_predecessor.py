@@ -63,6 +63,7 @@ def _finalize(write, *, identity, predecessor):
         store_identity=identity,
         predecessor_identity=predecessor,
         store_scope=WHOLE,
+        quiescence_evidence=None,
     )
 
 
