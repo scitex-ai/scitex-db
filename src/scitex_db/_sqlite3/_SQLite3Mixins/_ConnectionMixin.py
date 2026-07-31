@@ -141,20 +141,42 @@ class _ConnectionMixin:
 
         Found by scitex-cards asking whether a failing COMMIT could leave state
         the next context inherits. It could.
+
+        THE HANDLES ARE READ WITH ``getattr``, NOT ``self.cursor``, because
+        teardown must also survive never having been SET UP. ``__init__`` can
+        raise before ``_ConnectionMixin.__init__`` ever assigns them -- a
+        mistyped ``mode=`` is enough -- and ``__del__`` then calls ``close()``
+        on a half-built object. Measured 2026-07-31:
+
+            SQLite3("/tmp/x.db", mode="nope")
+            -> ValueError: mode must be one of 'ro', 'rw', 'rwc'   correct
+            -> Exception ignored in SQLite3.__del__:
+                 AttributeError: 'SQLite3' object has no attribute 'cursor'
+
+        The second traceback is the damage. The caller made one mistake and is
+        shown two, the louder of which points at an attribute they have never
+        heard of instead of at the argument they mistyped. Teardown must not
+        editorialise over the failure that caused it.
+
+        Note this is a DIFFERENT precondition from the one above, which is why
+        the earlier fix did not cover it: that one made teardown survive its own
+        failures, this one makes it survive never having run its setup.
         """
+        cursor = getattr(self, "cursor", None)
+        conn = getattr(self, "conn", None)
         try:
-            if self.cursor:
+            if cursor:
                 try:
-                    self.cursor.close()
+                    cursor.close()
                 except sqlite3.Error:
                     pass
-            if self.conn:
+            if conn:
                 try:
-                    self.conn.rollback()
+                    conn.rollback()
                 except sqlite3.Error:
                     pass
                 try:
-                    self.conn.close()
+                    conn.close()
                 except sqlite3.Error:
                     pass
         finally:
@@ -162,11 +184,7 @@ class _ConnectionMixin:
             self.cursor = None
             self.conn = None
 
-        if (
-            hasattr(self, "temp_path")
-            and self.temp_path
-            and os.path.exists(self.temp_path)
-        ):
+        if getattr(self, "temp_path", None) and os.path.exists(self.temp_path):
             try:
                 os.remove(self.temp_path)
                 self.temp_path = None
