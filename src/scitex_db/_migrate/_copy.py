@@ -44,6 +44,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
+from ._observe import QuiescenceEvidence
 from ._plan import TablePlan, exclusions, tables_to_migrate
 # Re-exported below rather than moved out of the public surface: `from ._copy
 # import Quiescence` appears in tests and in callers outside this repo, and a
@@ -250,6 +251,7 @@ def finalize(
     store_identity: str | None,
     predecessor_identity: str | None,
     store_scope: "StoreScope",
+    quiescence_evidence: QuiescenceEvidence | None,
     declined_objects: Any = (),
     placeholder: str = "?",
     transformations: Any = None,
@@ -316,6 +318,22 @@ def finalize(
     set -- while an explicit null is a fact. This package argues that about
     other people's data often enough that it should hold in its own payload.
 
+    ``quiescence_evidence`` IS WHAT WAS SEEN, beside ``quiescence`` which is
+    what was CLAIMED. Keyword-only with no default and may be ``None``, by the
+    same rule as ``store_identity``: a default would let "nobody looked" pass as
+    an unremarkable normal, and this is precisely the value that must not be
+    supplied by forgetting. ``None`` is the explicit claim "no observation was
+    taken", recorded as an explicit null in the marker.
+
+    A writer caught here is REFUSED, and the refusal is worth its own sentence:
+    verification cannot detect this class at all. It compares the rows the copy
+    read, so a row written after the copy passed its table is missing from BOTH
+    sides and the comparison is clean. Two scitex-cards cutovers lost rows this
+    way behind a green report, and both had declared quiescence honestly -- the
+    writers were host-side units nobody had thought to name. See
+    :mod:`._observe` for why the observation must be SAMPLED rather than taken
+    at two instants.
+
     ``placeholder`` is the destination driver's parameter marker: ``"?"`` for
     sqlite3, ``"%s"`` for psycopg2. It is a parameter rather than a hardcoded
     ``"?"`` because the destination of this migration is PostgreSQL, where
@@ -350,6 +368,25 @@ def finalize(
             f"because it was the one sitting in front of the caller."
         )
 
+    # Also refused BEFORE the verification check, and for the same reason: a
+    # writer caught during the run means the copy was taken against a MOVING
+    # source, so a clean verification is not evidence that the destination is
+    # complete -- it is evidence that the rows the copy happened to read were
+    # copied correctly. Those are different claims, and the clean one must not
+    # be able to talk you past this.
+    if quiescence_evidence is not None and quiescence_evidence.writes_seen:
+        raise MigrationRefused(
+            f"refusing to mark the migration complete: a writer was OBSERVED "
+            f"on the source during this run, so `quiescence` "
+            f"({quiescence.mechanism}, stated by {quiescence.stated_by}) was "
+            f"not true in fact. {quiescence_evidence.summary()}. Verification "
+            f"cannot see this: it compares the rows the copy read, and a row "
+            f"written after the copy passed its table is absent from BOTH "
+            f"sides of that comparison. Stop the writer named above and re-run "
+            f"-- measured twice on the live scitex-cards store, where the "
+            f"writers were host-side units nobody had thought to name."
+        )
+
     failed = [r.table for r in reports if not r.ok]
     if failed:
         raise MigrationRefused(
@@ -373,6 +410,28 @@ def finalize(
         "quiescence": {
             "mechanism": quiescence.mechanism,
             "stated_by": quiescence.stated_by,
+            # What was OBSERVED, beside what was CLAIMED. An explicit null means
+            # nobody looked, and that is a different fact from looking and
+            # seeing nothing -- which is why the window is recorded with the
+            # result and never reduced to a boolean. A marker that said only
+            # "quiescent: true" would let a future reader believe a guarantee
+            # that no measurement here supports.
+            "observed": (
+                None
+                if quiescence_evidence is None
+                else {
+                    "window_seconds": quiescence_evidence.observed_seconds,
+                    "sample_interval_seconds": (
+                        quiescence_evidence.sample_interval_seconds
+                    ),
+                    "samples_taken": quiescence_evidence.samples_taken,
+                    "writes_seen": quiescence_evidence.writes_seen,
+                    "signals_fired": list(quiescence_evidence.signals_fired),
+                    "unobservable_reason": (
+                        quiescence_evidence.unobservable_reason
+                    ),
+                }
+            ),
         },
         # Whether this database was the whole store. Recorded because
         # `destination_is_usable` answers "was this migration completed and
