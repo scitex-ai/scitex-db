@@ -32,6 +32,8 @@ _LAZY_ATTRS = {
     "inspect": ("._inspect", "inspect"),
     "check_health": ("._check_health", "check_health"),
     "batch_health_check": ("._check_health", "batch_health_check"),
+    "register_post_save_hook": ("._observers", "register_post_save_hook"),
+    "register_post_load_hook": ("._observers", "register_post_load_hook"),
 }
 
 
@@ -67,4 +69,6 @@ __all__ = [
     "delete_duplicates",
     "delete_sqlite3_duplicates",
     "inspect",
+    "register_post_load_hook",
+    "register_post_save_hook",
 ]
