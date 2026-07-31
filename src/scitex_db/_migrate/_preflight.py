@@ -65,19 +65,53 @@ class TablePreflight:
     ddl: str
     nul_columns: tuple[str, ...] = ()
     nul_findings: tuple[NulFinding, ...] = ()
+    #: Columns whose DEFAULT is an expression we will not translate, paired with
+    #: the expression. Only a BLOCKER when the column is also NOT NULL -- see
+    #: `blockers`. Reported either way, because a silently dropped default is
+    #: indistinguishable from one nobody had.
+    undefaulted: tuple[tuple[str, str], ...] = ()
 
     @property
     def ok(self) -> bool:
         return (
             not self.unstorable
             and not self.nul_columns
+            and not self.blocking_defaults
             and bool(self.key_columns)
         )
+
+    @property
+    def blocking_defaults(self) -> tuple[tuple[str, str], ...]:
+        """Dropped defaults on NOT NULL columns -- the unsatisfiable ones.
+
+        The distinction is the whole point. A NULLABLE column that loses its
+        default is LOSSY: inserts still succeed, they just land NULL instead of
+        the default. A NOT NULL column that loses its default is BROKEN: the
+        constraint survives without the thing that satisfied it, so every insert
+        omitting the column fails, and the destination is stricter than the
+        source in a way no row-for-row verification can see.
+
+        Collapsing the two would either block migrations that are merely lossy
+        or wave through ones that cannot be written to.
+        """
+        names = {c.name for c in self.columns if c.not_null}
+        return tuple((n, e) for n, e in self.undefaulted if n in names)
 
     @property
     def blockers(self) -> tuple[str, ...]:
         """Human-readable reasons this table is not ready, in report order."""
         reasons = []
+        for name, expr in self.blocking_defaults:
+            reasons.append(
+                f"column {name!r} is NOT NULL with DEFAULT {expr}, and that "
+                f"default is an expression rather than a literal, so it will "
+                f"not be carried. The constraint would arrive WITHOUT the thing "
+                f"that satisfies it: every insert omitting {name!r} would fail "
+                f"against a destination that looks correctly created. Port the "
+                f"default by hand and add it after the migration, or drop the "
+                f"NOT NULL deliberately -- this tool will not guess at the "
+                f"PostgreSQL spelling of a SQLite expression."
+            )
         if not self.key_columns:
             reasons.append(
                 "no primary key: rows cannot be paired for verification, and a "
@@ -288,6 +322,13 @@ def preflight(
                     ddl=create_table_ddl(table, columns),
                     nul_columns=tuple(f.column for f in nul),
                     nul_findings=nul,
+                    undefaulted=tuple(
+                        (c.name, c.default_expr)
+                        for c in columns
+                        if c.default_expr is not None
+                        and not c.default_is_literal
+                        and not c.rowid_alias
+                    ),
                 )
             )
         # Classify every non-table object by asking the translator to actually
