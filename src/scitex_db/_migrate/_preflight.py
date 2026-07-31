@@ -46,8 +46,8 @@ from ._introspect import (
     read_columns,
     stored_types,
 )
-from ._plan import CARDS_STORE_DISPOSITIONS, TablePlan, build_plan, exclusions
-from ._plan import tables_to_migrate
+from ._plan import CARDS_STORE_DISPOSITIONS, MigrationPlanError, TablePlan
+from ._plan import build_plan, exclusions, tables_to_migrate
 from ._triggers import TriggerTranslationError, translate_schema_object
 
 __all__ = ["PreflightReport", "TablePreflight", "preflight"]
@@ -123,6 +123,10 @@ class PreflightReport:
     #: counting them there overstates what will arrive, and separately from
     #: `uncarried` because nothing is wrong with them and they must not block.
     skipped: tuple[SchemaObject, ...] = field(default_factory=tuple)
+    #: Objects the CALLER declined, each with a stated reason. Distinct from
+    #: `uncarried` (nobody decided) and from `skipped` (its table is not
+    #: going): someone looked at this object and said no, on the record.
+    declined: tuple[tuple[SchemaObject, str], ...] = field(default_factory=tuple)
 
     @property
     def ok(self) -> bool:
@@ -173,6 +177,11 @@ class PreflightReport:
                 lines.append(f"      - {reason}")
         for plan in self.excluded:
             lines.append(f"  {plan.table}: NOT MIGRATED -- {plan.reason}")
+        for obj, reason in self.declined:
+            lines.append(
+                f"  {obj.kind} {obj.name} on {obj.table}: DECLINED by the "
+                f"caller -- {reason}"
+            )
         for obj in self.skipped:
             lines.append(
                 f"  {obj.kind} {obj.name} on {obj.table}: not applied -- its "
@@ -217,6 +226,7 @@ def preflight(
     source_path: str,
     dispositions: Mapping[str, TablePlan] = CARDS_STORE_DISPOSITIONS,
     transformations: "Transformations | None" = None,
+    excluded_objects: Mapping[str, str] | None = None,
 ) -> PreflightReport:
     """Inspect ``source_path`` and report what a migration would do.
 
@@ -270,8 +280,20 @@ def preflight(
         carried: list[SchemaObject] = []
         uncarried: list[SchemaObject] = []
         skipped: list[SchemaObject] = []
+        declined: list[tuple[SchemaObject, str]] = []
+        declared = dict(excluded_objects or {})
         migrating = set(tables_to_migrate(plan))
         for obj in list_triggers(conn) + list_indexes(conn):
+            # A caller may DECLINE an object with a stated reason -- the same
+            # rule tables already live under, one level down: every object is
+            # carried, or excluded FOR A REASON, and nothing is merely absent.
+            # The case this exists for is an object the destination gets
+            # NATIVELY rather than by translation: scitex-cards generates the
+            # PostgreSQL form of their guards from a running server, so a
+            # translated copy would be the inferior duplicate of a better one.
+            if obj.name in declared:
+                declined.append((obj, declared.pop(obj.name)))
+                continue
             # An object on an EXCLUDED table is a third thing, neither "will
             # arrive" nor "cannot be translated". Its table is not going, so
             # applying it would target a relation that does not exist -- which
@@ -287,6 +309,18 @@ def preflight(
             else:
                 carried.append(obj)
 
+        if declared:
+            # A name that matched nothing is a stale exclusion, and staleness
+            # here is dangerous in the quiet direction: the object it used to
+            # cover may have been renamed, in which case the rename is now
+            # UNCARRIED and the exclusion is silently protecting nothing.
+            raise MigrationPlanError(
+                f"excluded_objects names {sorted(declared)}, which do not "
+                f"exist in this source. An exclusion that matches nothing "
+                f"protects nothing -- if the object was renamed, its new name "
+                f"is now unaccounted for."
+            )
+
         return PreflightReport(
             source=source_path,
             tables=tuple(entries),
@@ -294,6 +328,7 @@ def preflight(
             uncarried=tuple(uncarried),
             carried=tuple(carried),
             skipped=tuple(skipped),
+            declined=tuple(declined),
         )
     finally:
         conn.close()

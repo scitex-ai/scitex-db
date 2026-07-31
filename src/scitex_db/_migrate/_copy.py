@@ -355,6 +355,7 @@ def finalize(
     completed_at: str,
     store_identity: str | None,
     store_scope: "StoreScope",
+    declined_objects: Any = (),
     placeholder: str = "?",
     transformations: Any = None,
 ) -> MigrationResult:
@@ -430,6 +431,14 @@ def finalize(
         "database_is_whole_store": store_scope.database_is_whole_store,
         "outside_the_database": list(store_scope.outside_the_database),
         "store_scope_stated_by": store_scope.stated_by,
+        # Objects the caller DECLINED, with reasons. Recorded so the
+        # destination carries its own account of what was deliberately not
+        # translated -- an absent trigger with no explanation is
+        # indistinguishable from one that was lost.
+        "declined_objects": [
+            {"name": o.name, "kind": o.kind, "table": o.table, "reason": r}
+            for o, r in (declined_objects or ())
+        ],
         "tables": {r.table: r.rows_compared for r in reports},
         "excluded": {p.table: p.reason for p in exclusions(plan)},
         # The manifest of every value this migration changed, with the original

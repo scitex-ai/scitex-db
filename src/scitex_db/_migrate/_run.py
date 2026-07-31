@@ -269,6 +269,7 @@ def migrate(
     dispositions: Mapping[str, TablePlan] = CARDS_STORE_DISPOSITIONS,
     batch_size: int = 1000,
     transformations: Any = None,
+    excluded_objects: Mapping[str, str] | None = None,
 ) -> RunReport:
     """Migrate ``source_path`` into ``destination``, or refuse and write nothing.
 
@@ -304,7 +305,9 @@ def migrate(
     fails -- in both cases leaving the destination WITHOUT a marker, which is
     what makes it unusable rather than silently partial.
     """
-    report = preflight(source_path, dispositions, transformations)
+    report = preflight(
+        source_path, dispositions, transformations, excluded_objects
+    )
     if not report.ok:
         raise MigrationRefused(
             "refusing to migrate: the preflight is NOT READY, so nothing has "
@@ -407,6 +410,7 @@ def migrate(
             completed_at=completed_at,
             store_identity=store_identity,
             store_scope=store_scope,
+            declined_objects=report.declined,
             placeholder=destination.placeholder,
             transformations=transformations,
         )
