@@ -45,6 +45,11 @@ from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from ._plan import TablePlan, exclusions, tables_to_migrate
+# Re-exported below rather than moved out of the public surface: `from ._copy
+# import Quiescence` appears in tests and in callers outside this repo, and a
+# migration's public surface should not churn for an internal file split.
+from ._provenance import Quiescence, StoreScope
+from ._refusal import MigrationRefused
 from ._verify import MigrationVerificationError, VerificationReport, verify_table
 
 __all__ = [
@@ -64,117 +69,6 @@ __all__ = [
 #: this package.
 MARKER_TABLE = "scitex_migration_complete"
 
-
-class MigrationRefused(Exception):
-    """Raised when the migration will not start, or will not be marked done."""
-
-
-@dataclass(frozen=True)
-class Quiescence:
-    """The caller's statement that no writer can touch the source.
-
-    Deliberately a required object rather than a boolean flag with a default.
-    A defaulted ``quiesced: bool = False`` invites ``quiesced=True`` typed
-    without thought at a call site; a value that must be constructed, and that
-    demands a stated mechanism, does not.
-
-    ``mechanism`` names HOW writes are stopped, and is recorded in the
-    completion marker. Two forms exist today:
-
-    * ``"store-mode"`` -- scitex-cards' write path refuses while a store-level
-      mode is set. This is the durable answer, and it is only honoured by
-      processes running a version that HAS the gate; scitex-cards measured
-      agents resident on older versions, so it is necessary and not yet
-      sufficient.
-    * ``"operator"`` -- the operator has stopped the fleet by hand. This is the
-      real mechanism for the FIRST migration, and saying so in the marker is
-      better than implying a guarantee the code did not provide.
-    """
-
-    mechanism: str
-    stated_by: str
-
-    def __post_init__(self) -> None:
-        if not self.mechanism.strip():
-            raise MigrationRefused(
-                "quiescence claimed with no mechanism named. Recording HOW "
-                "writes were stopped is the difference between an audit trail "
-                "and an assertion; if the answer is 'the operator stopped the "
-                "fleet', say `operator` rather than leaving it blank."
-            )
-        if not self.stated_by.strip():
-            raise MigrationRefused(
-                "quiescence claimed by nobody. The marker records who "
-                "asserted it, because this claim is the one thing the "
-                "migration cannot verify for itself."
-            )
-
-
-@dataclass(frozen=True)
-class StoreScope:
-    """The caller's statement of whether this DATABASE is the whole STORE.
-
-    THIS EXISTS BECAUSE THE TOOL CANNOT ANSWER IT, and on 2026-07-30 it reported
-    an answer anyway. A migration of the scitex-cards store copied 12 tables,
-    verified every row, and reported success -- while 2,536 of 3,446 DM messages
-    and 47 attachments sat in ``threads.json`` and ``attachments/`` NEXT TO the
-    database. The copy was faithful. The claim "the entire store" was not, and
-    both were said in the same sentence.
-
-    The blind spot is structural rather than careless: :func:`._preflight.preflight`
-    enumerates tables from ``sqlite_master``, so it cannot see a file beside the
-    database. Every exclusion this package prints is a TABLE. There was no line
-    it could emit that would have said "and three quarters of the DM history is
-    in a JSON file next to this one."
-
-    So the question is moved to whoever can answer it. ``database_is_whole_store``
-    is a claim the caller makes and the marker records, exactly like
-    :class:`Quiescence` -- a thing the migration depends on, cannot verify, and
-    must therefore attribute rather than assume.
-
-    ``outside_the_database`` NAMES what is not being carried when the answer is
-    no. Required in that case, because "this is partial" without saying what is
-    missing is a warning nobody can act on -- and because naming them is what
-    turns a vague doubt into scitex-cards' next card.
-    """
-
-    database_is_whole_store: bool
-    stated_by: str
-    outside_the_database: tuple[str, ...] = ()
-
-    def __post_init__(self) -> None:
-        if not self.stated_by.strip():
-            raise MigrationRefused(
-                "store scope claimed by nobody. Whether this database is the "
-                "whole store is something the migration cannot check, so the "
-                "marker records who said it."
-            )
-        if self.database_is_whole_store and self.outside_the_database:
-            raise MigrationRefused(
-                f"contradictory store scope: the database is claimed to be the "
-                f"whole store, yet {list(self.outside_the_database)} are named "
-                f"as living outside it. One of the two is wrong."
-            )
-        if not self.database_is_whole_store and not self.outside_the_database:
-            raise MigrationRefused(
-                "the database is claimed NOT to be the whole store, but "
-                "nothing is named as living outside it. 'Partial' without "
-                "saying what is missing is a warning nobody can act on -- name "
-                "the files, directories or sidecar stores that are not being "
-                "carried."
-            )
-
-    def summary(self) -> str:
-        if self.database_is_whole_store:
-            return (
-                f"store scope: this database IS the whole store "
-                f"(stated by {self.stated_by})"
-            )
-        return (
-            f"store scope: PARTIAL -- this database is NOT the whole store "
-            f"(stated by {self.stated_by}). NOT CARRIED BY THIS MIGRATION: "
-            f"{', '.join(self.outside_the_database)}"
-        )
 
 
 @dataclass(frozen=True)
@@ -354,6 +248,7 @@ def finalize(
     source_identity: str,
     completed_at: str,
     store_identity: str | None,
+    predecessor_identity: str | None,
     store_scope: "StoreScope",
     declined_objects: Any = (),
     placeholder: str = "?",
@@ -375,14 +270,43 @@ def finalize(
     correct; neither is an identity. scitex-cards keys theirs on a ``store_uuid``
     held INSIDE the store, and that is the value this carries across.
 
-    IDENTITY IS NECESSARY AND NOT SUFFICIENT, which is worth stating here
-    because this field alone invites the opposite conclusion. After a verified
-    copy there are TWO stores carrying the same identity -- the source and the
-    destination -- both complete, both legitimately that workspace's store. What
-    distinguishes them is a statement of which is CURRENT, and moving that
-    statement is what a cutover actually is. That statement lives in the source
-    (scitex-cards' ``store_status`` / ``retired_in_favour_of``), not here: this
-    marker can say what the destination IS, never that it is the one to use.
+    THE DESTINATION MUST GET A **NEW** IDENTITY, AND THIS PARAGRAPH USED TO SAY
+    THE OPPOSITE. It read: "after a verified copy there are TWO stores carrying
+    the same identity ... what distinguishes them is a statement of which is
+    CURRENT". The second half is still true. The first half shipped a twin, and
+    the twin broke the very guard identity exists for.
+
+    Measured on the live cutover, 2026-07-31:
+
+        retired SQLite   store_uuid            = 0bb1395b-...
+                         retired_in_favour_of  = 0bb1395b-...   <- itself
+        PostgreSQL       store_uuid            = 0bb1395b-...   <- twin
+
+    ``retired_in_favour_of`` is a uuid-shaped POINTER, so against twins it names
+    both stores and identifies neither, and ``expected_uuid`` -- whose entire job
+    is answering "am I on the right store?" -- passes on the RETIRED one. A gate
+    that cannot fail.
+
+    The old paragraph conflated two questions that only look alike:
+
+        which WORKSPACE is this?   answered by carrying the identity forward
+        which STORE is this?       answered only by them being DIFFERENT
+
+    A cutover needs the second. So the destination is a NEW store that RECORDS
+    its predecessor, and the workspace question is answered by walking that
+    lineage backward -- the direction that still works once the source is
+    retired and the forward pointer is the thing under test.
+
+    ``predecessor_identity`` carries that link, on the SUCCESSOR. Keeping it here
+    rather than only in the source's ``retired_in_favour_of`` is deliberate: the
+    source may never be retired at all (this run was reversed), and a lineage
+    that exists only in the store you are moving away from is not lineage.
+
+    PASSING THE SOURCE'S OWN IDENTITY IS REFUSED. It is the one value that is
+    always wrong and the one most likely to be passed, because it is the value
+    sitting in front of the caller -- which is exactly how it was passed here.
+    Requiring a decision was not enough; a required question can still be
+    answered wrong, so the answer that is always wrong is now rejected by name.
 
     Keyword-only with NO DEFAULT, and may be ``None``. Required-but-nullable so
     a caller must DECIDE rather than forget; ``None`` is the explicit claim
@@ -405,6 +329,27 @@ def finalize(
     servable, and an operator who sees no marker knows to investigate rather
     than to trust.
     """
+    # Refused BEFORE the verification check, because this is a defect in what the
+    # caller ASKED FOR rather than in what the copy achieved -- and a clean run
+    # must not be able to talk you past it.
+    if (
+        store_identity is not None
+        and predecessor_identity is not None
+        and store_identity == predecessor_identity
+    ):
+        raise MigrationRefused(
+            f"refusing to mark the migration complete: store_identity and "
+            f"predecessor_identity are both {store_identity!r}, so the "
+            f"destination would be an identity TWIN of its source. Nothing "
+            f"could then tell the two apart -- a uuid-shaped 'retired in favour "
+            f"of' pointer names both and identifies neither, and an 'am I on "
+            f"the right store?' check passes against the RETIRED one. Mint a "
+            f"NEW identity for the destination and pass the source's here; the "
+            f"lineage is what preserves the link, not the sameness. Measured on "
+            f"the live scitex-cards cutover, where this exact value was passed "
+            f"because it was the one sitting in front of the caller."
+        )
+
     failed = [r.table for r in reports if not r.ok]
     if failed:
         raise MigrationRefused(
@@ -418,6 +363,12 @@ def finalize(
     payload = {
         "source": source_identity,
         "store_identity": store_identity,
+        # Lineage, recorded on the SUCCESSOR and pointing BACKWARD. The forward
+        # pointer (`retired_in_favour_of` in the source) is the one that breaks:
+        # it only exists if the source is ever retired, and this run was
+        # reversed. A lineage that lives only in the store you are moving away
+        # from is not lineage.
+        "predecessor_identity": predecessor_identity,
         "completed_at": completed_at,
         "quiescence": {
             "mechanism": quiescence.mechanism,

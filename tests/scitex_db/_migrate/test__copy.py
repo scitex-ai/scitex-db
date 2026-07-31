@@ -193,7 +193,8 @@ def test_finalize_writes_the_marker_when_every_table_verified(destination):
         source_identity="cards.db",
         completed_at="2026-07-30T02:00:00Z",
         store_identity=None,
-        store_scope=WHOLE,
+        
+        predecessor_identity="predecessor-store",store_scope=WHOLE,
     )
     # Assert
     assert destination_is_usable(_fetch(destination)) is True
@@ -213,7 +214,8 @@ def test_the_marker_carries_the_store_identity(destination):
         source_identity="cards.db",
         completed_at="2026-07-30T02:00:00Z",
         store_identity="0bb1395b-6f19-4a2d-9782-7dd4d296f2a0",
-        store_scope=WHOLE,
+        
+        predecessor_identity="predecessor-store",store_scope=WHOLE,
     )
     # Assert
     assert read_marker(_fetch(destination))["store_identity"] == (
@@ -236,7 +238,8 @@ def test_an_absent_store_identity_is_recorded_as_an_explicit_null(destination):
         source_identity="cards.db",
         completed_at="2026-07-30T02:00:00Z",
         store_identity=None,
-        store_scope=WHOLE,
+        
+        predecessor_identity="predecessor-store",store_scope=WHOLE,
     )
     # Assert
     assert "store_identity" in read_marker(_fetch(destination))
@@ -290,7 +293,8 @@ def test_a_partial_copy_is_still_marked_complete(destination):
         source_identity="cards.db",
         completed_at="2026-07-30T02:00:00Z",
         store_identity=None,
-        store_scope=partial,
+        
+        predecessor_identity="predecessor-store",store_scope=partial,
     )
     # Assert
     assert destination_is_usable(_fetch(destination)) is True
@@ -313,7 +317,8 @@ def test_a_partial_copy_is_not_the_whole_store(destination):
         source_identity="cards.db",
         completed_at="2026-07-30T02:00:00Z",
         store_identity=None,
-        store_scope=partial,
+        
+        predecessor_identity="predecessor-store",store_scope=partial,
     )
     # Assert
     assert destination_is_whole_store(_fetch(destination)) is False
@@ -331,7 +336,8 @@ def test_a_whole_store_copy_says_so(destination):
         source_identity="cards.db",
         completed_at="2026-07-30T02:00:00Z",
         store_identity=None,
-        store_scope=WHOLE,
+        
+        predecessor_identity="predecessor-store",store_scope=WHOLE,
     )
     # Assert
     assert destination_is_whole_store(_fetch(destination)) is True
@@ -364,7 +370,8 @@ def test_the_marker_names_what_was_left_outside(destination):
         source_identity="cards.db",
         completed_at="2026-07-30T02:00:00Z",
         store_identity=None,
-        store_scope=partial,
+        
+        predecessor_identity="predecessor-store",store_scope=partial,
     )
     # Assert
     assert read_marker(_fetch(destination))["outside_the_database"] == [
@@ -388,7 +395,8 @@ def test_finalize_refuses_when_a_table_failed_verification(destination):
             source_identity="cards.db",
             completed_at="2026-07-30T02:00:00Z",
             store_identity=None,
-            store_scope=WHOLE,
+            
+            predecessor_identity="predecessor-store",store_scope=WHOLE,
         )
 
 
@@ -408,7 +416,8 @@ def test_a_failed_migration_leaves_the_destination_unusable(destination):
             source_identity="cards.db",
             completed_at="2026-07-30T02:00:00Z",
             store_identity=None,
-            store_scope=WHOLE,
+            
+            predecessor_identity="predecessor-store",store_scope=WHOLE,
         )
     # Assert
     assert destination_is_usable(_fetch(destination)) is False
@@ -426,7 +435,8 @@ def test_marker_records_the_quiescence_mechanism(destination):
         source_identity="cards.db",
         completed_at="2026-07-30T02:00:00Z",
         store_identity=None,
-        store_scope=WHOLE,
+        
+        predecessor_identity="predecessor-store",store_scope=WHOLE,
     )
     # Assert
     assert read_marker(_fetch(destination))["quiescence"]["mechanism"] == "operator"
@@ -444,7 +454,8 @@ def test_marker_records_the_excluded_tables_and_why(destination):
         source_identity="cards.db",
         completed_at="2026-07-30T02:00:00Z",
         store_identity=None,
-        store_scope=WHOLE,
+        
+        predecessor_identity="predecessor-store",store_scope=WHOLE,
     )
     # Assert
     assert "mirror_hashes" in read_marker(_fetch(destination))["excluded"]
@@ -468,7 +479,8 @@ def test_finalize_uses_the_placeholder_the_destination_driver_wants(destination)
         source_identity="cards.db",
         completed_at="2026-07-30T02:00:00Z",
         store_identity=None,
-        store_scope=WHOLE,
+        
+        predecessor_identity="predecessor-store",store_scope=WHOLE,
         placeholder="%s",
     )
     # Assert
@@ -487,7 +499,8 @@ def test_marker_records_rows_compared_per_table(destination):
         source_identity="cards.db",
         completed_at="2026-07-30T02:00:00Z",
         store_identity=None,
-        store_scope=WHOLE,
+        
+        predecessor_identity="predecessor-store",store_scope=WHOLE,
     )
     # Assert
     assert read_marker(_fetch(destination))["tables"]["tasks"] == 2872

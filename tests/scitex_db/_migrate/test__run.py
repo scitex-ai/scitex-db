@@ -166,7 +166,8 @@ def _run(source, destination):
         source_identity="test-store",
         completed_at="2026-07-30T00:00:00Z",
         store_identity=None,
-        store_scope=WHOLE,
+        
+        predecessor_identity="predecessor-store",store_scope=WHOLE,
         dispositions=DISPOSITIONS,
     )
 
