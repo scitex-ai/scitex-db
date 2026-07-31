@@ -5,6 +5,7 @@
 # ----------------------------------------
 from __future__ import annotations
 import os
+import sqlite3
 __FILE__ = __file__
 __DIR__ = os.path.dirname(__FILE__)
 # ----------------------------------------
@@ -168,8 +169,46 @@ class SQLite3(
             )
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Exit context manager and ensure proper cleanup."""
-        self.close()
+        """Commit on a clean exit, roll back on an exception, then close.
+
+        THIS USED TO DISCARD EVERY UNCOMMITTED WRITE, SILENTLY. ``__exit__``
+        called ``close()``, and ``close()`` issues an explicit
+        ``conn.rollback()`` -- so with the default ``autocommit=False`` a block
+        that wrote and then ended normally threw the work away. Measured
+        2026-07-31:
+
+            with SQLite3(p) as db:
+                db.execute("INSERT INTO t VALUES (1)")
+                db.execute("SELECT COUNT(*) FROM t")   -> 1   (inside)
+            fresh connection afterwards                -> 0   (gone)
+
+        Two things made it dangerous rather than merely surprising. The context
+        manager is MANDATORY here -- ``_check_context_manager`` refuses to
+        execute without one -- so the API forced callers into the construct
+        that lost their writes. And the loss is INVERTED: every read inside the
+        block confirms the write landed, so a test that opens, writes and
+        asserts in one block passes. Only a separate connection sees the truth.
+
+        Committing on a clean exit is the contract a mandatory context manager
+        implies, and it matches ``sqlite3.Connection``'s own. Rolling back on an
+        exception keeps a half-applied write from surviving a failure.
+
+        A failing COMMIT is raised rather than swallowed -- losing data quietly
+        is the defect being fixed, so the fix must not have a quiet path of its
+        own. During exception unwinding it is left alone, because masking the
+        original error with a commit error would hide the cause.
+        """
+        try:
+            if self.conn is not None:
+                if exc_type is None:
+                    self.conn.commit()
+                else:
+                    self.conn.rollback()
+        except sqlite3.Error:
+            if exc_type is None:
+                raise
+        finally:
+            self.close()
 
     def __del__(self):
         """Destructor with context manager usage warning."""
