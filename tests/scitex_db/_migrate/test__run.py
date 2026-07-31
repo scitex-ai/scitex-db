@@ -286,11 +286,49 @@ def test_migrate_applies_schema_objects_after_the_rows(workspace):
     # The marker's own INSERT is excluded: it is written last by design, so
     # counting it here would compare the index against the marker rather than
     # against the rows.
-    assert next(i for i, s in enumerate(log) if "CREATE INDEX" in s) > max(
+    #
+    # `max`, NOT `next`: CREATE INDEX now appears TWICE. The acceptance probe
+    # issues it before the copy to prove the destination accepts it, then rolls
+    # that back to a savepoint, and the real application follows the rows. The
+    # guarantee this test exists for is about the surviving index -- built over
+    # a populated table -- so the APPLIED occurrence is the one to compare, and
+    # `next` was silently measuring the probe.
+    assert max(i for i, s in enumerate(log) if "CREATE INDEX" in s) > max(
         i
         for i, s in enumerate(log)
         if s.startswith("INSERT INTO") and MARKER_TABLE not in s
     )
+
+
+def test_migrate_probes_the_schema_object_before_copying_any_row(workspace):
+    # The other half of the change above, pinned rather than merely tolerated:
+    # refusing is only free if it happens BEFORE the rows. Measured as the FIRST
+    # CREATE INDEX preceding the first INSERT.
+    # Arrange
+    source = _make_source(workspace)
+    conn = _open_destination(workspace)
+    log = []
+    # Act
+    _run(source, _destination(conn, log))
+    # Assert
+    assert next(i for i, s in enumerate(log) if "CREATE INDEX" in s) < next(
+        i for i, s in enumerate(log) if s.startswith("INSERT INTO")
+    )
+
+
+def test_migrate_undoes_the_probe_so_the_copy_runs_without_the_index(workspace):
+    # The probe must not leave the index in place during the copy -- that would
+    # make every insert maintain an index for no reason, which is the cost the
+    # after-the-rows ordering exists to avoid.
+    # Arrange
+    source = _make_source(workspace)
+    conn = _open_destination(workspace)
+    log = []
+    _run(source, _destination(conn, log))
+    # Act
+    probe_undone = [s for s in log if "ROLLBACK TO SAVEPOINT" in s]
+    # Assert
+    assert probe_undone != []
 
 
 def test_migrate_creates_the_source_index_on_the_destination(workspace):
