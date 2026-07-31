@@ -109,7 +109,8 @@ def _run(tmpdir, *, with_trigger):
             source_identity="test",
             completed_at="2026-07-31T00:00:00Z",
             store_identity="test-store",
-            store_scope=WHOLE,
+            
+            predecessor_identity="predecessor-store",store_scope=WHOLE,
             dispositions=DISPOSITIONS,
         )
         # COMMIT before closing, or the assertions read an empty database and
