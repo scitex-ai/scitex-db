@@ -156,6 +156,33 @@ it get a lock scope chosen by the library.
 where these block it — same code, different concurrency contract,
 visible only under load.
 
+**Its test must observe the lock from a third connection.** "Run two
+concurrent writers and check the result" is too weak: a `begin_write`
+that does nothing at all passes it whenever the two writers happen not
+to collide, which under light load is most of the time. So the test
+asserts the lock is *visible while held* and *gone after commit* —
+
+```sql
+SELECT pid, objid, granted FROM pg_locks WHERE locktype = 'advisory';
+```
+
+— one row while the context manager is open, zero rows after it exits.
+For SQLite, the equivalent is a second connection whose write attempt
+fails with `SQLITE_BUSY` while the first holds `BEGIN IMMEDIATE`.
+
+This is not belt-and-braces. Without it, guard 3 is a gate that cannot
+fail, inside the module written to prevent gates that cannot fail.
+
+The requirement came from a real reading: scitex-cards sampled
+`pg_locks` 216 times at 200ms across four writes and saw zero granted
+rows. Zero waiters answered the contention question; zero *granted* rows
+is the shape that would also appear if the lock were never taken at all.
+Their data cannot distinguish the two — and did not need to, because
+either way the hold is bounded: missing four holds at 200ms sampling
+puts it under about 100ms at 95% confidence, which cannot explain a
+13-25s lag. But a library whose lock might silently not be taken is
+exactly what this test exists to rule out.
+
 ### 4. `describe_backend(conn_or_location) -> BackendReport`
 
 ```python
@@ -185,6 +212,10 @@ and a test that runs against that version rather than the developer's.
 - A test per guard that can be shown to FAIL — for each one, the red
   output goes in the PR body. A guard whose test has never been red is
   not yet known to be a guard.
+- Where a guard's effect is observable from outside the process (a lock,
+  a file, an executed statement), the test observes the EFFECT, not the
+  return value. A function that returns the right answer without doing
+  the thing passes every test written against its return value.
 - No renames after merge without an alias.
 
 ## Open question for the operator
