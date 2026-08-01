@@ -54,7 +54,7 @@ constraint.
 ```
 src/scitex_db/store/
     __init__.py        # the public names, and nothing else
-    _url.py            # 1. DSN vs path
+    _url.py            # 1. read the config value; DSN vs path
     _ddl.py            # 2. statement-by-statement DDL with a count
     _tx.py             # 3. per-dialect write-transaction begin
     _backend.py        # 4. which engine is live
@@ -71,7 +71,7 @@ Per the constitution: one dataclass per question, every signal its own
 named field, every signal three-valued, a validator on the dataclass so
 a malformed answer fails where it is built.
 
-### 1. `parse_store_url(value) -> StoreLocation`
+### 1. `resolve_store(...)` / `parse_store_url(value) -> StoreLocation`
 
 ```python
 @dataclass(frozen=True)
@@ -87,6 +87,45 @@ Validator: exactly one of `path` / `dsn` is set, and it matches
 `postgresql:/host/db`, which SQLite will then create, serve empty, and
 report healthy. Raise on an unrecognised scheme; do not fall back to
 "probably a path".
+
+**Where the refusal lives.** Asked by scitex-cards, 2026-08-02, and a
+fair question against the first draft: it said "before any `Path()`
+coercion" without saying whose job that is. It is not the caller's.
+
+1. **`parse_store_url` is total.** Every input either becomes a
+   validated `StoreLocation` or raises. It never returns `None`, never
+   "probably a path", never a bare string. There is no branch where the
+   caller is handed something and asked to decide — and that branch is
+   where both silent successes lived.
+
+2. **A postgres location carries `path=None`,** validator-enforced. A
+   caller who ignores `dialect` and reaches for `.path` gets
+   `Path(None)` → `TypeError`: loud, at the call site, on the first run.
+   Not an empty file at a mangled relative path serving zero rows.
+
+3. **The seam owns READING the config value, not only parsing it** —
+   `resolve_store(env=..., default=...) -> StoreLocation`. Both
+   incidents happened *before* any parse: the raw string went from the
+   environment straight into `Path()`. A parser that only refuses what
+   is handed to it cannot refuse what was never handed to it. The intent
+   is that no code in a consuming package ever holds the raw value.
+
+**What no type can do** is reach a caller who never calls it.
+`Path(os.environ["SCITEX_CARDS_DB"])`, written by someone who has not
+heard of this module, is invisible to all three points above. That is a
+linter rule, not a library feature: `STX-DB002`, flagging `Path(<env
+lookup>)` for variable names matching `*_DB|*_URL|*_DSN|*_STORE*`, in
+the existing plugin beside `STX-DB001` (entry point
+`scitex_dev.linter.plugins`).
+
+State its limits as plainly as DB001 states its own: plain AST, no
+seeing through wrappers, fires on the literal shape. It will miss an
+indirection and will occasionally fire on a genuine path variable. Both
+are acceptable — a false positive costs one line of thought; the false
+negative cost two incidents in a single day.
+
+The type refuses; the rule catches the bypass. Neither alone closes the
+class, and building to the type alone should not feel as though it did.
 
 ### 2. `execute_ddl(conn, statements) -> DDLResult`
 

@@ -76,6 +76,27 @@ Guard: report the live backend and the config tier that selected it.
 Three-valued: SQLite / PostgreSQL / **unknown** — never default to a
 guess.
 
+### 4b. SQLite stores the CREATE text you wrote, not the schema you meant
+
+`sqlite_master` keeps the original `CREATE TABLE` statement verbatim —
+comments, whitespace and all. So two databases with identical schemas
+compare unequal if they were built by different routes.
+
+Measured by scitex-cards, 2026-08-02: an explanatory comment placed
+inside a `CREATE TABLE` column list made a database built via
+statement-by-statement `execute_ddl` stop matching one built via
+`executescript`. Three CI legs went red on a single assertion.
+
+Worth knowing because a porting package would not guess it, and because
+schema comparison is exactly the tool you reach for to convince yourself
+a migration was faithful.
+
+The test that caught it existed only because of an earlier near-miss —
+its docstring records that "eleven unit tests passed while the splitter
+was cutting four append-only triggers in half". 187 tests had been run
+locally beforehand and that file was in neither selection: the thing
+that would have told them was present and not consulted.
+
 ### 5. Standard SQL is not portable SQL
 
 `IS NOT DISTINCT FROM` is standard and unsupported by SQLite before
