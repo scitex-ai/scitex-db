@@ -33,7 +33,7 @@ from pathlib import Path
 
 import pytest
 
-_SRC = Path(__file__).resolve().parents[3] / "src" / "scitex_db"
+_SRC = Path(__file__).resolve().parents[2] / "src" / "scitex_db"
 _SKILLS = _SRC / "_skills" / "scitex-db"
 
 _PY_FENCE = re.compile(r"```python\n(.*?)```", re.DOTALL)
