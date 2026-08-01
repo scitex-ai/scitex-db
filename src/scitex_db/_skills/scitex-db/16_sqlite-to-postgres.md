@@ -2,7 +2,7 @@
 description: |
   [TOPIC] Porting a package from SQLite to PostgreSQL
   [DETAILS] The failures that produce NO error — silent wrong-store writes, DDL that runs zero statements, lock semantics that differ, engine reported wrong. Checklist before and during a backend move.
-tags: [scitex-db-postgres, scitex-db-migration, scitex-db]
+tags: [scitex-db-sqlite-to-postgres, scitex-db-migration, scitex-db]
 ---
 
 # SQLite → PostgreSQL: the failures that do not raise
