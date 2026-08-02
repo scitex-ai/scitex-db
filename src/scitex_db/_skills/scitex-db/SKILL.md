@@ -23,6 +23,12 @@ interfaces:
 Two database classes (`SQLite3`, `PostgreSQL`) composed from a dozen
 shared mixins, plus standalone maintenance helpers.
 
+They share a mixin namespace but **not** a surface — `SQLite3` leaves 23
+of the 59 base methods unimplemented and spells several others
+differently. Write against one class, and read
+[16_sqlite-to-postgres](16_sqlite-to-postgres.md) before planning a move
+between them.
+
 ## Installation & import (two equivalent paths)
 
 The same module is reachable via two install paths. Both forms work at
@@ -56,7 +62,8 @@ rule and empirical verification table.
 
 ### Deep-dive
 
-* [13_mixins](13_mixins.md) — The mixin architecture (capability groups)
+* [13_mixins](13_mixins.md) — The mixin architecture, and where the two backends diverge
+* [16_sqlite-to-postgres](16_sqlite-to-postgres.md) — Porting to PostgreSQL: the failures that do not raise
 * [14_numpy-blob](14_numpy-blob.md) — Storing ndarrays with compression
 * [15_maintenance](15_maintenance.md) — `check_health`, `delete_duplicates`, `inspect`
 * [11_quick-start](11_quick-start.md), [12_python-api](12_python-api.md) — historical leaves

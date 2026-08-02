@@ -114,22 +114,77 @@ class _ConnectionMixin:
                 self.cursor.execute("PRAGMA cache_size = -2000")
 
     def close(self) -> None:
-        if self.cursor:
-            self.cursor.close()
-        if self.conn:
-            try:
-                self.conn.rollback()
-                self.conn.close()
-            except sqlite3.Error:
-                pass
-        self.cursor = None
-        self.conn = None
+        """Release the handles. Always leaves the object clean, even on failure.
 
-        if (
-            hasattr(self, "temp_path")
-            and self.temp_path
-            and os.path.exists(self.temp_path)
-        ):
+        EVERY STEP IS GUARDED AND THE NULLING IS UNCONDITIONAL, because it used
+        not to be: ``self.cursor.close()`` sat outside the try, so a raising
+        cursor teardown aborted the method before ``self.cursor``/``self.conn``
+        were cleared. The object was then left holding a DEAD connection --
+        ``conn is None`` was False against an already-closed database -- and
+        ``__del__`` called ``close()`` again and raised again, surfacing as
+        "Exception ignored in ``SQLite3.__del__``".
+
+        Measured 2026-07-31, reachable through the commit that ``__exit__`` now
+        performs on a clean exit:
+
+            with SQLite3(p) as db:
+                db.execute("INSERT INTO t VALUES (1)")
+                db.conn.close()          # makes the exit-commit fail
+            -> exit raised, correctly
+            -> conn is None: False, cursor is None: False   <- the defect
+
+        SWALLOWING HERE IS CORRECT, and it is the one place in this package
+        where it is. Teardown's job is to release resources; the caller has
+        already been told what actually went wrong, because ``__exit__`` raises
+        the commit failure itself. A secondary error from closing a handle that
+        is already dead adds nothing and would mask the real one.
+
+        Found by scitex-cards asking whether a failing COMMIT could leave state
+        the next context inherits. It could.
+
+        THE HANDLES ARE READ WITH ``getattr``, NOT ``self.cursor``, because
+        teardown must also survive never having been SET UP. ``__init__`` can
+        raise before ``_ConnectionMixin.__init__`` ever assigns them -- a
+        mistyped ``mode=`` is enough -- and ``__del__`` then calls ``close()``
+        on a half-built object. Measured 2026-07-31:
+
+            SQLite3("/tmp/x.db", mode="nope")
+            -> ValueError: mode must be one of 'ro', 'rw', 'rwc'   correct
+            -> Exception ignored in SQLite3.__del__:
+                 AttributeError: 'SQLite3' object has no attribute 'cursor'
+
+        The second traceback is the damage. The caller made one mistake and is
+        shown two, the louder of which points at an attribute they have never
+        heard of instead of at the argument they mistyped. Teardown must not
+        editorialise over the failure that caused it.
+
+        Note this is a DIFFERENT precondition from the one above, which is why
+        the earlier fix did not cover it: that one made teardown survive its own
+        failures, this one makes it survive never having run its setup.
+        """
+        cursor = getattr(self, "cursor", None)
+        conn = getattr(self, "conn", None)
+        try:
+            if cursor:
+                try:
+                    cursor.close()
+                except sqlite3.Error:
+                    pass
+            if conn:
+                try:
+                    conn.rollback()
+                except sqlite3.Error:
+                    pass
+                try:
+                    conn.close()
+                except sqlite3.Error:
+                    pass
+        finally:
+            # Unconditional: no teardown failure may leave a dead handle set.
+            self.cursor = None
+            self.conn = None
+
+        if getattr(self, "temp_path", None) and os.path.exists(self.temp_path):
             try:
                 os.remove(self.temp_path)
                 self.temp_path = None
