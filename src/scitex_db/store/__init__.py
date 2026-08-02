@@ -26,6 +26,7 @@ Contract: ``docs/portable-store-seam-surface.md``.
 
 from __future__ import annotations
 
+from ._backend import BackendReport, describe_backend
 from ._url import (
     POSTGRESQL,
     SQLITE,
@@ -38,8 +39,10 @@ from ._url import (
 __all__ = [
     "POSTGRESQL",
     "SQLITE",
+    "BackendReport",
     "StoreLocation",
     "UnknownStoreScheme",
+    "describe_backend",
     "parse_store_url",
     "resolve_store",
 ]
