@@ -14,6 +14,15 @@ Regenerate with:
 Do not hand-edit the list: the PS-140 auditor recomputes it from
 source on every run and fails on any drift in either direction
 (a missing entry OR a stale one).
+
+The AAA marker comments in the test body below are NOT as the
+generator emits them. As of scitex-dev 0.41.1 the generator writes a
+combined `# Arrange / Act` marker, which its own PA-307 / STX-TQ002
+rule rejects ("each of `# Arrange`, `# Act`, `# Assert` must appear on
+its own line in order") -- so a freshly generated gate fails the audit
+it was generated to pass. Split here to satisfy the rule. Re-running
+the generator will reintroduce the violation until that is fixed
+upstream; re-split the markers if so. The LIST above is untouched.
 """
 
 import importlib
@@ -30,10 +39,11 @@ CROSS_PACKAGE_IMPORTS = [
 
 @pytest.mark.parametrize("module_name", CROSS_PACKAGE_IMPORTS)
 def test_cross_package_import_resolves(module_name):
-    # Arrange / Act — a real import, not importlib.util.find_spec:
-    # find_spec only proves a module is FINDABLE on the path, and
-    # the failures this gate exists to catch (a renamed symbol
-    # re-exported through a package __init__) happen at EXECUTION.
+    # Arrange: nothing to build — the module name is the parametrised input
+    # Act: a real import, not importlib.util.find_spec. find_spec only proves
+    # a module is FINDABLE on the path, and the failures this gate exists to
+    # catch (a renamed symbol re-exported through a package __init__) happen
+    # at EXECUTION.
     module = importlib.import_module(module_name)
 
     # Assert
