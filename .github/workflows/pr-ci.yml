@@ -1,17 +1,34 @@
 name: pr-ci
 
-# Consolidated PR-only CI gate. Runs the per-PR validation suite as a
-# single workflow so the cancel-in-progress concurrency group, path
-# filters, and uv cache apply uniformly. Post-merge validation lives
-# in release-ci.yml.
+# WHAT SURVIVES HERE, AND WHY ONLY THIS.
 #
-# L1 concurrency — cancel superseded PR runs.
-# L3 path filters — skip docs/skills/examples/markdown-only PRs.
-# L4 conditional matrix — full ["3.11", "3.12", "3.13"] on PR (this trigger).
-# L5a uv-managed Python (`uv python install` + `uv venv --python`) so the
-#     matrix leg is not bound to the runner's system Python.
-# L5b .venv/bin on PATH (and explicit `.venv/bin/python` for clarity) so
-#     console scripts resolve without needing `uv run`.
+# This file used to carry four jobs (import-smoke, dep-hygiene-smoke,
+# tests, audit). Three of them duplicated the canonical `ci.yml` caller,
+# which is the ONE per-repo shape (see that file's header). Running both
+# meant every push paid for the same checks twice, under two different
+# status-check names, and nothing depended on this file's names --
+# branch protection on main and develop requires only:
+#
+#   pytest-matrix / pytest-matrix-on-ubuntu-py3.11
+#   pytest-matrix / pytest-matrix-on-ubuntu-py3.12
+#   pytest-matrix / pytest-matrix-on-ubuntu-py3.13
+#
+# all of which come from `ci.yml`. So the three duplicates are gone.
+#
+# `dep-hygiene-smoke` is NOT a duplicate, and is the reason this file
+# still exists. It is the only check that installs the package
+# NON-EDITABLE and WITHOUT extras -- `uv pip install .` rather than
+# `uv pip install -e ".[all,dev]"`. That is the shape a user gets from
+# PyPI, and it is what catches an import that only resolves because a
+# dev extra happened to be installed. `import-smoke` in `ci.yml` uses
+# `-e .`, which is close but not the same install.
+#
+# Deleting this file wholesale would have removed that check silently.
+# That is why it did not happen.
+#
+# RUNNER: self-hosted only (PS-169, operator mandate 2026-07-14). The
+# expression matches `ci.yml`'s so a per-repo CI_RUNS_ON override works
+# here too.
 
 on:
   pull_request:
@@ -31,29 +48,9 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  import-smoke:
-    name: import-smoke-on-ubuntu-py3-12
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
-        with:
-          enable-cache: true
-          cache-dependency-glob: pyproject.toml
-      - name: Set up Python 3.12 (uv-managed)
-        run: uv python install 3.12
-      - name: Install (no extras) in uv venv
-        run: |
-          uv venv --python 3.12 .venv
-          uv pip install --python .venv/bin/python -e .
-      - name: Import smoke
-        run: .venv/bin/python -c "import scitex_db; print(getattr(scitex_db, '__version__', 'unversioned'))"
-      - name: smoke scitex-db --help
-        run: .venv/bin/scitex-db --help
   dep-hygiene-smoke:
     name: dep-hygiene-smoke
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted","Linux","X64","scitex-ci"]') }}
     steps:
       - uses: actions/checkout@v4
       - name: Install uv
@@ -69,66 +66,3 @@ jobs:
           uv pip install --python .venv/bin/python .
       - name: Import package
         run: .venv/bin/python -c "import scitex_db; print(scitex_db.__name__)"
-
-  tests:
-    name: pytest-matrix-on-ubuntu-py${{ matrix.python-version }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ${{ github.event_name == 'pull_request' && fromJson('["3.11", "3.12", "3.13"]') || fromJson('["3.12"]') }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
-        with:
-          enable-cache: true
-          cache-dependency-glob: pyproject.toml
-      - name: Set up Python ${{ matrix.python-version }} (uv-managed)
-        run: uv python install ${{ matrix.python-version }}
-      - name: Create uv venv on this matrix Python
-        run: uv venv --python ${{ matrix.python-version }} .venv
-      - name: Install dependencies
-        # Fallback chain: prefer [all,dev] so optional-dep code paths
-        # get exercised. Falls back to [dev] then plain editable so a
-        # packaging hiccup doesn't strand CI.
-        run: |
-          uv pip install --python .venv/bin/python -e ".[all,dev]" \
-            || uv pip install --python .venv/bin/python -e ".[dev]" \
-            || uv pip install --python .venv/bin/python -e .
-      - name: Run tests
-        # PATH prepend so any test that subprocess-calls a console script
-        # finds it in .venv/bin/.
-        run: |
-          export PATH="$PWD/.venv/bin:$PATH"
-          .venv/bin/pytest tests/ --cov=src/scitex_db --cov-report=xml --cov-report=term
-      - name: Upload coverage to Codecov
-        if: always() && matrix.python-version == '3.12'
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage.xml
-          fail_ci_if_error: false
-
-  audit:
-    name: audit
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
-        with:
-          enable-cache: true
-          cache-dependency-glob: pyproject.toml
-      - name: Set up Python 3.12 (uv-managed)
-        run: uv python install 3.12
-      - name: Install package + audit tooling
-        run: |
-          uv venv --python 3.12 .venv
-          uv pip install --python .venv/bin/python -e ".[dev]"
-          uv pip install --python .venv/bin/python "scitex-dev[cli-audit]"
-      - name: Run scitex-dev ecosystem audit-all
-        run: |
-          export PATH="$PWD/.venv/bin:$PATH"
-          scitex-dev ecosystem audit-all scitex-db --no-version-check
