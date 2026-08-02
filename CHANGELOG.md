@@ -7,6 +7,36 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-08-02
+
+### Added
+
+- `STX-DB001` — the `SQLite3(...)` construction rule, registered through the
+  `scitex_dev.linter.plugins` entry point so scitex-linter discovers it. The
+  rule states its own limits: plain AST detection, no seeing through wrapper
+  functions, fires wherever `SQLite3(` literally appears.
+- A gate pinning prose to the rule corpus: every `STX-DB###` named in `docs/`
+  or the skill docs must be defined by the plugin, or listed as an open
+  proposal with a written reason. A companion test fails if such an exemption
+  outlives the rule landing, and the rule-id extractor is itself tested to fire
+  and to not over-fire — a broken extractor would make both gates vacuous.
+
+### Fixed
+
+- `docs/portable-store-seam-surface.md`, published in 0.2.0, told another
+  package to add `STX-DB002` "in the existing plugin beside `STX-DB001`" and to
+  "state its limits as plainly as DB001 states its own" — while the plugin was
+  on neither `main` nor `develop`. It had sat unmerged on a branch since
+  2026-07-05, so the published surface pointed a reader at code this repository
+  did not carry. Landing the rule makes the claim true; the new gate is what
+  stops the next one.
+
+### Note
+
+The 0.2.0 gate (`tests/scitex_db/test__skills.py`) did not cover this: it scans
+the skill docs for `db.<method>(` calls only, so `docs/` was unguarded. Two
+gates now, over different prose and different claims.
+
 ## [0.2.0] — 2026-08-02
 
 First release containing the SQLite→PostgreSQL migration toolkit. The work
