@@ -18,8 +18,8 @@ with SQLite3("experiments.db", compress_by_default=True) as db:
         "results",
         {"id": "INTEGER PRIMARY KEY", "name": "TEXT", "value": "REAL"},
     )
-    db.insert("results", {"name": "run_1", "value": 3.14})
-    rows = db.select("results", where="value > 3.0")
+    db.insert_many("results", [{"name": "run_1", "value": 3.14}])
+    rows = db.get_rows("results", where="value > 3.0")
 ```
 
 Writes are thread-safe; the context manager commits + closes cleanly.
@@ -34,7 +34,9 @@ with PostgreSQL(host="localhost", dbname="mydb", user="me") as db:
     rows = db.select("experiments", where="status = 'done'")
 ```
 
-Same mixin-backed API as SQLite3 (see [13_mixins.md](13_mixins.md)).
+Note the different spellings: `select` here, `get_rows` on SQLite3. The
+two classes are not interchangeable — see
+[16_sqlite-to-postgres.md](16_sqlite-to-postgres.md).
 
 ## Numpy arrays
 

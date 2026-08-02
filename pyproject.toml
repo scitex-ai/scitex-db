@@ -65,9 +65,15 @@ docs = [
     "sphinx-copybutton>=0.5",
     "sphinx-autodoc-typehints>=1.25",
 ]
+# Every public extra must be a subset of `all`, so `pip install
+# scitex-db[all]` really does pull everything public (PS-221 §3).
+# Referenced by name rather than by copied requirement lists, so adding a
+# requirement to an extra cannot silently fall out of `all`.
 all = [
     "scitex-db[git]",
     "scitex-db[postgresql]",
+    "scitex-db[dev]",
+    "scitex-db[docs]",
 ]
 
 [project.scripts]

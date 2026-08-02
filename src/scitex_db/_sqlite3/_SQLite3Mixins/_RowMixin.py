@@ -84,7 +84,10 @@ class _RowMixin:
                 query_parts.append(f"OFFSET {offset}")
 
             query = " ".join(query_parts)
-            self.cursor.execute(query)
+            # Routed through self.execute (not self.cursor.execute) so the
+            # read is visible to post-load observers; _QueryMixin.execute is
+            # the single dispatch point for hooks.
+            self.execute(query)
 
             column_names = [
                 description[0] for description in self.cursor.description
