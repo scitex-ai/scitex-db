@@ -38,16 +38,28 @@ _ENV = "SCITEX_TEST_STORE_URL"
 
 
 @pytest.fixture
-def unguarded_dsn_store(tmp_path: Path) -> dict:
-    """Reproduce the incident: the raw config value straight into Path()."""
+def unguarded_dsn_store(tmp_path: Path) -> Iterator[dict]:
+    """Reproduce the incident: the raw config value straight into Path().
+
+    ``yield``, not ``return``: the connection is an external resource, so
+    it is closed in teardown even when the test body fails. Returning it
+    (or anything derived from it) after closing would leave the cleanup
+    on the happy path only.
+    """
     mangled = tmp_path / Path(_DSN)
     mangled.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(mangled)
-    conn.execute("CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY)")
-    rows = conn.execute("SELECT * FROM tasks").fetchall()
-    integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
-    conn.close()
-    return {"path": mangled, "rows": rows, "integrity": integrity}
+    try:
+        conn.execute("CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY)")
+        yield {
+            "path": mangled,
+            "rows": conn.execute("SELECT * FROM tasks").fetchall(),
+            "integrity": conn.execute(
+                "PRAGMA integrity_check"
+            ).fetchone()[0],
+        }
+    finally:
+        conn.close()
 
 
 @pytest.fixture
