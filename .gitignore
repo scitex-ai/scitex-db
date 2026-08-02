@@ -34,3 +34,4 @@ docs/sphinx/_build/
 
 # Python virtualenv
 .venv/
+.worktrees/

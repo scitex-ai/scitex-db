@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "scitex-db"
-version = "0.2.0"
+version = "0.2.1"
 description = "Database utilities for scientific computing with SQLite3 and PostgreSQL"
 readme = "README.md"
 license = "AGPL-3.0-only"
@@ -84,6 +84,9 @@ scitex-db = "scitex_db"
 
 [project.entry-points."scitex_dev.skills"]
 scitex-db = "scitex_db"
+
+[project.entry-points."scitex_dev.linter.plugins"]
+db = "scitex_db._linter_plugin:get_plugin"
 
 [project.urls]
 Homepage = "https://github.com/ywatanabe1989/scitex-db"
