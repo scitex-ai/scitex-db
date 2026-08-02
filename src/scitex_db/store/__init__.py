@@ -27,6 +27,14 @@ Contract: ``docs/portable-store-seam-surface.md``.
 from __future__ import annotations
 
 from ._backend import BackendReport, describe_backend
+from ._portable_sql import (
+    MIN_SQLITE_VERSION_FOR_IS_NOT_DISTINCT_FROM,
+    POSTGRESQL_NULL_SAFE,
+    SQLITE_NULL_SAFE,
+    SQLITE_ONLY_UPSERT_FORMS,
+    null_safe_eq,
+    to_paramstyle,
+)
 from ._url import (
     POSTGRESQL,
     SQLITE,
@@ -37,14 +45,20 @@ from ._url import (
 )
 
 __all__ = [
+    "MIN_SQLITE_VERSION_FOR_IS_NOT_DISTINCT_FROM",
     "POSTGRESQL",
+    "POSTGRESQL_NULL_SAFE",
     "SQLITE",
+    "SQLITE_NULL_SAFE",
+    "SQLITE_ONLY_UPSERT_FORMS",
     "BackendReport",
     "StoreLocation",
     "UnknownStoreScheme",
     "describe_backend",
+    "null_safe_eq",
     "parse_store_url",
     "resolve_store",
+    "to_paramstyle",
 ]
 
 # EOF

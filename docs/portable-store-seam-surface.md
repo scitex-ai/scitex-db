@@ -199,12 +199,40 @@ passing — the failure this field exists to prevent.
 
 ### 5. `portable_sql` — spellings, not a query builder
 
-Constants and small helpers for constructs that differ or that fail on
-supported-but-old engines, e.g. `IS NOT DISTINCT FROM` (standard SQL,
-unsupported by SQLite before 3.39; the affected host ran 3.37.2).
+**Corrected 2026-08-03, and the correction is load-bearing.** This
+section originally said "constants and small helpers ... ships with the
+minimum SQLite version it supports as a module constant". That framing
+assumes one correct literal plus a version gate. It is wrong. Measured
+by scitex-cards on their deployment
+(`src/scitex_cards/_sql_null_safe.py`):
 
-Ships with the minimum SQLite version it supports as a module constant,
-and a test that runs against that version rather than the developer's.
+```
+backend                col IS ?      col IS NOT DISTINCT FROM ?
+SQLite 3.37.2          WORKS         SYNTAX ERROR (needs >= 3.39)
+PostgreSQL             SYNTAX ERROR  WORKS
+```
+
+**There is no single spelling that works on both.** `IS` does not parse
+on PostgreSQL either, so no constant — gated or not — expresses this.
+The spelling must be chosen where the dialect is known, which makes
+`describe_backend` (§4) a *dependency* of this module rather than a
+sibling.
+
+The version constant still ships, and a test still asserts against it
+rather than against the developer's SQLite — the spread between host
+(3.37.2) and container (3.45.1) is exactly what hid the outage — but it
+selects a spelling, it does not certify one.
+
+That mismatch cost a **36-hour silent delivery outage**: every enqueue
+raised and a fail-soft `except` swallowed it. Work performed, evidence
+lost.
+
+Paramstyle is the other half, and the naive rewrite is worse than none:
+a `?` **inside a string literal** is not a placeholder, so
+`sql.replace("?", "%s")` silently corrupts card and message bodies
+containing question marks; and a literal `%` must be doubled or a
+`LIKE '%foo%'` pattern becomes a format specifier and raises. One
+correctness hazard and one crash hazard from the same one-liner.
 
 ## What scitex-db owes in return
 
