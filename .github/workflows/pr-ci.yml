@@ -1,0 +1,68 @@
+name: pr-ci
+
+# WHAT SURVIVES HERE, AND WHY ONLY THIS.
+#
+# This file used to carry four jobs (import-smoke, dep-hygiene-smoke,
+# tests, audit). Three of them duplicated the canonical `ci.yml` caller,
+# which is the ONE per-repo shape (see that file's header). Running both
+# meant every push paid for the same checks twice, under two different
+# status-check names, and nothing depended on this file's names --
+# branch protection on main and develop requires only:
+#
+#   pytest-matrix / pytest-matrix-on-ubuntu-py3.11
+#   pytest-matrix / pytest-matrix-on-ubuntu-py3.12
+#   pytest-matrix / pytest-matrix-on-ubuntu-py3.13
+#
+# all of which come from `ci.yml`. So the three duplicates are gone.
+#
+# `dep-hygiene-smoke` is NOT a duplicate, and is the reason this file
+# still exists. It is the only check that installs the package
+# NON-EDITABLE and WITHOUT extras -- `uv pip install .` rather than
+# `uv pip install -e ".[all,dev]"`. That is the shape a user gets from
+# PyPI, and it is what catches an import that only resolves because a
+# dev extra happened to be installed. `import-smoke` in `ci.yml` uses
+# `-e .`, which is close but not the same install.
+#
+# Deleting this file wholesale would have removed that check silently.
+# That is why it did not happen.
+#
+# RUNNER: self-hosted only (PS-169, operator mandate 2026-07-14). The
+# expression matches `ci.yml`'s so a per-repo CI_RUNS_ON override works
+# here too.
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths-ignore:
+      - 'docs/**'
+      - '_skills/**'
+      - 'examples/**'
+      - '**.md'
+      - 'CHANGELOG.*'
+      - '.github/CODEOWNERS'
+      - '.github/ISSUE_TEMPLATE/**'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  dep-hygiene-smoke:
+    name: dep-hygiene-smoke
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted","Linux","X64","scitex-ci"]') }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: pyproject.toml
+      - name: Set up Python 3.11 (uv-managed)
+        run: uv python install 3.11
+      - name: Bare install (no extras) in uv venv
+        run: |
+          uv venv --python 3.11 .venv
+          uv pip install --python .venv/bin/python .
+      - name: Import package
+        run: .venv/bin/python -c "import scitex_db; print(scitex_db.__name__)"
