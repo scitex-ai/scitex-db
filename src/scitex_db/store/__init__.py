@@ -27,6 +27,7 @@ Contract: ``docs/portable-store-seam-surface.md``.
 from __future__ import annotations
 
 from ._backend import BackendReport, describe_backend
+from ._ddl import DDLResult, execute_ddl, should_run_ddl
 from ._portable_sql import (
     MIN_SQLITE_VERSION_FOR_IS_NOT_DISTINCT_FROM,
     POSTGRESQL_NULL_SAFE,
@@ -52,12 +53,15 @@ __all__ = [
     "SQLITE_NULL_SAFE",
     "SQLITE_ONLY_UPSERT_FORMS",
     "BackendReport",
+    "DDLResult",
     "StoreLocation",
     "UnknownStoreScheme",
     "describe_backend",
+    "execute_ddl",
     "null_safe_eq",
     "parse_store_url",
     "resolve_store",
+    "should_run_ddl",
     "to_paramstyle",
 ]
 
