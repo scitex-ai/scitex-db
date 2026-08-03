@@ -28,6 +28,7 @@ from __future__ import annotations
 
 from ._backend import BackendReport, describe_backend
 from ._ddl import DDLResult, execute_ddl, should_run_ddl
+from ._tx import begin_write
 from ._portable_sql import (
     MIN_SQLITE_VERSION_FOR_IS_NOT_DISTINCT_FROM,
     POSTGRESQL_NULL_SAFE,
@@ -56,6 +57,7 @@ __all__ = [
     "DDLResult",
     "StoreLocation",
     "UnknownStoreScheme",
+    "begin_write",
     "describe_backend",
     "execute_ddl",
     "null_safe_eq",
