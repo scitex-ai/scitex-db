@@ -20,6 +20,10 @@ from scitex_db._schema_change import (
     Status,
     preflight,
 )
+from scitex_db._schema_change._cards_store import (
+    row_level_write_landed,
+    v10_rung_checks,
+)
 
 
 class _Conn:
@@ -349,3 +353,79 @@ def test_non_passing_finding_without_hint_is_refused():
     # Assert
     with pytest.raises(ValueError, match="no hint"):
         Finding(**kwargs)
+
+
+# --------------------------------------------------------------------------
+# _cards_store: the binding scitex-cards will call on 08-13
+# --------------------------------------------------------------------------
+
+
+def test_row_level_write_probe_reports_fail_when_trigger_absent(conn):
+    # Arrange
+    probe = row_level_write_landed(has_trigger=lambda c, name: False)
+    # Act
+    finding = probe.run(conn)
+    # Assert
+    assert finding.status is Status.FAIL
+
+
+def test_row_level_write_probe_reports_pass_when_trigger_present(conn):
+    # Arrange
+    probe = row_level_write_landed(has_trigger=lambda c, name: True)
+    # Act
+    finding = probe.run(conn)
+    # Assert
+    assert finding.status is Status.PASS
+
+
+def test_row_level_write_probe_asks_for_the_agreed_artifact_name(conn):
+    """The rung name is scitex-cards' contract; drifting from it silently
+    would make this probe answer a question nobody agreed to."""
+    # Arrange
+    asked: list[str] = []
+    probe = row_level_write_landed(
+        has_trigger=lambda c, name: (asked.append(name), False)[1]
+    )
+    # Act
+    probe.run(conn)
+    # Assert
+    assert asked == ["tasks_row_level_write"]
+
+
+def test_missing_cards_package_yields_unknown_not_fail(conn):
+    """An absent package is not evidence that the change is absent."""
+    # Arrange
+    def unavailable(c, name):
+        raise ImportError("No module named 'scitex_cards'")
+
+    probe = row_level_write_landed(has_trigger=unavailable)
+    # Act
+    finding = probe.run(conn)
+    # Assert
+    assert finding.status is Status.UNKNOWN
+
+
+def test_v10_rung_checks_put_the_control_first(conn):
+    """A reader must meet the instrument's verdict before findings that rest on it."""
+    # Arrange
+    checks = v10_rung_checks(
+        fetch_one_int=lambda c, q: 3569,
+        has_trigger=lambda c, name: False,
+    )
+    # Act
+    first = checks[0]
+    # Assert
+    assert isinstance(first, PositiveControl)
+
+
+def test_v10_rung_is_not_ready_on_a_store_without_the_trigger(conn):
+    """The whole point: an honest NOT READY, from a live instrument."""
+    # Arrange
+    checks = v10_rung_checks(
+        fetch_one_int=lambda c, q: 3569,
+        has_trigger=lambda c, name: False,
+    )
+    # Act
+    report = preflight(conn, checks)
+    # Assert
+    assert report.ok is False
