@@ -12,6 +12,9 @@ from __future__ import annotations
 import pytest
 
 from scitex_db._schema_change import (
+    LockCost,
+    RefusedToLockLiveStore,
+    measure_lock_cost,
     ArtifactProbe,
     ExpectedFailure,
     Finding,
@@ -473,3 +476,95 @@ def test_catalogue_control_asks_for_the_v7_rung(conn):
     control.run(conn)
     # Assert
     assert asked == ["tasks_bump_revision"]
+
+
+# --------------------------------------------------------------------------
+# measure_lock_cost: takes a REAL lock, so the disruptive path cannot be
+# reached by forgetting an argument
+# --------------------------------------------------------------------------
+
+
+def test_measuring_without_asserting_scratch_is_refused(conn):
+    """The lock is taken even though the write is rolled back."""
+    # Arrange
+    stmt = "CREATE TRIGGER t AFTER UPDATE ON tasks BEGIN SELECT 1; END"
+    # Act
+    # Assert
+    with pytest.raises(RefusedToLockLiveStore):
+        measure_lock_cost(conn, stmt, scratch=False)
+
+
+def test_refusal_names_the_lock_not_the_write(conn):
+    """A caller who reads 'rolled back' must not conclude 'undisruptive'."""
+    # Arrange
+    stmt = "ALTER TABLE tasks ADD COLUMN x INTEGER"
+    # Act
+    with pytest.raises(RefusedToLockLiveStore) as excinfo:
+        measure_lock_cost(conn, stmt, scratch=False)
+    # Assert
+    assert "blocks every reader and writer" in str(excinfo.value)
+
+
+def test_scratch_measurement_rolls_back(conn):
+    # Arrange
+    calls: list[str] = []
+    # Act
+    result = measure_lock_cost(
+        conn,
+        "CREATE TRIGGER t",
+        scratch=True,
+        execute=lambda c, s: calls.append("execute"),
+        begin=lambda c: calls.append("begin"),
+        rollback=lambda c: calls.append("rollback"),
+    )
+    # Assert
+    assert result.rolled_back is True
+
+
+def test_scratch_measurement_never_commits(conn):
+    """There is no commit path; the sequence must end in rollback."""
+    # Arrange
+    calls: list[str] = []
+    # Act
+    measure_lock_cost(
+        conn,
+        "CREATE TRIGGER t",
+        scratch=True,
+        execute=lambda c, s: calls.append("execute"),
+        begin=lambda c: calls.append("begin"),
+        rollback=lambda c: calls.append("rollback"),
+    )
+    # Assert
+    assert calls == ["begin", "execute", "rollback"]
+
+
+def test_a_raising_statement_still_rolls_back(conn):
+    """A failed DDL must not leave the transaction open holding its lock."""
+    # Arrange
+    calls: list[str] = []
+
+    def boom(c, s):
+        raise RuntimeError("syntax error")
+
+    # Act
+    with pytest.raises(RuntimeError):
+        measure_lock_cost(
+            conn,
+            "CREATE TRIGGR t",
+            scratch=True,
+            execute=boom,
+            begin=lambda c: calls.append("begin"),
+            rollback=lambda c: calls.append("rollback"),
+        )
+    # Assert
+    assert calls == ["begin", "rollback"]
+
+
+def test_summary_names_a_committed_result_loudly():
+    """rolled_back=False must be visibly alarming in the summary."""
+    # Arrange
+    cost = LockCost(statement="ALTER TABLE tasks ...", seconds=0.5, rolled_back=False)
+    # Act
+    text = cost.summary()
+    # Assert
+    assert "COMMITTED" in text

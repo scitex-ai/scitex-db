@@ -63,6 +63,7 @@ from __future__ import annotations
 from ._report import Report, Finding, Status
 from ._checks import ArtifactProbe, PositiveControl, ExpectedFailure, Check
 from ._preflight import preflight
+from ._lock_cost import LockCost, RefusedToLockLiveStore, measure_lock_cost
 
 __all__ = [
     "preflight",
@@ -73,4 +74,7 @@ __all__ = [
     "ArtifactProbe",
     "PositiveControl",
     "ExpectedFailure",
+    "measure_lock_cost",
+    "LockCost",
+    "RefusedToLockLiveStore",
 ]
