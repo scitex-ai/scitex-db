@@ -21,6 +21,7 @@ from scitex_db._schema_change import (
     preflight,
 )
 from scitex_db._schema_change._cards_store import (
+    catalogue_is_visible,
     row_level_write_landed,
     v10_rung_checks,
 )
@@ -429,3 +430,46 @@ def test_v10_rung_is_not_ready_on_a_store_without_the_trigger(conn):
     report = preflight(conn, checks)
     # Assert
     assert report.ok is False
+
+
+def test_blind_catalogue_makes_instrument_not_live(conn):
+    """A catalogue read that sees NOTHING must not publish a verdict.
+
+    THE ISOLATING CASE, per scitex-cards: a broken catalogue read returns False
+    for every artifact, so row_level_write_landed reports "absent" -- which is
+    byte-identical to an honest pre-flip store. Without this control the report
+    would say NOT READY for the right reason by accident.
+
+    Here the artifact probe legitimately fails too, so ok would be False either
+    way; what this pins is that INSTRUMENT_LIVE goes False, which is the only
+    signal that distinguishes "not landed" from "I cannot see anything"."""
+    # Arrange
+    blind = lambda c, name: False
+    checks = v10_rung_checks(fetch_one_int=lambda c, q: 3608, has_trigger=blind)
+    # Act
+    report = preflight(conn, checks)
+    # Assert
+    assert report.instrument_live is False
+
+
+def test_visible_catalogue_marks_instrument_live(conn):
+    # Arrange
+    sighted = lambda c, name: name == "tasks_bump_revision"
+    checks = v10_rung_checks(fetch_one_int=lambda c, q: 3608, has_trigger=sighted)
+    # Act
+    report = preflight(conn, checks)
+    # Assert
+    assert report.instrument_live is True
+
+
+def test_catalogue_control_asks_for_the_v7_rung(conn):
+    """It must probe an artifact known to exist, through the same helper."""
+    # Arrange
+    asked: list[str] = []
+    control = catalogue_is_visible(
+        has_trigger=lambda c, name: (asked.append(name), True)[1]
+    )
+    # Act
+    control.run(conn)
+    # Assert
+    assert asked == ["tasks_bump_revision"]

@@ -84,17 +84,67 @@ def row_level_write_landed(
 def tasks_are_readable(
     fetch_one_int: Callable[[Any, str], int],
 ) -> PositiveControl:
-    """Prove the instrument reaches live card data before trusting any zero.
+    """Prove the connection reaches live card data.
 
-    ``tasks`` is never empty on a real store -- it held 3569 rows when this was
-    written -- so a zero here means the query is not reaching the data, not that
-    the store is clean. Without this control every other zero in the run is
-    uninformative.
+    ``tasks`` is never empty on a real store -- it held 3608 rows when this was
+    written -- so a zero here means the query is not reaching the data.
+
+    NOT SUFFICIENT ON ITS OWN, and the reason is the point of
+    :func:`catalogue_is_visible`: this control exercises a TABLE read while the
+    verdict comes from a CATALOGUE read. It rules out failures of the mechanism
+    the verdict does not use. Keep it because it gives a sharper message when
+    the connection itself is the problem, not because it makes the verdict
+    trustworthy.
     """
     return PositiveControl(
-        name="instrument reaches live card data",
+        name="connection reaches live card data",
         query="SELECT count(*) FROM tasks",
         fetch_one_int=fetch_one_int,
+    )
+
+
+#: The v7 rung. An AFTER UPDATE trigger on ``tasks``, installed by
+#: ``_db_migrations.py:107-113`` and hand-ported to PostgreSQL at
+#: ``_pg_triggers.py:140-151``. Present on EVERY v9 store, which is what makes
+#: it usable as a control.
+KNOWN_PRESENT_ARTIFACT = "tasks_bump_revision"
+
+
+def catalogue_is_visible(
+    has_trigger: Callable[[Any, str], bool] | None = None,
+) -> PositiveControl:
+    """Prove THIS probe can see an artifact that is known to be there.
+
+    WHY THIS EXISTS, and it is scitex-cards' correction rather than my design.
+    The verdict of :func:`row_level_write_landed` comes from a CATALOGUE read
+    (``pg_trigger`` / ``sqlite_master``). A table-row control cannot vouch for
+    it, because the failure that matters produces a FALSE from the catalogue:
+
+        broken catalogue read / wrong search_path / wrong database
+          -> has_trigger returns False
+          -> report says "artifact absent"
+          -> which is EXACTLY what it says on an honest pre-flip store
+
+    A dead catalogue read and a genuine NOT LANDED are byte-identical in the
+    output. This control removes that ambiguity by asking the SAME helper, on
+    the SAME table, through the SAME catalogue, for an artifact that must
+    already exist. If it answers False, the probe is lying and the run says so
+    before publishing a verdict.
+
+    That is the difference between "the connection works" and "an artifact I
+    know exists is visible to this exact probe" -- and only the second supports
+    the claim the report makes.
+    """
+    probe = has_trigger
+
+    def count(conn: Any, _query: str) -> int:
+        fn = probe if probe is not None else _resolve_has_trigger()
+        return 1 if fn(conn, KNOWN_PRESENT_ARTIFACT) else 0
+
+    return PositiveControl(
+        name=f"probe can see a known artifact ({KNOWN_PRESENT_ARTIFACT})",
+        query=f"has_trigger({KNOWN_PRESENT_ARTIFACT})",
+        fetch_one_int=count,
     )
 
 
@@ -104,10 +154,12 @@ def v10_rung_checks(
 ) -> Sequence[Check]:
     """The set scitex-cards asked for: is this store ready for the v10 rung?
 
-    Ordered control-first so a reader of the report meets the instrument's own
-    verdict before any finding that depends on it.
+    Controls first, so a reader meets the instrument's own verdict before any
+    finding that rests on it. BOTH controls run: the table read localises a
+    dead connection, the catalogue read is what makes the FAIL trustworthy.
     """
     return (
         tasks_are_readable(fetch_one_int),
+        catalogue_is_visible(has_trigger),
         row_level_write_landed(has_trigger),
     )
