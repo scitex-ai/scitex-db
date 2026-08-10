@@ -141,8 +141,20 @@ def catalogue_is_visible(
         fn = probe if probe is not None else _resolve_has_trigger()
         return 1 if fn(conn, KNOWN_PRESENT_ARTIFACT) else 0
 
+    # The name is the failure message. When this control fails, the report must
+    # not read as though the RUNG failed -- it is a statement about the store
+    # being an unexpected shape, or the probe being blind. scitex-cards raised
+    # this: the control degrades with the check, and if tasks_bump_revision is
+    # ever dropped or renamed this goes FAIL for a reason unrelated to the rung.
+    # That is the correct direction to fail in (loud and wrong-looking, so it
+    # gets investigated) but only if the wording sends the reader to the right
+    # place.
     return PositiveControl(
-        name=f"probe can see a known artifact ({KNOWN_PRESENT_ARTIFACT})",
+        name=(
+            f"control artifact {KNOWN_PRESENT_ARTIFACT!r} visible to this probe "
+            "(if this fails, the store is not the shape this instrument expects "
+            "-- it is NOT a verdict about the rung)"
+        ),
         query=f"has_trigger({KNOWN_PRESENT_ARTIFACT})",
         fetch_one_int=count,
     )
