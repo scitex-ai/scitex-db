@@ -34,3 +34,13 @@ docs/sphinx/_build/
 
 # Python virtualenv
 .venv/
+
+# Local linked git worktrees. Every topic branch is developed in a worktree
+# under here, so the directory is per-checkout scaffolding, never source.
+# NOTE: this rule alone does not undo the gitlinks that were already committed
+# under .worktrees/ — gitignore never untracks. Those are removed from the
+# index in the same commit that adds this line.
+.worktrees/
+
+# Agent scratch — per-machine notes and working files, never source.
+GITIGNORED/
