@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-from scitex_db._schema_change import LockCost, RefusedToLockLiveStore, measure_lock_cost
+from scitex_db.schema_change import LockCost, RefusedToLockLiveStore, measure_lock_cost
 
 
 def test_measuring_without_asserting_scratch_is_refused(conn):

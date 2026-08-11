@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """How long does one statement hold its lock?
 
-NOT PART OF :func:`~scitex_db._schema_change._preflight.preflight`, and the
+NOT PART OF :func:`~scitex_db.schema_change._preflight.preflight`, and the
 separation is the safety property. ``preflight`` accepts no DDL and therefore
 cannot write; this module EXECUTES the statement in order to time it. Putting
 them behind one entry point with a flag is exactly the shape ``_migrate``

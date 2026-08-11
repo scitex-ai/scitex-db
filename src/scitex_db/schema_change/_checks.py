@@ -21,7 +21,7 @@ class Check(Protocol):
     """Anything that can look at a live connection and produce one Finding.
 
     A check NEVER raises for a condition it is testing -- that is what
-    :class:`~scitex_db._schema_change._report.Status` is for. It may raise only
+    :class:`~scitex_db.schema_change._report.Status` is for. It may raise only
     if the connection itself is unusable, which is a different failure and
     belongs to the caller.
     """

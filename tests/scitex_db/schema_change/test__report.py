@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-from scitex_db._schema_change import Finding, Report, Status
+from scitex_db.schema_change import Finding, Report, Status
 
 
 def test_unknown_status_refuses_boolean_coercion():

@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from scitex_db._schema_change import ExpectedFailure, Status
+from scitex_db.schema_change import ExpectedFailure, Status
 
 
 def test_absent_artifact_reports_fail(conn, absent_artifact):

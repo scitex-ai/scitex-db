@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from scitex_db._schema_change._fk_shape import FKShape, observe_fk
+from scitex_db.schema_change._fk_shape import FKShape, observe_fk
 
 
 class _Conn:
