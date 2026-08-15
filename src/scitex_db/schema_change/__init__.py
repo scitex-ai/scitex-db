@@ -53,9 +53,31 @@ FOUR REQUIREMENTS, each from a measured failure rather than from taste:
    instrument is live, and its failure invalidates the run rather than adding a
    finding.
 
-WHAT IS NOT HERE YET, stated so absence is not read as completeness: lock-held
-cost measurement per statement (ALTER takes ACCESS EXCLUSIVE and freezes every
-agent's board), and migrate-a-copy-first as the default. Both are on the card.
+PUBLIC BY NAME, AND IT WAS NOT BEFORE. This module was ``_schema_change`` until
+2026-08-11, which made every name in it unreachable to another package without
+reaching into a private module. That was never a decision -- PRs #78 and #79
+shipped :func:`add_deferrable_fk` and :func:`observe_fk` with tests and mutation
+coverage and simply stopped before the export step, and this docstring's own
+export list repeated the omission. Two artifacts agreeing is not two witnesses
+when one was copied from the other. It surfaced only when scitex-cards asked to
+CALL the primitive rather than reimplement it, having been told by me that it
+was exported. It was not.
+
+So: ``__all__`` below is the promise. Anything not in it is internal and may
+move. :func:`add_deferrable_fk` exists to be called from another package's
+migration rung -- one implementation of the one-transaction discipline, because
+two mechanisms altering the same constraint is how the FK oscillation of
+2026-08-10 happened, with every individual step correct and neither converging.
+
+:func:`observe_fk` is POSTGRESQL ONLY, by construction rather than by omission;
+see its own module docstring for the measurements. It raises on a SQLite
+connection rather than reporting ABSENT.
+
+WHAT IS NOT HERE YET, stated so absence is not read as completeness:
+migrate-a-copy-first as the default. On the card. (Lock-held cost measurement
+per statement WAS listed here as missing long after :func:`measure_lock_cost`
+shipped -- a docstring outliving its own subject, which is the same staleness
+the export list had.)
 """
 
 from __future__ import annotations
@@ -64,6 +86,8 @@ from ._report import Report, Finding, Status
 from ._checks import ArtifactProbe, PositiveControl, ExpectedFailure, Check
 from ._preflight import preflight
 from ._lock_cost import LockCost, RefusedToLockLiveStore, measure_lock_cost
+from ._deferrable_fk import OrphansFound, add_deferrable_fk
+from ._fk_shape import FKObservation, FKShape, observe_fk
 
 __all__ = [
     "preflight",
@@ -77,4 +101,9 @@ __all__ = [
     "measure_lock_cost",
     "LockCost",
     "RefusedToLockLiveStore",
+    "add_deferrable_fk",
+    "OrphansFound",
+    "observe_fk",
+    "FKShape",
+    "FKObservation",
 ]

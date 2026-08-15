@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-from scitex_db._schema_change._deferrable_fk import OrphansFound, add_deferrable_fk
+from scitex_db.schema_change._deferrable_fk import OrphansFound, add_deferrable_fk
 
 
 class _Conn:

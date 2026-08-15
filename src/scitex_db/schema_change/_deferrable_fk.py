@@ -103,7 +103,7 @@ def add_deferrable_fk(
     IDEMPOTENCY IS THE CALLER'S: this does not check whether the constraint
     already exists, because ``ADD CONSTRAINT`` on a duplicate name fails loudly
     and that is the right outcome for a migration that should run once. Probe
-    with :mod:`scitex_db._schema_change` first if you need to know.
+    with :mod:`scitex_db.schema_change` first if you need to know.
     """
     _execute = execute or (lambda c, sql: c.execute(sql))
     _count = count_orphans or _default_count_orphans

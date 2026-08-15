@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from scitex_db._schema_change import ArtifactProbe, preflight
+from scitex_db.schema_change import ArtifactProbe, preflight
 
 
 def test_zero_control_marks_instrument_not_live(conn, dead_control):

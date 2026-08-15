@@ -4,8 +4,8 @@
 
 from __future__ import annotations
 
-from scitex_db._schema_change import PositiveControl, Status, preflight
-from scitex_db._schema_change._cards_store import (
+from scitex_db.schema_change import PositiveControl, Status, preflight
+from scitex_db.schema_change._cards_store import (
     catalogue_is_visible,
     row_level_write_landed,
     v10_rung_checks,

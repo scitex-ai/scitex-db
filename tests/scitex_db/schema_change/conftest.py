@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Shared fixtures for the _schema_change tests.
+"""Shared fixtures for the schema_change tests.
 
 Lifted here rather than duplicated per module so each test file carries only
 the behaviour it pins. The connection is a stand-in: every check in this
@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from scitex_db._schema_change import ArtifactProbe, PositiveControl
+from scitex_db.schema_change import ArtifactProbe, PositiveControl
 
 
 class _Conn:
