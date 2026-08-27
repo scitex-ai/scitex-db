@@ -1,0 +1,37 @@
+[Unit]
+Description=SciTeX fleet database REPLICA — rootless PostgreSQL 18 (apptainer)
+Documentation=https://github.com/scitex-ai/scitex-db
+After=network-online.target
+Wants=network-online.target
+
+# WHY APPTAINER HERE AND DOCKER ON THE PRIMARY. Same intent, two runtimes, and
+# the split is deliberate rather than accidental: the compute hosts run rootless
+# without a docker daemon, the NAS has docker. The mechanism is therefore a
+# PARAMETER of the deployment, not a property of the database — which is why
+# this unit and the primary's compose declare the same server two ways.
+#
+# READING THIS UNIT IS THE ONLY WAY TO KNOW THE MECHANISM. `apptainer exec`
+# registers NO instance, so `apptainer instance list` is empty while this runs,
+# and apptainer shares the host PID/network namespaces so the postmaster appears
+# in the host process table with a host-visible listener. `docker ps` empty plus
+# `apptainer instance list` empty reads exactly like "not containerised" and is
+# not. Measured 2026-08-27, after three probes agreed on the wrong answer.
+
+[Service]
+Type=exec
+EnvironmentFile=%h/.scitex/pg/replica.env
+Environment=PGPASSFILE=%h/.pgpass
+
+# The datadir gate. It repairs the empty-directory/permission damage that once
+# crash-looped this service 1222 times, and it must run BEFORE every start —
+# not once at install — because the damage is inflicted by restores, not by us.
+ExecStartPre=%h/.scitex/pg/bin/preflight_datadir.sh ${SCITEX_PG_DATADIR}
+
+ExecStart=/usr/bin/apptainer exec -B ${SCITEX_PG_BIND} --env PGPASSFILE=%h/.pgpass \
+  ${SCITEX_PG_SIF} /usr/lib/postgresql/18/bin/postgres -D ${SCITEX_PG_DATADIR}
+
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
