@@ -1,0 +1,17 @@
+[Unit]
+Description=Nightly logical dumps of the primary, pushed offsite and verified there by name+size
+Documentation=https://github.com/scitex-ai/scitex-db
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.scitex/pg/dump.env
+# Self-bounding: the cards DB is a few hundred MB; 900s is generous and still
+# cannot hang forever (pattern from compute-04's proven lane).
+ExecStart=/usr/bin/timeout 900 %h/.scitex/pg/bin/dump-primary.sh
+StandardOutput=append:%h/.scitex/pg/logs/dump.log
+StandardError=append:%h/.scitex/pg/logs/dump.log
+
+[Install]
+WantedBy=default.target
