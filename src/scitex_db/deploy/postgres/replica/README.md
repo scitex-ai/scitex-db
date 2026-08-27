@@ -40,9 +40,13 @@ empty reads exactly like "not containerised", and is wrong. Read the unit:
       +---------+-------+-------+---------+
       |         |               |         |
   compute-01 compute-02   compute-03  compute-04     direct standbys (apptainer)
-                                          |
-                                       nas-02        CASCADED standby (docker)
 ```
+
+`nas-02` also held a standby until 2026-08-28 — a **cascaded** one following
+compute-04 rather than the primary. It was retired on the operator's call: it
+carried nothing that did not already exist on six other machines, and it made
+the offsite host depend on a compute node staying up. Stopped, not deleted;
+the 1.3G datadir is still on disk pending confirmation.
 
 Seven of nine hosts. `nas-01` is not a candidate: armv7l 32-bit ARM, no
 container runtime, and not on the overlay — it cannot reach the primary, whose
