@@ -1,0 +1,55 @@
+# The fleet's PostgreSQL primary, declared.
+#
+# Captured 2026-08-27 from the container that was running UNDECLARED on
+# scitex-nas-03 (`docker inspect scitex-cards-pg18` showed empty labels — a
+# hand-typed `docker run`, reproducible by nobody). This file is the same
+# server, restartable by anyone.
+#
+# Addressing rule (operator, 2026-08-27): the primary lives on scitex-nas-03;
+# every other host runs a replica that keeps working while isolated and
+# resyncs when it returns. Sync logic belongs to each leaf package — this
+# file only provides the server.
+#
+# No address is baked in. LISTEN_ADDRESSES arrives from the environment or
+# .env beside this file, because an address written here would be silently
+# wrong on every host except the one it was copied from.
+services:
+  postgres:
+    image: postgres:18-trixie          # pinned major; matches the live data dir
+    container_name: scitex-pg18
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      PGDATA: /var/lib/postgresql/data
+      PGPASSFILE: /var/lib/postgresql/.pgpass
+    volumes:
+      - ${SCITEX_PG_DATA:?path to the data directory, e.g. ~/.scitex/pg/cards18}:/var/lib/postgresql/data
+      - ${SCITEX_PG_WAL_ARCHIVE:?path to the WAL archive dir}:/var/lib/postgresql/wal-archive
+      - ${SCITEX_PG_PGPASS:?path to a .pgpass file}:/var/lib/postgresql/.pgpass
+    command:
+      - -c
+      - port=${SCITEX_PG_PORT:-55432}
+      - -c
+      - listen_addresses=${SCITEX_PG_LISTEN:?comma-separated addresses to listen on}
+      - -c
+      - logging_collector=off
+      - -c
+      - log_destination=stderr
+      - -c
+      - unix_socket_directories=/var/run/postgresql
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=test ! -f /var/lib/postgresql/wal-archive/%f && cp -f %p /var/lib/postgresql/wal-archive/%f
+      - -c
+      - archive_timeout=300
+      - -c
+      - hot_standby=on
+    healthcheck:
+      # pg_isready exits 0 only when the server accepts connections — a check
+      # that can actually fail, unlike `docker ps`.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p ${SCITEX_PG_PORT:-55432}"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
