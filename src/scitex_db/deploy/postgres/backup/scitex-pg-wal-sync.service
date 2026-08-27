@@ -3,6 +3,7 @@ Description=Push the PRIMARY's archived WAL offsite; fail loud when the archiver
 Documentation=https://github.com/scitex-ai/scitex-db
 After=network-online.target
 Wants=network-online.target
+OnFailure=scitex-pg-backup-alert@%n.service
 
 [Service]
 Type=oneshot

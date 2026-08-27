@@ -28,7 +28,14 @@ SSH_KEY="${SCITEX_PG_SSH_KEY:-}"
 SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new)
 [ -n "$SSH_KEY" ] && SSH_OPTS+=(-i "$SSH_KEY")
 
-DATE=$(date -u +%F)
+# PER-RUN, not per-day. --ignore-existing never rewrites a shipped artifact
+# (a corrupted re-dump must not overwrite a good one), but with a DATE-only
+# name a second run the same day collides: the new dump never ships and the
+# offsite copy silently goes stale against the local one. Measured 2026-08-27 —
+# the size check caught it (local=42940363 remote=42938606); a file-count check
+# would have passed forever. A unique name per run makes immutability and
+# freshness stop fighting.
+DATE=$(date -u +%Y%m%dT%H%M%SZ)
 RC=0
 fail(){ echo "ALERT: $*"; RC=1; }
 mkdir -p "$SCITEX_PG_DUMP_DIR"; chmod 700 "$SCITEX_PG_DUMP_DIR"
