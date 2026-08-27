@@ -1,0 +1,17 @@
+[Unit]
+Description=Push the PRIMARY's archived WAL offsite; fail loud when the archiver is broken
+Documentation=https://github.com/scitex-ai/scitex-db
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Self-bounding: rsync of small immutable files. 300s covers a slow link
+# without ever hanging forever (pattern from compute-04's proven lane).
+EnvironmentFile=%h/.scitex/pg/wal-sync.env
+ExecStart=/usr/bin/timeout 300 %h/.scitex/pg/bin/wal-sync-primary.sh
+StandardOutput=append:%h/.scitex/pg/logs/wal-sync.log
+StandardError=append:%h/.scitex/pg/logs/wal-sync.log
+
+[Install]
+WantedBy=default.target
