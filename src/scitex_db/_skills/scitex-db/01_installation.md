@@ -13,7 +13,7 @@ tags: [scitex-db-installation]
 pip install scitex-db
 ```
 
-Pulls `numpy`, `pandas`, `click`, and `scitex-core`. SQLite support is
+Pulls `numpy`, `pandas` and `click`. SQLite support is
 built in via Python's stdlib `sqlite3` — no system deps.
 
 ## Optional extras

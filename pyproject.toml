@@ -34,11 +34,29 @@ classifiers = [
     "Topic :: Scientific/Engineering",
 ]
 
+# scitex-core is DELIBERATELY ABSENT. It was declared here and never imported —
+# zero occurrences of `scitex_core` in src/ or tests/, only prose listing it as a
+# dependency — while dragging the whole ecosystem in behind it:
+#
+#     scitex-db -> scitex-core -> scitex (UNCONSTRAINED) -> 103 scitex-* leaves
+#
+# scitex-core 0.2.8 requires a bare `scitex`, the umbrella requires 103 leaf
+# packages, and `scitex-core>=0.2.0` is itself one of them — so the edge closed a
+# cycle as well as inverting the intended direction. Leaves are what the umbrella
+# depends on; a leaf must not pull the umbrella back in.
+#
+# The visible cost was elsewhere: consumers that merely install scitex-db[...]
+# inherited an old pinned umbrella, and scitex-io's REQUIRED audit gate then
+# failed on a rule that grades the INSTALLED umbrella and reports the verdict as
+# scitex-io's own violation. Same code, same rule, verdict flipping purely on
+# whether the umbrella happened to be resolved in.
+#
+# If something here ever does need a scitex package, depend on THAT package
+# (scitex-str, say), never on an aggregate.
 dependencies = [
     "click>=8.0",
     "numpy",
     "pandas",
-    "scitex-core>=0.1.0",
 ]
 
 [project.optional-dependencies]
