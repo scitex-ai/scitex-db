@@ -22,13 +22,6 @@ MANIFEST
 
 docs/sphinx/_build/
 
-# Sphinx's incremental-build cache. Not part of the published HTML, and it
-# is not merely redundant: environment.pickle embeds the ABSOLUTE build
-# directory and a copy of every intersphinx inventory (the whole CPython
-# object index), so committing it makes the bundle depend on who built it
-# and on which machine.
-src/*/_sphinx_html/.doctrees/
-
 # Coverage artifacts (combined + parallel shards)
 .coverage
 .coverage.*

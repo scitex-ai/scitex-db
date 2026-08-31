@@ -79,4 +79,48 @@ class PostgreSQL(
         self()
 
 
+# class BaseSQLiteDB(
+#     _ConnectionMixin,
+#     _QueryMixin,
+#     _TransactionMixin,
+#     _TableMixin,
+#     _IndexMixin,
+#     _RowMixin,
+#     _BatchMixin,
+#     _BlobMixin,
+#     _ImportExportMixin,
+#     _MaintenanceMixin,
+# ):
+#     """Comprehensive SQLite database management class."""
+
+#     def __init__(self, db_path: str, use_temp: bool = False):
+#         """Initializes database with option for temporary copy."""
+#         _ConnectionMixin.__init__(self, db_path, use_temp)
+
+#     def __call__(
+#         self,
+#         return_summary=False,
+#         print_summary=True,
+#         table_names: Optional[List[str]] = None,
+#         verbose: bool = True,
+#         limit: int = 5,
+#     ):
+#         summary = self.get_summaries(
+#             table_names=table_names,
+#             verbose=verbose,
+#             limit=limit,
+#         )
+
+#         if print_summary:
+#             for k, v in summary.items():
+#                 _printc(f"{k}\n{v}")
+
+#         if return_summary:
+#             return summary
+
+#     @property
+#     def summary(self):
+#         self()
+
+
 # EOF

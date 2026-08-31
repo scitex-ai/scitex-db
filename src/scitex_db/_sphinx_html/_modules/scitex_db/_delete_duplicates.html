@@ -1,0 +1,174 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>scitex_db._delete_duplicates &mdash; SciTeX DB v0.1.12</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=297ad043"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            SciTeX DB
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../installation.html#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation.html#basic-installation">Basic Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation.html#development">Development</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/scitex_db.html">scitex_db</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../api/scitex_db.html#scitex_db.SQLite3"><code class="docutils literal notranslate"><span class="pre">SQLite3</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../api/scitex_db.html#scitex_db.SQLite3.__init__"><code class="docutils literal notranslate"><span class="pre">SQLite3.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/scitex_db.html#scitex_db.SQLite3.__enter__"><code class="docutils literal notranslate"><span class="pre">SQLite3.__enter__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/scitex_db.html#scitex_db.SQLite3.__exit__"><code class="docutils literal notranslate"><span class="pre">SQLite3.__exit__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/scitex_db.html#scitex_db.SQLite3.__del__"><code class="docutils literal notranslate"><span class="pre">SQLite3.__del__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/scitex_db.html#scitex_db.SQLite3.__call__"><code class="docutils literal notranslate"><span class="pre">SQLite3.__call__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/scitex_db.html#scitex_db.SQLite3.summary"><code class="docutils literal notranslate"><span class="pre">SQLite3.summary</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/scitex_db.html#scitex_db.batch_health_check"><code class="docutils literal notranslate"><span class="pre">batch_health_check()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/scitex_db.html#scitex_db.check_health"><code class="docutils literal notranslate"><span class="pre">check_health()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/scitex_db.html#scitex_db.delete_duplicates"><code class="docutils literal notranslate"><span class="pre">delete_duplicates()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/scitex_db.html#scitex_db.delete_sqlite3_duplicates"><code class="docutils literal notranslate"><span class="pre">delete_sqlite3_duplicates()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/scitex_db.html#scitex_db.inspect"><code class="docutils literal notranslate"><span class="pre">inspect()</span></code></a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">SciTeX DB</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">scitex_db._delete_duplicates</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for scitex_db._delete_duplicates</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Timestamp: &quot;2025-07-12 12:00:00 (ywatanabe)&quot;</span>
+<span class="c1"># File: ./src/scitex/db/_delete_duplicates.py</span>
+<span class="c1"># ----------------------------------------</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+
+<span class="n">__FILE__</span> <span class="o">=</span> <span class="vm">__file__</span>
+<span class="n">__DIR__</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">__FILE__</span><span class="p">)</span>
+<span class="c1"># ----------------------------------------</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Backward compatibility wrapper for delete_duplicates function.</span>
+<span class="sd">The actual implementation has been moved to _sqlite3._delete_duplicates</span>
+<span class="sd">as it is SQLite3-specific.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">._sqlite3._delete_duplicates</span><span class="w"> </span><span class="kn">import</span> <span class="n">delete_sqlite3_duplicates</span>
+
+
+<div class="viewcode-block" id="delete_duplicates">
+<a class="viewcode-back" href="../../api/scitex_db.html#scitex_db.delete_duplicates">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">delete_duplicates</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Delete duplicate entries from an SQLite database table.</span>
+
+<span class="sd">    .. deprecated::</span>
+<span class="sd">        This function is deprecated as it&#39;s SQLite3-specific.</span>
+<span class="sd">        Use scitex.db._sqlite3.delete_sqlite3_duplicates() instead.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+        <span class="s2">&quot;scitex.db.delete_duplicates is deprecated. &quot;</span>
+        <span class="s2">&quot;Use scitex.db._sqlite3.delete_sqlite3_duplicates instead. &quot;</span>
+        <span class="s2">&quot;Will be removed in v3.0.0.&quot;</span><span class="p">,</span>
+        <span class="ne">DeprecationWarning</span><span class="p">,</span>
+        <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">delete_sqlite3_duplicates</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+
+
+<span class="c1"># Export for backward compatibility</span>
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;delete_duplicates&quot;</span><span class="p">]</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Yusuke Watanabe.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
