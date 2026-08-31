@@ -6,7 +6,7 @@
   </a>
 </p>
 
-<p align="center"><b>Database utilities for scientific computing — SQLite3 + PostgreSQL with NumPy-aware storage.</b></p>
+<p align="center"><b>PostgreSQL utilities for scientific computing — NumPy-aware storage.</b></p>
 
 <p align="center">
   <a href="https://scitex-db.readthedocs.io/">Full Documentation</a> · <code>uv pip install scitex-db[all]</code>
@@ -31,15 +31,15 @@
 
 | # | Problem | Solution |
 |---|---------|----------|
-| 1 | **Storing ndarrays in SQLite means `pickle.dumps → BLOB`** — no compression, no dtype/shape, no deterministic hashing | **`db.save_array(table, arr) / load_array(...)`** — typed compressed BLOBs round-trip with `dtype`, `shape`, `is_compressed`, `_hash` columns |
-| 2 | **`sqlite3` API is low-level** — every project re-writes connect / transaction / execute boilerplate | **`with db.transaction(): ...`** — context-managed transactions, health checks, dedup, schema inspection built-in |
-| 3 | **Switching SQLite ↔ Postgres rewrites every call site** | **Mixin composition** — `SQLite3` and `PostgreSQL` share `_BaseMixins/`; the same call site works against either backend |
+| 1 | **Storing ndarrays in a table means `pickle.dumps → bytes`** — no dtype, no shape, nothing to reconstruct from | **`db.save_array(table, arr) / load_array(...)`** — `BYTEA` payloads round-trip through `<column>_dtype` / `<column>_shape` sidecar columns |
+| 2 | **The `psycopg2` API is low-level** — every project re-writes connect / transaction / execute boilerplate | **`with db.transaction(): ...`** — context-managed transactions, batch insert, schema inspection built-in |
+| 3 | **An in-place schema change on a live store is a guess** | **`scitex_db.schema_change`** — pre-flight the change, probe a physical artifact, and refuse on a zero the instrument did not earn |
 
 ## Installation
 
 ```bash
-pip install scitex-db                 # SQLite3 only
-pip install scitex-db[postgresql]     # add psycopg2 driver
+pip install scitex-db                 # library only
+pip install scitex-db[postgresql]     # add the psycopg2 driver
 pip install scitex-db[all]            # everything
 ```
 
@@ -53,13 +53,17 @@ resolution order.
 ## Quick Start
 
 ```python
-from scitex_db import SQLite3
+import os
 import numpy as np
+from scitex_db import PostgreSQL
 
-db = SQLite3("experiments.db")
+db = PostgreSQL(
+    dbname="lab", user="me", password=os.environ["PGPASSWORD"],
+    host="localhost", port=55432,
+)
 
 db.create_table("results", {
-    "id": "INTEGER PRIMARY KEY",
+    "id": "SERIAL PRIMARY KEY",
     "experiment": "TEXT",
     "accuracy": "REAL",
 })
@@ -82,31 +86,27 @@ features = db.load_array("features", "embeddings", where="model = 'bert'")
 <br>
 
 ```python
-from scitex_db import SQLite3, PostgreSQL, check_health, inspect
+from scitex_db import PostgreSQL
 
-# Backends
-db = SQLite3("experiments.db")
-db = PostgreSQL(host=..., user=..., dbname=...)
+db = PostgreSQL(host=..., user=..., dbname=..., port=55432)
 
 # CRUD
 db.insert("results", {"experiment": "exp1", "accuracy": 0.95})
 db.insert_many("results", rows, batch_size=1000)
-rows = db.get_rows("results", where="accuracy > 0.9")
+rows = db.select("results", where="accuracy > 0.9")
 db.update("results", {"accuracy": 0.97}, where="id = 1")
 db.delete("results", where="id = 1")
 
-# Arrays / Blobs
-db.save_array(table, arr, column="data")
-db.load_array(table, "data", where=...)
-db.save_blob(table, obj, column="checkpoint")
-db.load_blob(table, "checkpoint", where=...)
+# Arrays
+db.save_array("features", arr, column="data")
+db.load_array("features", column="data", where=...)
 
 # Transactions / maintenance
 with db.transaction():
     db.insert("a", {...}); db.insert("b", {...})
 db.summary                # schema + row counts
-inspect("experiments.db") # standalone helper
-check_health("experiments.db", fix_issues=True)
+db.vacuum("results")
+db.get_database_size()
 ```
 
 </details>
@@ -118,15 +118,14 @@ check_health("experiments.db", fix_issues=True)
 
 ```bash
 scitex-db --help-recursive            # all subcommands at once
-scitex-db inspect-db experiments.db   # schema + row counts
-scitex-db inspect-db experiments.db --tables results --json
-scitex-db check-health experiments.db --fix --yes
-scitex-db check-health experiments.db --dry-run
 scitex-db list-python-apis            # introspect public Python surface
+scitex-db list-python-apis --json
+scitex-db mcp list-tools
+scitex-db skills list                 # agent-facing skill files
 ```
 
-Every subcommand supports `-h/--help`, `--json`, and the safety pair
-`--dry-run` / `--yes` where it mutates state.
+The CLI is deliberately thin — `scitex-db` is a library first. Every
+subcommand supports `-h/--help` and `--json`.
 
 </details>
 
@@ -134,36 +133,29 @@ Every subcommand supports `-h/--help`, `--json`, and the safety pair
 
 ```
 scitex_db/
-├── __init__.py            ← public API (SQLite3, PostgreSQL, check_health, inspect)
+├── __init__.py            ← public API (PostgreSQL, observer hooks)
 ├── __main__.py            ← `scitex-db` CLI entry
-├── _BaseMixins/           ← backend-agnostic mixins (CRUD, schema, batch, ...)
-├── _sqlite3/              ← SQLite3 driver
-│   └── _SQLite3Mixins/    ← SQLite3-specific mixin overrides
+├── _BaseMixins/           ← the declaration namespace (CRUD, schema, batch, ...)
 ├── _postgresql/           ← PostgreSQL driver
-│   └── _PostgreSQLMixins/ ← PostgreSQL-specific mixin overrides
-├── _check_health.py       ← `scitex-db check-health`
-├── _inspect.py            ← `scitex-db inspect-db`
-├── _inspect_optimized.py  ← faster path for large DBs
-├── _delete_duplicates.py  ← duplicate-row cleanup
+│   └── _PostgreSQLMixins/ ← concrete mixin implementations
+├── _observers/            ← post-save / post-load hook registry
+├── schema_change/         ← pre-flight an in-place schema change
 ├── _utils.py              ← shared helpers
 └── _skills/               ← agent-facing skill files
 ```
 
-Each backend composes its `_*Mixins/` folder onto `_BaseMixins/`, so
-swapping `SQLite3` ↔ `PostgreSQL` does not change call sites.
+`PostgreSQL` composes `_PostgreSQLMixins/` onto `_BaseMixins/`; the base
+declares the surface and the concrete mixins supply every body.
 
 ## Demo
 
 ```mermaid
 flowchart LR
-    U["user code"] --> A["SQLite3('exp.db')"]
-    U --> B["PostgreSQL(host=..., user=...)"]
-    A --> M["_BaseMixins (CRUD · schema · batch · maintenance)"]
-    B --> M
-    A -.-> SM["_SQLite3Mixins<br/>(backend overrides)"]
-    B -.-> PM["_PostgreSQLMixins<br/>(backend overrides)"]
-    M --> H["scitex-db check-health<br/>(fix orphans, vacuum)"]
-    M --> I["scitex-db inspect-db<br/>(schema + row counts)"]
+    U["user code"] --> B["PostgreSQL(host=..., user=...)"]
+    B --> M["_BaseMixins (CRUD · schema · batch · maintenance)"]
+    B -.-> PM["_PostgreSQLMixins<br/>(concrete bodies)"]
+    B --> O["_observers<br/>(post-save / post-load hooks)"]
+    B --> S["schema_change<br/>(pre-flight an in-place change)"]
 ```
 
 ## Part of SciTeX

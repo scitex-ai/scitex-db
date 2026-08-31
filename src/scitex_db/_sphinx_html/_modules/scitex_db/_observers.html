@@ -1,0 +1,228 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>scitex_db._observers &mdash; SciTeX DB v0.0.0</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=7026087e"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            SciTeX DB
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../installation.html#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation.html#basic-installation">Basic Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation.html#development">Development</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/scitex_db.html">scitex_db</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../api/scitex_db.html#scitex_db.register_post_load_hook"><code class="docutils literal notranslate"><span class="pre">register_post_load_hook()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/scitex_db.html#scitex_db.register_post_save_hook"><code class="docutils literal notranslate"><span class="pre">register_post_save_hook()</span></code></a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">SciTeX DB</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">scitex_db._observers</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for scitex_db._observers</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">"""Neutral post-save / post-load hook registry for scitex-db.</span>
+
+<span class="sd">Public extension API. Observer packages (scitex-clew, future audit or</span>
+<span class="sd">notification observers) register callbacks here on their own import;</span>
+<span class="sd">scitex-db itself never names any observer.</span>
+
+<span class="sd">Per SOC.md R6: producer packages don't know observer packages. The</span>
+<span class="sd">arrow runs observer -&gt; producer. scitex-db owns this registry;</span>
+<span class="sd">observers self-register.</span>
+
+<span class="sd">This mirrors ``scitex_io._observers`` deliberately, so an observer that</span>
+<span class="sd">already knows the scitex-io shape needs no new concepts. The one</span>
+<span class="sd">difference is the payload: scitex-io hooks describe a *file*</span>
+<span class="sd">(``path, obj, kwargs``), whereas scitex-db hooks describe a *statement</span>
+<span class="sd">against a database* (``db_path, query, parameters/result``).</span>
+
+<span class="sd">Usage from an observer</span>
+<span class="sd">----------------------</span>
+
+<span class="sd">&gt;&gt;&gt; from scitex_db import register_post_save_hook</span>
+<span class="sd">&gt;&gt;&gt; def on_write(db_path, query, parameters):</span>
+<span class="sd">...     # never raise; hooks fail silently</span>
+<span class="sd">...     ...</span>
+<span class="sd">&gt;&gt;&gt; register_post_save_hook(on_write)</span>
+<span class="sd">"""</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">List</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="n">PostSaveHook</span> <span class="o">=</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span>
+<span class="sd">"""Signature: ``(db_path, query, parameters) -&gt; None``.</span>
+
+<span class="sd">Fires after every successful write statement (INSERT / UPDATE / DELETE /</span>
+<span class="sd">DROP / CREATE / ALTER).</span>
+<span class="sd">"""</span>
+
+<span class="n">PostLoadHook</span> <span class="o">=</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span>
+<span class="sd">"""Signature: ``(db_path, query, result) -&gt; None``.</span>
+
+<span class="sd">Fires after every successful read statement. ``result`` is the live</span>
+<span class="sd">cursor, NOT materialized rows — fetching is the caller's job, and a hook</span>
+<span class="sd">must not consume it. Fetch from a hook only if you know you own the</span>
+<span class="sd">cursor.</span>
+<span class="sd">"""</span>
+
+
+<span class="n">_post_save_hooks</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">PostSaveHook</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">_post_load_hooks</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">PostLoadHook</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+
+<div class="viewcode-block" id="register_post_save_hook">
+<a class="viewcode-back" href="../../api/scitex_db.html#scitex_db.register_post_save_hook">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">register_post_save_hook</span><span class="p">(</span><span class="n">fn</span><span class="p">:</span> <span class="n">PostSaveHook</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Register a function to run after every successful scitex-db write.</span>
+
+<span class="sd">    Hooks fire in registration order. They MUST NOT raise — exceptions</span>
+<span class="sd">    are swallowed with ``logger.debug``. A misbehaving observer must</span>
+<span class="sd">    never break the host's database access.</span>
+<span class="sd">    """</span>
+    <span class="n">_post_save_hooks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">fn</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="register_post_load_hook">
+<a class="viewcode-back" href="../../api/scitex_db.html#scitex_db.register_post_load_hook">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">register_post_load_hook</span><span class="p">(</span><span class="n">fn</span><span class="p">:</span> <span class="n">PostLoadHook</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Register a function to run after every successful scitex-db read."""</span>
+    <span class="n">_post_load_hooks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">fn</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">fire_post_save</span><span class="p">(</span><span class="n">db_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">parameters</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Internal: invoke registered post-save hooks. Never raises."""</span>
+    <span class="k">for</span> <span class="n">fn</span> <span class="ow">in</span> <span class="n">_post_save_hooks</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">fn</span><span class="p">(</span><span class="n">db_path</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">parameters</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>  <span class="c1"># noqa: BLE001</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">"post-save hook </span><span class="si">%r</span><span class="s2"> failed for </span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span> <span class="n">fn</span><span class="p">,</span> <span class="n">db_path</span><span class="p">,</span> <span class="n">e</span>
+            <span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">fire_post_load</span><span class="p">(</span><span class="n">db_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">result</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Internal: invoke registered post-load hooks. Never raises."""</span>
+    <span class="k">for</span> <span class="n">fn</span> <span class="ow">in</span> <span class="n">_post_load_hooks</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">fn</span><span class="p">(</span><span class="n">db_path</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>  <span class="c1"># noqa: BLE001</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">"post-load hook </span><span class="si">%r</span><span class="s2"> failed for </span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span> <span class="n">fn</span><span class="p">,</span> <span class="n">db_path</span><span class="p">,</span> <span class="n">e</span>
+            <span class="p">)</span>
+
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">"PostSaveHook"</span><span class="p">,</span>
+    <span class="s2">"PostLoadHook"</span><span class="p">,</span>
+    <span class="s2">"register_post_save_hook"</span><span class="p">,</span>
+    <span class="s2">"register_post_load_hook"</span><span class="p">,</span>
+    <span class="s2">"fire_post_save"</span><span class="p">,</span>
+    <span class="s2">"fire_post_load"</span><span class="p">,</span>
+<span class="p">]</span>
+
+<span class="c1"># EOF</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Yusuke Watanabe.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

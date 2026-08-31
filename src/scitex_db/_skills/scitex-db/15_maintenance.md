@@ -1,60 +1,76 @@
 ---
 description: |
   [TOPIC] Maintenance
-  [DETAILS] See file body for details.
+  [DETAILS] Methods on an open PostgreSQL instance — vacuum / analyze / reindex / optimize, size reporting, summaries, and pg_dump-backed backup + restore.
 tags: [scitex-db-maintenance, scitex-db]
 ---
 
 
-# Maintenance Helpers
+# Maintenance
 
-Standalone functions that operate on a database path (SQLite3) or
-connection string (PostgreSQL). They do not require an open
-`SQLite3` / `PostgreSQL` instance.
-
-## check_health
+These are **methods on an open connection**, not standalone functions.
+Open a `PostgreSQL` instance first.
 
 ```python
-from scitex_db import check_health
+import os
+import scitex_db
 
-report = check_health("experiments.db", verbose=True, fix_issues=False)
+db = scitex_db.PostgreSQL(
+    dbname="lab", user="me", password=os.environ["PGPASSWORD"],
+    host="localhost", port=55432,
+)
 ```
 
-Runs `PRAGMA integrity_check`, verifies schema consistency, surfaces
-corruption. Returns a dict: `{"ok": bool, "issues": [...], "fixed": [...]}`.
-
-## batch_health_check
+## Reclaim and re-plan
 
 ```python
-from scitex_db import batch_health_check
-batch_health_check(["a.db", "b.db", "c.db"], verbose=True, fix_issues=True)
+db.vacuum()                    # whole database
+db.vacuum("results", full=True)
+db.analyze("results")          # refresh planner statistics
+db.reindex("results")          # rebuild indexes
+db.optimize("results")         # VACUUM FULL + ANALYZE + REINDEX
 ```
 
-Iterates and reports per-file status.
+Every one of these takes an in-process `maintenance_lock` (300 s
+timeout) so two of them cannot run against the same instance at once,
+and every one calls `_check_writable` first — they raise rather than
+silently no-op on a read-only connection.
 
-## delete_duplicates
+`VACUUM FULL` takes an ACCESS EXCLUSIVE lock and rewrites the table.
+Readers block for its whole duration; do not reach for `optimize` on a
+live store during working hours.
+
+## Size and shape
 
 ```python
-from scitex_db import delete_duplicates, delete_sqlite3_duplicates
-
-delete_duplicates(db, table="results", columns=["name", "value"])
-delete_sqlite3_duplicates("experiments.db", table="results")
+db.get_database_size()      # e.g. '412 MB'
+db.get_table_size("results")
+db.get_table_info()         # per-table name + size + row estimate
+db.get_summaries(table_names=["results"], limit=5)
 ```
 
-`delete_duplicates` works on any open connection and takes the subset
-of columns that define uniqueness. `delete_sqlite3_duplicates` is the
-path-level SQLite3 specialization (opens the DB, acts, closes it).
+`get_summaries` returns a `{table: DataFrame}` mapping. Calling the
+instance itself (`db()`), or reading `db.summary`, prints the same
+thing.
 
-## inspect
+## Backup and restore
+
+These shell out to the PostgreSQL client tools, so `pg_dump`, `psql`
+and `pg_restore` must be on `PATH`.
 
 ```python
-from scitex_db import inspect
-schema = inspect("experiments.db")
-# {"tables": {"results": {"columns": [...], "indexes": [...]}}, ...}
+db.backup_table("results", "/backups/results.sql")
+db.restore_table("results", "/backups/results.sql")
+
+db.backup_database("/backups/lab.dump")
+db.restore_database("/backups/lab.dump")
+
+db.copy_table("results", "results_2026", where="run_id > 100")
 ```
 
-Returns a structured snapshot of tables, columns (with types/PK/NULL
-flags), and indexes. Handy as an audit step before migrations.
+`restore_*` and `copy_table` check writability first.
 
-See also [10_cli-reference.md](10_cli-reference.md) for the shell
-entry points wrapping these.
+## See also
+
+- [03_python-api.md](03_python-api.md) — the public surface
+- [13_mixins.md](13_mixins.md) — where these methods live

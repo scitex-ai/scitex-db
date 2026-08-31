@@ -1,9 +1,9 @@
 ---
 name: scitex-db
 description: |
-  [WHAT] Relational-DB wrapper for scientific Python.
-  [WHEN] Use when the user asks to "store numpy arrays in SQLite", "persist experiment results to Postgres", "dedupe rows in a table", "check this SQLite DB is healthy / not corrupt", "inspect the schema of a DB", "save/load compressed ndarrays a....
-  [HOW] `import scitex_db` then call `SQLite3(db_path, ...)`.
+  [WHAT] Relational-DB wrapper for scientific Python, on PostgreSQL.
+  [WHEN] Use when the user asks to "persist experiment results to Postgres", "store numpy arrays in a database", "inspect the schema of a Postgres database", "save/load compressed ndarrays from a table", "vacuum / analyze / reindex a store", or "pre-flight an in-place schema change on a live store".
+  [HOW] `import scitex_db` then call `PostgreSQL(dbname=..., user=..., ...)`.
 tags: [scitex-db]
 primary_interface: python
 interfaces:
@@ -20,14 +20,13 @@ interfaces:
 
 > **Interfaces:** Python ⭐⭐⭐ (primary) · CLI ⭐ · MCP — · Skills ⭐⭐ · Hook — · HTTP —
 
-Two database classes (`SQLite3`, `PostgreSQL`) composed from a dozen
-shared mixins, plus standalone maintenance helpers.
+One database class, `PostgreSQL`, composed from a dozen shared mixins,
+plus a `schema_change` package for pre-flighting an in-place schema
+change against a live store.
 
-They share a mixin namespace but **not** a surface — `SQLite3` leaves 23
-of the 59 base methods unimplemented and spells several others
-differently. Write against one class, and read
-[16_sqlite-to-postgres](16_sqlite-to-postgres.md) before planning a move
-between them.
+The backend requires the `postgresql` extra (`psycopg2`). Without it
+`scitex_db.PostgreSQL` is `None` rather than an ImportError — see
+[01_installation](01_installation.md).
 
 ## Installation & import (two equivalent paths)
 
@@ -37,11 +36,11 @@ runtime; which one a user has depends on their install choice.
 ```python
 # Standalone — pip install scitex-db
 import scitex_db
-scitex_db.SQLite3(...)
+scitex_db.PostgreSQL(...)
 
 # Umbrella — pip install scitex
 import scitex.db
-scitex.db.SQLite3(...)
+scitex.db.PostgreSQL(...)
 ```
 
 `pip install scitex-db` alone does NOT expose the `scitex` namespace;
@@ -56,15 +55,12 @@ rule and empirical verification table.
 ### Mandatory
 
 * [01_installation](01_installation.md) — pip install + extras + verify
-* [02_quick-start](02_quick-start.md) — SQLite3 + PostgreSQL minimal examples
+* [02_quick-start](02_quick-start.md) — minimal end-to-end example
 * [03_python-api](03_python-api.md) — Public symbols
 * [04_cli-reference](04_cli-reference.md) — `scitex-db` console entry
 
 ### Deep-dive
 
-* [13_mixins](13_mixins.md) — The mixin architecture, and where the two backends diverge
-* [16_sqlite-to-postgres](16_sqlite-to-postgres.md) — Porting to PostgreSQL: the failures that do not raise
-* [14_numpy-blob](14_numpy-blob.md) — Storing ndarrays with compression
-* [15_maintenance](15_maintenance.md) — `check_health`, `delete_duplicates`, `inspect`
-* [11_quick-start](11_quick-start.md), [12_python-api](12_python-api.md) — historical leaves
-* [10_cli-reference](10_cli-reference.md) — historical CLI notes
+* [13_mixins](13_mixins.md) — The mixin architecture and the measured surface
+* [14_numpy-blob](14_numpy-blob.md) — Storing ndarrays in `BYTEA` columns
+* [15_maintenance](15_maintenance.md) — vacuum / analyze / sizes / backup
