@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Index &mdash; SciTeX DB v0.0.0</title>
+  <title>Index &mdash; SciTeX DB v0.1.12</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
@@ -13,7 +13,7 @@
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=7026087e"></script>
+      <script src="_static/documentation_options.js?v=297ad043"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/clipboard.min.js?v=a7894cd8"></script>
@@ -54,8 +54,20 @@
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="api/scitex_db.html">scitex_db</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="api/scitex_db.html#scitex_db.register_post_load_hook"><code class="docutils literal notranslate"><span class="pre">register_post_load_hook()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api/scitex_db.html#scitex_db.register_post_save_hook"><code class="docutils literal notranslate"><span class="pre">register_post_save_hook()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api/scitex_db.html#scitex_db.SQLite3"><code class="docutils literal notranslate"><span class="pre">SQLite3</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/scitex_db.html#scitex_db.SQLite3.__init__"><code class="docutils literal notranslate"><span class="pre">SQLite3.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/scitex_db.html#scitex_db.SQLite3.__enter__"><code class="docutils literal notranslate"><span class="pre">SQLite3.__enter__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/scitex_db.html#scitex_db.SQLite3.__exit__"><code class="docutils literal notranslate"><span class="pre">SQLite3.__exit__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/scitex_db.html#scitex_db.SQLite3.__del__"><code class="docutils literal notranslate"><span class="pre">SQLite3.__del__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/scitex_db.html#scitex_db.SQLite3.__call__"><code class="docutils literal notranslate"><span class="pre">SQLite3.__call__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/scitex_db.html#scitex_db.SQLite3.summary"><code class="docutils literal notranslate"><span class="pre">SQLite3.summary</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api/scitex_db.html#scitex_db.batch_health_check"><code class="docutils literal notranslate"><span class="pre">batch_health_check()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api/scitex_db.html#scitex_db.check_health"><code class="docutils literal notranslate"><span class="pre">check_health()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api/scitex_db.html#scitex_db.delete_duplicates"><code class="docutils literal notranslate"><span class="pre">delete_duplicates()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api/scitex_db.html#scitex_db.delete_sqlite3_duplicates"><code class="docutils literal notranslate"><span class="pre">delete_sqlite3_duplicates()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api/scitex_db.html#scitex_db.inspect"><code class="docutils literal notranslate"><span class="pre">inspect()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -88,11 +100,69 @@
 <h1 id="index">Index</h1>
 
 <div class="genindex-jumpbox">
- <a href="#M"><strong>M</strong></a>
- | <a href="#R"><strong>R</strong></a>
+ <a href="#_"><strong>_</strong></a>
+ | <a href="#B"><strong>B</strong></a>
+ | <a href="#C"><strong>C</strong></a>
+ | <a href="#D"><strong>D</strong></a>
+ | <a href="#I"><strong>I</strong></a>
+ | <a href="#M"><strong>M</strong></a>
  | <a href="#S"><strong>S</strong></a>
  
 </div>
+<h2 id="_">_</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/scitex_db.html#scitex_db.SQLite3.__call__">__call__() (scitex_db.SQLite3 method)</a>
+</li>
+      <li><a href="api/scitex_db.html#scitex_db.SQLite3.__del__">__del__() (scitex_db.SQLite3 method)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/scitex_db.html#scitex_db.SQLite3.__enter__">__enter__() (scitex_db.SQLite3 method)</a>
+</li>
+      <li><a href="api/scitex_db.html#scitex_db.SQLite3.__exit__">__exit__() (scitex_db.SQLite3 method)</a>
+</li>
+      <li><a href="api/scitex_db.html#scitex_db.SQLite3.__init__">__init__() (scitex_db.SQLite3 method)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="B">B</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/scitex_db.html#scitex_db.batch_health_check">batch_health_check() (in module scitex_db)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="C">C</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/scitex_db.html#scitex_db.check_health">check_health() (in module scitex_db)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="D">D</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/scitex_db.html#scitex_db.delete_duplicates">delete_duplicates() (in module scitex_db)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/scitex_db.html#scitex_db.delete_sqlite3_duplicates">delete_sqlite3_duplicates() (in module scitex_db)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="I">I</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/scitex_db.html#scitex_db.inspect">inspect() (in module scitex_db)</a>
+</li>
+  </ul></td>
+</tr></table>
+
 <h2 id="M">M</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
@@ -106,18 +176,6 @@
   </ul></td>
 </tr></table>
 
-<h2 id="R">R</h2>
-<table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="api/scitex_db.html#scitex_db.register_post_load_hook">register_post_load_hook() (in module scitex_db)</a>
-</li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="api/scitex_db.html#scitex_db.register_post_save_hook">register_post_save_hook() (in module scitex_db)</a>
-</li>
-  </ul></td>
-</tr></table>
-
 <h2 id="S">S</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
@@ -128,6 +186,12 @@
         <li><a href="api/scitex_db.html#module-scitex_db">module</a>
 </li>
       </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/scitex_db.html#scitex_db.SQLite3">SQLite3 (class in scitex_db)</a>
+</li>
+      <li><a href="api/scitex_db.html#scitex_db.SQLite3.summary">summary (scitex_db.SQLite3 property)</a>
+</li>
   </ul></td>
 </tr></table>
 

@@ -2,36 +2,41 @@
 # -*- coding: utf-8 -*-
 """Tests for the scitex-db post-save / post-load observer registry.
 
-Real-collaborator tests against the registry itself — no mocks. Hooks
-are plain functions recording into plain lists, and the dispatch under
-test is the module's own ``fire_post_save`` / ``fire_post_load``, so
-what is asserted is the actual dispatch scitex-db performs rather than
-a stubbed stand-in.
+Real-collaborator tests against an on-disk SQLite database — no mocks.
+Hooks are recorded into plain lists, so what is asserted is the actual
+dispatch scitex-db performs, not a stubbed stand-in.
 
 Each test exercises a single behaviour with one assertion in the
 AAA-marker shape required by STX-TQ001/TQ002/TQ003/TQ007.
 """
 
 import os
+import shutil
 import sys
-from pathlib import Path
+import tempfile
 
 import pytest
 
 # Add src to path for testing
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../src"))
 
+from scitex_db import SQLite3  # noqa: E402
 from scitex_db import _observers  # noqa: E402
 
 
 @pytest.fixture
-def db_path():
-    """A store path to hand the dispatcher.
+def temp_dir():
+    """Create a temporary directory for test databases."""
+    tmpdir = tempfile.mkdtemp()
+    yield tmpdir
+    if os.path.exists(tmpdir):
+        shutil.rmtree(tmpdir)
 
-    The registry never opens it — ``db_path`` is carried through to the
-    hook as provenance, so a plain path is the honest collaborator.
-    """
-    return Path("/tmp/scitex-db-observers/test.db")
+
+@pytest.fixture
+def db_path(temp_dir):
+    """Get a temporary database path."""
+    return os.path.join(temp_dir, "test.db")
 
 
 @pytest.fixture(autouse=True)
@@ -98,7 +103,7 @@ def test_hooks_are_exposed_on_the_package_root():
 # ----------------------------------------------------------------------------
 
 
-def test_fire_post_save_invokes_a_registered_hook(db_path):
+def test_insert_fires_post_save_hook(db_path):
     # Arrange
     seen = []
     _observers.register_post_save_hook(
@@ -106,13 +111,15 @@ def test_fire_post_save_invokes_a_registered_hook(db_path):
     )
 
     # Act
-    _observers.fire_post_save(db_path, "INSERT INTO t VALUES (1)", None)
+    with SQLite3(db_path) as db:
+        db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, v TEXT)")
+        db.execute("INSERT INTO t (v) VALUES (?)", ("a",))
 
     # Assert
-    assert seen == ["INSERT INTO t VALUES (1)"]
+    assert any(q.startswith("INSERT") for q in seen)
 
 
-def test_fire_post_save_passes_the_store_path_through(db_path):
+def test_post_save_hook_receives_the_db_path(db_path):
     # Arrange
     seen = []
     _observers.register_post_save_hook(
@@ -120,13 +127,14 @@ def test_fire_post_save_passes_the_store_path_through(db_path):
     )
 
     # Act
-    _observers.fire_post_save(db_path, "INSERT INTO t VALUES (1)", None)
+    with SQLite3(db_path) as db:
+        db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY)")
 
     # Assert
-    assert seen == [db_path]
+    assert seen[0] == db_path
 
 
-def test_fire_post_save_passes_the_parameters_through(db_path):
+def test_post_save_hook_receives_the_parameters(db_path):
     # Arrange
     seen = []
     _observers.register_post_save_hook(
@@ -134,35 +142,45 @@ def test_fire_post_save_passes_the_parameters_through(db_path):
     )
 
     # Act
-    _observers.fire_post_save(db_path, "INSERT INTO t VALUES (%s)", (1,))
+    with SQLite3(db_path) as db:
+        db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, v TEXT)")
+        db.execute("INSERT INTO t (v) VALUES (?)", ("payload",))
 
     # Assert
-    assert seen == [(1,)]
+    assert list(seen[-1]) == ["payload"]
 
 
-def test_fire_post_save_invokes_hooks_in_registration_order(db_path):
-    # Arrange
-    order = []
-    _observers.register_post_save_hook(lambda p, q, x: order.append("first"))
-    _observers.register_post_save_hook(lambda p, q, x: order.append("second"))
-
-    # Act
-    _observers.fire_post_save(db_path, "INSERT INTO t VALUES (1)", None)
-
-    # Assert
-    assert order == ["first", "second"]
-
-
-def test_fire_post_save_does_not_run_load_hooks(db_path):
+def test_executemany_fires_post_save_hook(db_path):
     # Arrange
     seen = []
-    _observers.register_post_load_hook(lambda p, q, r: seen.append(q))
+    _observers.register_post_save_hook(
+        lambda path, query, params: seen.append(query)
+    )
 
     # Act
-    _observers.fire_post_save(db_path, "INSERT INTO t VALUES (1)", None)
+    with SQLite3(db_path) as db:
+        db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, v TEXT)")
+        db.executemany(
+            "INSERT INTO t (v) VALUES (?)", [("a",), ("b",)]
+        )
 
     # Assert
-    assert seen == []
+    assert any(q.startswith("INSERT") for q in seen)
+
+
+def test_executescript_fires_post_save_hook(db_path):
+    # Arrange
+    seen = []
+    _observers.register_post_save_hook(
+        lambda path, query, params: seen.append(query)
+    )
+
+    # Act
+    with SQLite3(db_path) as db:
+        db.executescript("CREATE TABLE t (id INTEGER PRIMARY KEY);")
+
+    # Assert
+    assert len(seen) == 1
 
 
 # ----------------------------------------------------------------------------
@@ -170,91 +188,162 @@ def test_fire_post_save_does_not_run_load_hooks(db_path):
 # ----------------------------------------------------------------------------
 
 
-def test_fire_post_load_invokes_a_registered_hook(db_path):
+def test_select_fires_post_load_hook(db_path):
     # Arrange
     seen = []
-    _observers.register_post_load_hook(lambda path, query, r: seen.append(query))
+    _observers.register_post_load_hook(
+        lambda path, query, result: seen.append(query)
+    )
 
     # Act
-    _observers.fire_post_load(db_path, "SELECT * FROM t", None)
+    with SQLite3(db_path) as db:
+        db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY)")
+        db.execute("SELECT * FROM t")
 
     # Assert
-    assert seen == ["SELECT * FROM t"]
+    assert any(q.startswith("SELECT") for q in seen)
 
 
-def test_fire_post_load_passes_the_result_through(db_path):
+def test_select_does_not_fire_post_save_hook(db_path):
     # Arrange
     seen = []
-    _observers.register_post_load_hook(lambda path, query, r: seen.append(r))
-    rows = [(1,), (2,)]
+    _observers.register_post_save_hook(
+        lambda path, query, params: seen.append(query)
+    )
 
     # Act
-    _observers.fire_post_load(db_path, "SELECT * FROM t", rows)
-
-    # Assert
-    assert seen == [rows]
-
-
-def test_fire_post_load_does_not_run_save_hooks(db_path):
-    # Arrange
-    seen = []
-    _observers.register_post_save_hook(lambda p, q, x: seen.append(q))
-
-    # Act
-    _observers.fire_post_load(db_path, "SELECT * FROM t", None)
+    with SQLite3(db_path) as db:
+        db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY)")
+        seen.clear()
+        db.execute("SELECT * FROM t")
 
     # Assert
     assert seen == []
 
 
-# ----------------------------------------------------------------------------
-# A misbehaving observer must never break the host's database access
-# ----------------------------------------------------------------------------
-
-
-def test_a_raising_post_save_hook_does_not_propagate(db_path):
-    # Arrange
-    def boom(path, query, params):
-        raise RuntimeError("observer is broken")
-
-    _observers.register_post_save_hook(boom)
-
-    # Act
-    _observers.fire_post_save(db_path, "INSERT INTO t VALUES (1)", None)
-
-    # Assert
-    assert _observers._post_save_hooks == [boom]
-
-
-def test_a_raising_post_save_hook_does_not_stop_later_hooks(db_path):
+def test_get_rows_fires_post_load_hook(db_path):
+    """get_rows historically bypassed the dispatch point via
+    self.cursor.execute; it must now be observable."""
     # Arrange
     seen = []
-
-    def boom(path, query, params):
-        raise RuntimeError("observer is broken")
-
-    _observers.register_post_save_hook(boom)
-    _observers.register_post_save_hook(lambda p, q, x: seen.append(q))
+    _observers.register_post_load_hook(
+        lambda path, query, result: seen.append(query)
+    )
 
     # Act
-    _observers.fire_post_save(db_path, "INSERT INTO t VALUES (1)", None)
+    with SQLite3(db_path) as db:
+        db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, v TEXT)")
+        db.execute("INSERT INTO t (v) VALUES (?)", ("a",))
+        db.get_rows("t")
 
     # Assert
-    assert seen == ["INSERT INTO t VALUES (1)"]
+    assert any("SELECT" in q for q in seen)
 
 
-def test_a_raising_post_load_hook_does_not_propagate(db_path):
+def test_get_rows_still_returns_its_data_after_routing_change(db_path):
+    """Routing get_rows through self.execute must not consume the cursor."""
     # Arrange
-    def boom(path, query, result):
-        raise RuntimeError("observer is broken")
+    with SQLite3(db_path) as db:
+        db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, v TEXT)")
+        db.execute("INSERT INTO t (v) VALUES (?)", ("a",))
 
-    _observers.register_post_load_hook(boom)
-
-    # Act
-    _observers.fire_post_load(db_path, "SELECT * FROM t", None)
+        # Act
+        rows = db.get_rows("t", return_as="list")
 
     # Assert
-    assert _observers._post_load_hooks == [boom]
+    assert len(rows) == 1
+
+
+# ----------------------------------------------------------------------------
+# Isolation: a bad observer must never break the host
+# ----------------------------------------------------------------------------
+
+
+def test_raising_post_save_hook_does_not_break_the_write(db_path):
+    # Arrange
+    def bad_hook(path, query, params):
+        raise RuntimeError("observer is broken")
+
+    _observers.register_post_save_hook(bad_hook)
+
+    # Act
+    with SQLite3(db_path) as db:
+        db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, v TEXT)")
+        db.execute("INSERT INTO t (v) VALUES (?)", ("a",))
+        rows = db.get_rows("t", return_as="list")
+
+    # Assert
+    assert len(rows) == 1
+
+
+def test_raising_post_load_hook_does_not_break_the_read(db_path):
+    # Arrange
+    def bad_hook(path, query, result):
+        raise RuntimeError("observer is broken")
+
+    _observers.register_post_load_hook(bad_hook)
+
+    # Act
+    with SQLite3(db_path) as db:
+        db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, v TEXT)")
+        db.execute("INSERT INTO t (v) VALUES (?)", ("a",))
+        rows = db.get_rows("t", return_as="list")
+
+    # Assert
+    assert len(rows) == 1
+
+
+def test_hooks_fire_in_registration_order(db_path):
+    # Arrange
+    order = []
+    _observers.register_post_save_hook(
+        lambda path, query, params: order.append("first")
+    )
+    _observers.register_post_save_hook(
+        lambda path, query, params: order.append("second")
+    )
+
+    # Act
+    with SQLite3(db_path) as db:
+        db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY)")
+
+    # Assert
+    assert order == ["first", "second"]
+
+
+def test_a_failing_hook_does_not_stop_later_hooks(db_path):
+    # Arrange
+    reached = []
+
+    def bad_hook(path, query, params):
+        raise RuntimeError("observer is broken")
+
+    _observers.register_post_save_hook(bad_hook)
+    _observers.register_post_save_hook(
+        lambda path, query, params: reached.append(query)
+    )
+
+    # Act
+    with SQLite3(db_path) as db:
+        db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY)")
+
+    # Assert
+    assert len(reached) == 1
+
+
+def test_no_registered_hooks_leaves_writes_working(db_path):
+    # Arrange
+    # The autouse ``clean_registry`` fixture guarantees both registries are
+    # empty here, so this is the no-observers baseline.
+
+    # Act
+    with SQLite3(db_path) as db:
+        db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, v TEXT)")
+        db.execute("INSERT INTO t (v) VALUES (?)", ("a",))
+        rows = db.get_rows("t", return_as="list")
+
+    # Assert
+    assert len(rows) == 1
 
 
 # EOF

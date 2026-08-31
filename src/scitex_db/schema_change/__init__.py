@@ -2,18 +2,22 @@
 # -*- coding: utf-8 -*-
 """Is a LIVE store ready for an IN-PLACE schema change, and what will it cost?
 
-Narrowness is load-bearing here. A selectable backend destroyed the card board
-three times (2170 rows -> 18, 2136 -> 21, 2138 -> 1), because "reconcile" deletes
-rows absent from whichever store is treated as the source. The operator's
-2026-07-20 ruling was "provide no exceptions, switch hard, carry exactly ONE way
-in the source". A module that grew a second mode would rebuild the condition that
-ruling removed.
+A sibling of :mod:`scitex_db._migrate`, deliberately NOT part of it. ``_migrate``
+is a ONE-WAY CUTOVER (SQLite -> PostgreSQL) and its own docstring says so. Its
+narrowness is load-bearing: a selectable backend destroyed the card board three
+times (2170 rows -> 18, 2136 -> 21, 2138 -> 1), because "reconcile" deletes rows
+absent from whichever store is treated as the source. The operator's 2026-07-20
+ruling was "provide no exceptions, switch hard, carry exactly ONE way in the
+source". A module that grew a second mode would rebuild the condition that
+ruling removed -- so this is a second module, not a second mode.
 
-THE QUESTION THIS ANSWERS. An in-place change asks "is this store, which ~90
+THE QUESTION THIS ANSWERS is different from a cutover's. A cutover asks "can the
+destination hold the source". An in-place change asks "is this store, which ~90
 containers are reading and writing RIGHT NOW, in the shape this change assumes --
 and how long will their board be frozen while it runs".
 
-TWO ENTRY POINTS, NOT A ``dry_run`` FLAG: a ``dry_run=False`` default makes the
+TWO ENTRY POINTS, NOT A ``dry_run`` FLAG -- inherited from ``_migrate._preflight``
+and correct for the same reason: a ``dry_run=False`` default makes the
 destructive path the one you get by forgetting an argument. :func:`preflight`
 takes no DDL and therefore CANNOT write, which is a stronger guarantee than a
 branch that promises not to.
@@ -65,9 +69,9 @@ migration rung -- one implementation of the one-transaction discipline, because
 two mechanisms altering the same constraint is how the FK oscillation of
 2026-08-10 happened, with every individual step correct and neither converging.
 
-:func:`observe_fk` reads ``pg_constraint`` directly, by construction rather than
-by omission; see its own module docstring for the measurements. A connection it
-cannot interrogate raises rather than reporting ABSENT.
+:func:`observe_fk` is POSTGRESQL ONLY, by construction rather than by omission;
+see its own module docstring for the measurements. It raises on a SQLite
+connection rather than reporting ABSENT.
 
 WHAT IS NOT HERE YET, stated so absence is not read as completeness:
 migrate-a-copy-first as the default. On the card. (Lock-held cost measurement

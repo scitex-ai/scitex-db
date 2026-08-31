@@ -1,69 +1,61 @@
 ---
 description: |
   [TOPIC] Quick start
-  [DETAILS] Smallest example — connect to PostgreSQL, create a table, insert rows, store an ndarray as a compressed blob.
+  [DETAILS] Smallest example — open a SQLite DB, create a table, insert rows, store an ndarray as a numpy blob, run a health check.
 tags: [scitex-db-quick-start]
 ---
 
 # Quick Start
 
-## Minimum viable use
+## SQLite — minimum viable use
 
 ```python
-import os
 import numpy as np
 import scitex_db
 
-db = scitex_db.PostgreSQL(
-    dbname="lab",
-    user="me",
-    password=os.environ["PGPASSWORD"],
-    host="localhost",
-    port=55432,
-)
+db = scitex_db.SQLite3("experiment.db")
 
 # Schema is a {column: SQL type} mapping, not a DataFrame.
 db.create_table(
     "trials",
-    {"id": "SERIAL PRIMARY KEY", "trial": "INTEGER", "rt_ms": "REAL"},
+    {"id": "INTEGER PRIMARY KEY", "trial": "INTEGER", "rt_ms": "REAL"},
 )
 
-db.insert("trials", {"trial": 1, "rt_ms": 342.0})
-db.insert_many("trials", [{"trial": 2, "rt_ms": 410.0}])
+db.insert_many(
+    "trials",
+    [{"trial": 1, "rt_ms": 342}, {"trial": 2, "rt_ms": 410}],
+)
 
-rows = db.select("trials", where="rt_ms > 300")
-n = db.count("trials", where="rt_ms > 300")
-```
+out = db.get_rows("trials", where="rt_ms > 300")   # DataFrame by default
 
-## numpy ndarrays
-
-The first argument is the TABLE, not a key — the array lives in a
-`BYTEA` column of that table.
-
-```python
-db.create_table("eeg", {"id": "SERIAL PRIMARY KEY", "data": "BYTEA"})
+# numpy ndarray as a compressed blob -- the first argument is the TABLE,
+# not a key. The array lives in a BLOB column of that table.
+db.create_table("eeg", {"id": "INTEGER PRIMARY KEY", "data": "BLOB"})
 arr = np.random.randn(1000, 64).astype("float32")
 db.save_array("eeg", arr, column="data")
 back = db.load_array("eeg", column="data")
 ```
 
-## Transactions
+## PostgreSQL
 
 ```python
-with db.transaction():
-    db.insert("trials", {"trial": 3, "rt_ms": 388.0})
+import os
+
+db = scitex_db.PostgreSQL(
+    host="localhost", database="lab", user="me", password=os.environ["PGPASS"],
+)
 ```
 
-## Observers
+`PostgreSQL` is **not** a drop-in replacement for `SQLite3` — the two
+classes name the same operations differently and neither implements the
+full base surface. See [16_sqlite-to-postgres.md](16_sqlite-to-postgres.md)
+before planning a move.
 
-Register a hook to see every write and read the wrapper performs:
+## Health check
 
 ```python
-import scitex_db
-
-scitex_db.register_post_save_hook(
-    lambda db_path, query, parameters: print("wrote", query)
-)
+from scitex_db import check_health
+check_health("experiment.db", fix_issues=False)
 ```
 
 ## Next
@@ -72,4 +64,4 @@ scitex_db.register_post_save_hook(
 - [04_cli-reference.md](04_cli-reference.md) — `scitex-db` CLI
 - [13_mixins.md](13_mixins.md) — mixin architecture
 - [14_numpy-blob.md](14_numpy-blob.md) — ndarray storage details
-- [15_maintenance.md](15_maintenance.md) — vacuum / analyze / sizes
+- [16_sqlite-to-postgres.md](16_sqlite-to-postgres.md) — porting to PostgreSQL

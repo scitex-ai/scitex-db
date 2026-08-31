@@ -5,14 +5,14 @@
 Every ``db.<method>(`` shown in a skill's Python example must resolve to a
 method that is actually IMPLEMENTED on the class the example constructs.
 
-Why this is a test and not a review note: on 2026-08-02 a six-line
-quick-start example had three lines that could not run --
+Why this is a test and not a review note: on 2026-08-02 the quick-start's
+six-line SQLite example had three lines that could not run --
 ``create_table(name, df)`` (the real signature takes a column dict),
-``db.insert(df, table)`` (declared in ``_BaseQueryMixin``, never
-overridden, so it raises ``NotImplementedError``) and
-``db.read_table(...)`` (a name that exists nowhere in the package).
-``13_mixins.md`` listed twelve such names and claimed they were callable,
-which was false in 23 places. Nothing failed, because prose has no test.
+``db.insert(df, table)`` (declared in ``_BaseQueryMixin``, never overridden
+for SQLite, so it raises ``NotImplementedError``) and ``db.read_table(...)``
+(a name that exists nowhere in the package). ``13_mixins.md`` listed twelve
+such names and stated "call those names on either class", which is false in
+23 places. Nothing failed, because prose has no test.
 
 A name DECLARED in ``_BaseMixins`` but whose whole body is
 ``raise NotImplementedError`` does not count as implemented -- that
@@ -83,15 +83,20 @@ def _doc_examples() -> list[tuple[Path, str]]:
 
 
 @pytest.fixture
+def sqlite_methods() -> set[str]:
+    return _implemented_methods(_SRC / "_sqlite3", _SRC / "_BaseMixins")
+
+
+@pytest.fixture
 def postgres_methods() -> set[str]:
     return _implemented_methods(_SRC / "_postgresql", _SRC / "_BaseMixins")
 
 
 def test_every_documented_db_method_exists_somewhere(
-    postgres_methods: set[str],
+    sqlite_methods: set[str], postgres_methods: set[str]
 ) -> None:
     # Arrange
-    known = postgres_methods
+    known = sqlite_methods | postgres_methods
     # Act
     unknown = [
         f"{path.name}: db.{name}()"
@@ -101,8 +106,32 @@ def test_every_documented_db_method_exists_somewhere(
     ]
     # Assert
     assert not unknown, (
-        "skill docs call methods PostgreSQL does not implement "
+        "skill docs call methods that exist on neither backend "
         f"(rename them or implement them): {sorted(set(unknown))}"
+    )
+
+
+def test_sqlite_examples_only_call_methods_sqlite_implements(
+    sqlite_methods: set[str],
+) -> None:
+    # Arrange
+    blocks = [
+        (path, block)
+        for path, block in _doc_examples()
+        if "SQLite3(" in block
+    ]
+    # Act
+    missing = [
+        f"{path.name}: db.{name}()"
+        for path, block in blocks
+        for name in _DB_CALL.findall(block)
+        if name not in sqlite_methods
+    ]
+    # Assert
+    assert not missing, (
+        "a SQLite example calls a method SQLite3 does not implement -- it is "
+        "declared abstract in _BaseMixins and raises NotImplementedError at "
+        f"runtime: {sorted(set(missing))}"
     )
 
 
@@ -115,7 +144,7 @@ def test_the_abstract_detector_can_actually_fire() -> None:
     # Assert
     assert verdict is True, (
         "_is_abstract failed to recognise a bare NotImplementedError body; "
-        "with it broken the gate above would pass against any doc"
+        "with it broken both gates above would pass against any doc"
     )
 
 
@@ -127,7 +156,7 @@ def test_the_abstract_detector_does_not_over_fire() -> None:
     verdict = _is_abstract(node)
     # Assert
     assert verdict is False, (
-        "_is_abstract called a real implementation abstract; the gate would "
+        "_is_abstract called a real implementation abstract; the gates would "
         "then reject correct documentation"
     )
 

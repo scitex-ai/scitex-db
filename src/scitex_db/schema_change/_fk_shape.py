@@ -31,23 +31,44 @@ Turned into an asset: because the names coincide, detection needs no heuristic.
 Same name, same table, same column, so "already present" is a fact rather than
 an inference.
 
-READS THE CATALOGUE DIRECTLY, BY CONSTRUCTION RATHER THAN BY OMISSION.
-``SHAPE_SQL`` reads ``pg_constraint``, whose ``condeferrable`` is a structured
-column -- so the shape is observable and the constraint is ALTERable. That
-pairing is what makes this module possible: an observer for an ALTER that can
-never run would be an instrument with nothing to instrument, and a shape
-recovered by parsing stored DDL TEXT would depend on how the store was created
-rather than on what it is.
+POSTGRESQL ONLY, BY CONSTRUCTION RATHER THAN BY OMISSION. ``SHAPE_SQL`` reads
+``pg_constraint``, so this module cannot observe a SQLite store. That is the
+correct shape, not a missing backend, and two measurements say so (2026-08-11,
+reproduced independently by scitex-cards):
 
-Fresh stores are covered by a different mechanism and not by this module's
-ALTER: they are born deferrable by DECLARATION (scitex-cards #796, merged
-2026-08-11T06:39:04Z), so there is nothing to reconcile, ever. This module is
-for the LIVE store, where the constraint already exists in some shape.
+    ALTER TABLE child ADD CONSTRAINT fk FOREIGN KEY (pid) REFERENCES parent(id)
+    -> OperationalError: near "CONSTRAINT": syntax error
+    ALTER TABLE child ADD COLUMN note TEXT          -> ACCEPTED  (control)
 
-A connection this module cannot interrogate raises rather than returning
-ABSENT. That is deliberate: ABSENT is a claim about a store that was
-successfully inspected, and a store this module cannot inspect must not be
-described in the same vocabulary as one it can.
+SQLite has no ADD CONSTRAINT at all -- not merely no deferrable variant. The
+control matters: ALTER TABLE itself works, so the refusal is specific to adding
+a constraint. Changing one there means rebuilding the table and copying every
+row. An observer for an ALTER that can never run would be an instrument with
+nothing to instrument.
+
+And SQLite could not answer the question anyway. ``PRAGMA foreign_key_list``
+returns BYTE-IDENTICAL rows for a deferrable and a non-deferrable FK -- its
+columns are id/seq/table/from/to/on_update/on_delete/match, with no
+deferrability field. The only record of deferrability is ``sqlite_master.sql``,
+the DDL TEXT, which differs by BUILD PATH: ``executescript`` stores comments
+verbatim while a stripping DDL helper does not, so the same logical schema
+yields two different recorded texts. A probe reading that text would report a
+shape that depends on how the store was created.
+
+So the two populations are covered by two different mechanisms and neither one
+is this module's ALTER:
+
+    fresh SQLite stores   the DECLARATION (scitex-cards #796, merged
+                          2026-08-11T06:39:04Z). Born deferrable; nothing to
+                          reconcile, ever.
+    live PostgreSQL       this module. ``pg_constraint.condeferrable`` is a
+                          structured column, so the shape is observable and the
+                          constraint is ALTERable.
+
+Passing a SQLite connection here raises rather than returning ABSENT. That is
+deliberate: ABSENT is a claim about a store that was successfully inspected,
+and a store this module cannot inspect must not be described in the same
+vocabulary as one it can.
 """
 
 from __future__ import annotations
@@ -113,9 +134,12 @@ def observe_fk(
 ) -> FKObservation:
     """Report the shape of the FK on ``table.column``, if any.
 
-    ``conn`` must be a PostgreSQL connection: the query reads ``pg_constraint``,
-    and a connection that cannot answer it RAISES rather than returning ABSENT.
-    See the module docstring for the measurements.
+    POSTGRESQL ONLY. ``conn`` must be a PostgreSQL connection: the query reads
+    ``pg_constraint``, and a SQLite connection RAISES rather than returning
+    ABSENT. SQLite is out of scope by construction -- it has no ADD CONSTRAINT,
+    and its catalogue does not record deferrability at all. See the module
+    docstring for the measurements; do not "fix" this by adding a SQLite
+    backend, because the operation it would inform cannot exist there.
 
     Matches on TABLE AND COLUMN, not on constraint name. A store that has the
     constraint under PostgreSQL's auto-generated name and a caller that expects

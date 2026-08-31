@@ -131,8 +131,8 @@ def catalogue_is_visible(
 
     WHY THIS EXISTS, and it is scitex-cards' correction rather than my design.
     The verdict of :func:`row_level_write_landed` comes from a CATALOGUE read
-    (``pg_trigger``). A table-row control cannot vouch for it, because the
-    failure that matters produces a FALSE from the catalogue:
+    (``pg_trigger`` / ``sqlite_master``). A table-row control cannot vouch for
+    it, because the failure that matters produces a FALSE from the catalogue:
 
         broken catalogue read / wrong search_path / wrong database
           -> has_trigger returns False
