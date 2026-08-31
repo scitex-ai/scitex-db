@@ -58,5 +58,5 @@ scitex-db list-python-apis
 ## Dependencies
 
 - Python >= 3.10
-- numpy, pandas, click, scitex-core
+- numpy, pandas, click
 - Optional: psycopg2 (PostgreSQL), GitPython (git helpers)
