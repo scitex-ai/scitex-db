@@ -22,16 +22,7 @@ except ImportError:  # pragma: no cover — only on ancient Pythons
 
 
 _LAZY_ATTRS = {
-    "SQLite3": ("._sqlite3._SQLite3", "SQLite3"),
     "PostgreSQL": ("._postgresql._PostgreSQL", "PostgreSQL"),
-    "delete_duplicates": ("._delete_duplicates", "delete_duplicates"),
-    "delete_sqlite3_duplicates": (
-        "._sqlite3._delete_duplicates",
-        "delete_sqlite3_duplicates",
-    ),
-    "inspect": ("._inspect", "inspect"),
-    "check_health": ("._check_health", "check_health"),
-    "batch_health_check": ("._check_health", "batch_health_check"),
     "register_post_save_hook": ("._observers", "register_post_save_hook"),
     "register_post_load_hook": ("._observers", "register_post_load_hook"),
 }
@@ -63,12 +54,6 @@ def __dir__() -> list[str]:
 __all__ = [
     "__version__",
     "PostgreSQL",
-    "SQLite3",
-    "batch_health_check",
-    "check_health",
-    "delete_duplicates",
-    "delete_sqlite3_duplicates",
-    "inspect",
     "register_post_load_hook",
     "register_post_save_hook",
 ]

@@ -1,84 +1,86 @@
 ---
 description: |
   [TOPIC] Mixins
-  [DETAILS] How SQLite3 and PostgreSQL are composed — and where the two surfaces diverge.
+  [DETAILS] How PostgreSQL is composed — the base declaration namespace, the concrete mixins, and the MRO.
 tags: [scitex-db-mixins, scitex-db]
 ---
 
 
 # Mixin Architecture
 
-`SQLite3` and `PostgreSQL` are each composed from mixins in the
-`_BaseMixins/` namespace, overridden by backend-specific mixins in
-`_SQLite3Mixins/` and `_PostgreSQLMixins/`.
+`PostgreSQL` is composed from twelve concrete mixins in
+`_postgresql/_PostgreSQLMixins/`, layered over the declaration namespace
+in `_BaseMixins/`.
 
-## The base declares; the backends implement a subset
+## The base declares; the backend implements
 
-`_BaseMixins` declares 59 methods, almost all as a bare
-`raise NotImplementedError`. That is a declaration, not a promise — and
-the two backends have honoured it unevenly. Measured 2026-08-02 by
-walking the source:
+`_BaseMixins` declares **61** methods. **55** of them are a bare
+`raise NotImplementedError` — a declaration, not a promise — and **6**
+carry a real body that the backend inherits (notably `transaction`, in
+`_BaseTransactionMixin`).
 
-| | declared in base | not implemented by this backend |
+Measured by walking the source with `ast`:
+
+| | value |
+|---|---|
+| declared in `_BaseMixins` | 61 |
+| of those, abstract | 55 |
+| abstract names `PostgreSQL` leaves unimplemented | **0** |
+| names `PostgreSQL` adds beyond the base | 7 |
+
+So every declared name resolves to a real body. The seven additions are
+`get_summaries`, `maintenance_lock`, `optimize`, `summary`, plus the
+internal `_check_writable`, `_get_connection_params` and
+`_map_dtype_to_postgres`.
+
+## Capability groups
+
+Each base mixin has exactly one concrete sibling:
+
+| capability | base | concrete |
 |---|---|---|
-| `SQLite3` | 59 | **23** — `select`, `insert`, `update`, `delete`, `count`, `table_exists`, `get_tables`, `get_table_info`, `analyze`, `backup_database`, … |
-| `PostgreSQL` | 59 | 1 — `transaction` |
-
-Calling one of those 23 on a `SQLite3` instance reaches the base method
-and raises `NotImplementedError` at runtime.
-
-## The same operation has two names
-
-Where both backends do implement an operation, they often spell it
-differently. This is the part that makes "swap the backend" a rewrite
-rather than a config change:
-
-| operation | `SQLite3` | `PostgreSQL` |
-|---|---|---|
-| list tables | `get_table_names` | `get_tables` |
-| describe a table | `get_table_schema` | `get_table_info` |
-| primary key | `get_primary_key` | `get_primary_keys` |
-| run SQL | `execute` | `execute_query` |
-| read rows | `get_rows` | `select` |
-| row count | `get_row_count` | `count` |
-| insert rows | `insert_many` | `insert` |
-
-32 method names exist only on `SQLite3` (the `_ArrayMixin`, `_ColumnMixin`
-and `_GitMixin` groups have no PostgreSQL counterpart at all); 23 exist
-only on `PostgreSQL`.
-
-## Test coverage is asymmetric too
-
-`SQLite3`: 98 test functions across 3 files. `PostgreSQL`: 12 test
-functions in 1 file (`_BatchMixin`). Treat the PostgreSQL class as
-lightly exercised and verify behaviour against your own data before
-relying on it.
+| connection | `_BaseConnectionMixin` | `_ConnectionMixin` |
+| query | `_BaseQueryMixin` | `_QueryMixin` |
+| transaction | `_BaseTransactionMixin` | `_TransactionMixin` |
+| table | `_BaseTableMixin` | `_TableMixin` |
+| schema | `_BaseSchemaMixin` | `_SchemaMixin` |
+| index | `_BaseIndexMixin` | `_IndexMixin` |
+| row | `_BaseRowMixin` | `_RowMixin` |
+| batch | `_BaseBatchMixin` | `_BatchMixin` |
+| blob | `_BaseBlobMixin` | `_BlobMixin` |
+| import/export | `_BaseImportExportMixin` | `_ImportExportMixin` |
+| maintenance | `_BaseMaintenanceMixin` | `_MaintenanceMixin` |
+| backup | `_BaseBackupMixin` | `_BackupMixin` |
 
 ## Method resolution
 
 ```
-class SQLite3(_SQLite3ConnectionMixin,
-              _SQLite3QueryMixin,
-              ...
-              _BaseConnectionMixin,
-              _BaseQueryMixin,
-              ...):
+class PostgreSQL(_BackupMixin,
+                 _BatchMixin,
+                 _ConnectionMixin,
+                 ...
+                 _BlobMixin):
     ...
 ```
 
-Backend-specific mixins come first in the MRO, so they win wherever they
-define a name. Where they do not define it, the base's
-`NotImplementedError` is what you get.
+The concrete mixins come first in the MRO, so they win wherever they
+define a name; where they do not, the base body (or its
+`NotImplementedError`) is what you get.
+
+## Test coverage is thin
+
+`PostgreSQL` has 12 test functions in one file (`_BatchMixin`). The
+class is lightly exercised — verify behaviour against your own data
+before relying on it, and add tests alongside any change.
 
 ## Why mixins
 
 Makes it obvious which capability a method belongs to when reading
-source, and avoids a 2000-line god-class. When adding a new capability,
-add a new `_BaseXMixin` + backend-specific sibling rather than
-extending an existing one — and implement it on **both** backends, or
-say plainly in this file that you did not.
+source, and avoids a 2000-line god-class. When adding a capability, add
+a new `_BaseXMixin` plus its concrete sibling rather than extending an
+existing one.
 
 ## See also
 
-- [16_sqlite-to-postgres.md](16_sqlite-to-postgres.md) — what a real port
-  costs, and the five silent failures to guard against.
+- [03_python-api.md](03_python-api.md) — the public surface
+- [15_maintenance.md](15_maintenance.md) — the maintenance mixin in detail

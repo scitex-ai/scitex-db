@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""scitex-db CLI — database inspection and health checks (Click)."""
+"""scitex-db CLI — PostgreSQL helpers for the SciTeX ecosystem (Click)."""
 
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ def _print_help_recursive(ctx: click.Context, _param, value):
 )
 @click.pass_context
 def main(ctx, as_json):
-    """Database utilities — SQLite/Postgres inspection and health checks.
+    """Database utilities — PostgreSQL helpers for the SciTeX ecosystem.
 
     \b
     Configuration precedence (highest -> lowest):
@@ -70,91 +70,6 @@ def main(ctx, as_json):
     ctx.obj["as_json"] = as_json
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
-
-
-@main.command("inspect-db")
-@click.argument("db_path", type=click.Path(exists=True, dir_okay=False))
-@click.option(
-    "--tables",
-    multiple=True,
-    help="Restrict inspection to the named tables (repeatable).",
-)
-@click.option("--quiet", "-q", is_flag=True, default=False, help="Minimal output.")
-@click.option(
-    "--json",
-    "as_json",
-    is_flag=True,
-    default=False,
-    help="Emit machine-readable JSON output.",
-)
-def inspect_db(db_path, tables, quiet, as_json):
-    """Inspect a database's structure (tables, schemas, row counts).
-
-    \b
-    Example:
-        $ scitex-db inspect-db ./mydb.sqlite
-        $ scitex-db inspect-db ./mydb.sqlite --tables users orders
-    """
-    from ._inspect import inspect
-
-    inspect(db_path, table_names=list(tables) or None, verbose=not quiet)
-
-
-@main.command("check-health")
-@click.argument(
-    "db_paths", nargs=-1, required=True, type=click.Path(exists=True, dir_okay=False)
-)
-@click.option(
-    "--fix", is_flag=True, default=False, help="Attempt to fix detected issues."
-)
-@click.option("--quiet", "-q", is_flag=True, default=False, help="Minimal output.")
-@click.option(
-    "--dry-run",
-    is_flag=True,
-    default=False,
-    help="Show what --fix would do without applying changes.",
-)
-@click.option(
-    "--yes",
-    "-y",
-    is_flag=True,
-    default=False,
-    help="Skip confirmation when --fix is used.",
-)
-@click.option(
-    "--json",
-    "as_json",
-    is_flag=True,
-    default=False,
-    help="Emit machine-readable JSON output.",
-)
-def check_health(db_paths, fix, quiet, dry_run, yes, as_json):
-    """Check database health and optionally repair issues.
-
-    \b
-    Example:
-        $ scitex-db check-health ./mydb.sqlite
-        $ scitex-db check-health ./db1.sqlite ./db2.sqlite
-        $ scitex-db check-health ./mydb.sqlite --fix --yes
-    """
-    from ._check_health import batch_health_check
-    from ._check_health import check_health as _check
-
-    if dry_run and fix:
-        click.echo("Dry-run: --fix would attempt repair on listed databases.", err=True)
-        fix = False
-    if fix and not yes:
-        click.echo(
-            f"Refusing to --fix {len(db_paths)} database(s) without --yes/-y. "
-            "Re-run with --dry-run to preview, or --yes to apply.",
-            err=True,
-        )
-        sys.exit(2)
-
-    if len(db_paths) == 1:
-        _check(db_paths[0], verbose=not quiet, fix_issues=fix)
-    else:
-        batch_health_check(list(db_paths), verbose=not quiet, fix_issues=fix)
 
 
 @main.group()
@@ -195,9 +110,9 @@ def list_python_apis(as_json):
         $ scitex-db list-python-apis --json
     """
     apis = [
-        "scitex_db._inspect.inspect",
-        "scitex_db._check_health.check_health",
-        "scitex_db._check_health.batch_health_check",
+        "scitex_db.PostgreSQL",
+        "scitex_db.register_post_save_hook",
+        "scitex_db.register_post_load_hook",
     ]
     if as_json:
         click.echo(json.dumps({"apis": apis}, indent=2))

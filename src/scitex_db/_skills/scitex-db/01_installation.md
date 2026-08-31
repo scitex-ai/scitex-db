@@ -1,7 +1,7 @@
 ---
 description: |
   [TOPIC] Installation
-  [DETAILS] pip install scitex-db. Default backend is SQLite (stdlib). Optional [postgresql] extra adds psycopg.
+  [DETAILS] pip install scitex-db. The PostgreSQL backend needs the [postgresql] extra, which adds psycopg.
 tags: [scitex-db-installation]
 ---
 
@@ -13,15 +13,18 @@ tags: [scitex-db-installation]
 pip install scitex-db
 ```
 
-Pulls `numpy`, `pandas`, `click`, and `scitex-core`. SQLite support is
-built in via Python's stdlib `sqlite3` — no system deps.
+Pulls `numpy`, `pandas`, `click`, and `scitex-core`.
+
+The `PostgreSQL` backend is **not** usable from this install alone — it
+imports `psycopg2`, which arrives with the extra below. Without it,
+`scitex_db.PostgreSQL` resolves to `None` rather than raising, so check
+the symbol before using it if you support both install shapes.
 
 ## Optional extras
 
 | Extra | Purpose |
 |---|---|
-| `postgresql` | Adds `psycopg` for the `PostgreSQL` backend |
-| `git` | Tooling used by maintenance helpers |
+| `postgresql` | Adds `psycopg2-binary` + `sqlalchemy` for the `PostgreSQL` backend |
 | `dev` | Test + lint tooling |
 | `docs` | Sphinx + RTD theme |
 | `all` | Everything above |
@@ -34,6 +37,7 @@ pip install 'scitex-db[postgresql]'
 
 ```bash
 python -c "import scitex_db; print(scitex_db.__version__)"
+python -c "import scitex_db; print(scitex_db.PostgreSQL)"   # None => extra missing
 scitex-db --version
 scitex-db --help
 ```

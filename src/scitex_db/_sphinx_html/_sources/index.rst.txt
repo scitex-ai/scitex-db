@@ -1,7 +1,7 @@
 SciTeX DB
 =========
 
-**scitex-db** provides SQLite3 / PostgreSQL helpers, health checks, and duplicate management for the SciTeX ecosystem.
+**scitex-db** provides PostgreSQL helpers, NumPy-aware storage, and schema-change pre-flight for the SciTeX ecosystem.
 
 .. toctree::
    :maxdepth: 2

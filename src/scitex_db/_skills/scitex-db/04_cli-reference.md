@@ -1,7 +1,7 @@
 ---
 description: |
   [TOPIC] CLI reference
-  [DETAILS] `scitex-db` console entry — check-health, inspect-db, list-python-apis, mcp.
+  [DETAILS] `scitex-db` console entry — list-python-apis, mcp, skills.
 tags: [scitex-db-cli-reference]
 ---
 
@@ -11,7 +11,11 @@ tags: [scitex-db-cli-reference]
 scitex-db [OPTIONS] COMMAND [ARGS]...
 ```
 
-Database utilities — SQLite/Postgres inspection and health checks.
+Database utilities — PostgreSQL helpers for the SciTeX ecosystem.
+
+The CLI is deliberately thin: `scitex-db` is a **library first**. The
+console entry point exists for introspection and skill management, not
+as an administration tool — use `psql` for that.
 
 ## Global options
 
@@ -34,23 +38,21 @@ Database utilities — SQLite/Postgres inspection and health checks.
 
 | Command | Purpose |
 |---|---|
-| `check-health` | Check database health and optionally repair issues |
-| `inspect-db` | Inspect a database's structure (tables, schemas, row counts) |
 | `list-python-apis` | List the public Python API surface of `scitex_db` |
-| `mcp` | MCP (Model Context Protocol) server management |
+| `mcp list-tools` | MCP tools exposed by scitex-db (none — library-only) |
+| `skills` | List / get / install agent-facing skills |
+
+Plus `install-shell-completion` / `print-shell-completion` when
+`scitex-dev` is installed.
 
 ## Examples
 
 ```bash
-scitex-db inspect-db trials.db
-scitex-db check-health trials.db --json
 scitex-db list-python-apis
-scitex-db mcp --help
+scitex-db list-python-apis --json
+scitex-db mcp list-tools
+scitex-db skills list
 ```
 
 For per-command flags, run `scitex-db <command> --help` or
 `scitex-db --help-recursive`.
-
-## See also
-
-- [10_cli-reference.md](10_cli-reference.md) — historical/extended notes

@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>scitex_db &mdash; SciTeX DB v0.1.12</title>
+  <title>scitex_db &mdash; SciTeX DB v0.0.0</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
@@ -14,7 +14,7 @@
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=297ad043"></script>
+      <script src="../_static/documentation_options.js?v=7026087e"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
@@ -56,20 +56,8 @@
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">scitex_db</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#scitex_db.SQLite3"><code class="docutils literal notranslate"><span class="pre">SQLite3</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#scitex_db.SQLite3.__init__"><code class="docutils literal notranslate"><span class="pre">SQLite3.__init__()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#scitex_db.SQLite3.__enter__"><code class="docutils literal notranslate"><span class="pre">SQLite3.__enter__()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#scitex_db.SQLite3.__exit__"><code class="docutils literal notranslate"><span class="pre">SQLite3.__exit__()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#scitex_db.SQLite3.__del__"><code class="docutils literal notranslate"><span class="pre">SQLite3.__del__()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#scitex_db.SQLite3.__call__"><code class="docutils literal notranslate"><span class="pre">SQLite3.__call__()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#scitex_db.SQLite3.summary"><code class="docutils literal notranslate"><span class="pre">SQLite3.summary</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="#scitex_db.batch_health_check"><code class="docutils literal notranslate"><span class="pre">batch_health_check()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#scitex_db.check_health"><code class="docutils literal notranslate"><span class="pre">check_health()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#scitex_db.delete_duplicates"><code class="docutils literal notranslate"><span class="pre">delete_duplicates()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#scitex_db.delete_sqlite3_duplicates"><code class="docutils literal notranslate"><span class="pre">delete_sqlite3_duplicates()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#scitex_db.inspect"><code class="docutils literal notranslate"><span class="pre">inspect()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#scitex_db.register_post_load_hook"><code class="docutils literal notranslate"><span class="pre">register_post_load_hook()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#scitex_db.register_post_save_hook"><code class="docutils literal notranslate"><span class="pre">register_post_save_hook()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -105,235 +93,27 @@
 symbols are imported lazily via PEP 562 <code class="docutils literal notranslate"><span class="pre">__getattr__</span></code> so that
 <code class="docutils literal notranslate"><span class="pre">import</span> <span class="pre">scitex_db</span></code> stays under the §10 cold-start budget — Click
 runs the CLI once per Tab press, and slow imports break tab-completion.</p>
-<dl class="py class">
-<dt class="sig sig-object py" id="scitex_db.SQLite3">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">scitex_db.</span></span><span class="sig-name descname"><span class="pre">SQLite3</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">db_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_temp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">compress_by_default</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">autocommit</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'rwc'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">60.0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/scitex_db/_sqlite3/_SQLite3.html#SQLite3"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scitex_db.SQLite3" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">_ArrayMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_ConnectionMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_QueryMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_TransactionMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_ColumnMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_TableMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_IndexMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_RowMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_BatchMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_BlobMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_ImportExportMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_MaintenanceMixin</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">_GitMixin</span></code></p>
-<p>SQLite database manager with automatic metadata handling, numpy array storage, and compression.</p>
-<p>This class provides a comprehensive interface for SQLite database operations with
-automatic compression, thread-safe operations, and specialized numpy array handling.</p>
-<dl class="simple">
-<dt>Features:</dt><dd><ul class="simple">
-<li><p>Automatic compression for BLOB data (70-90% reduction)</p></li>
-<li><p>Thread-safe operations with proper connection management</p></li>
-<li><p>Metadata handling for BLOB columns</p></li>
-<li><p>Batch processing support</p></li>
-<li><p>Context manager support for proper resource cleanup</p></li>
-</ul>
-</dd>
-</dl>
-<div class="admonition-examples admonition">
-<p class="admonition-title">Examples</p>
-<p>Basic usage with context manager (recommended):</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">with</span> <span class="n">SQLite3</span><span class="p">(</span><span class="s2">&quot;data.db&quot;</span><span class="p">,</span> <span class="n">compress_by_default</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="k">as</span> <span class="n">db</span><span class="p">:</span>
-<span class="gp">... </span>    <span class="n">db</span><span class="o">.</span><span class="n">create_table</span><span class="p">(</span><span class="s2">&quot;experiments&quot;</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;INTEGER PRIMARY KEY&quot;</span><span class="p">,</span> <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="s2">&quot;BLOB&quot;</span><span class="p">})</span>
-<span class="gp">... </span>    <span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">((</span><span class="mi">1000</span><span class="p">,</span> <span class="mi">100</span><span class="p">))</span>
-<span class="gp">... </span>    <span class="n">db</span><span class="o">.</span><span class="n">save_array</span><span class="p">(</span><span class="s2">&quot;experiments&quot;</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">column</span><span class="o">=</span><span class="s2">&quot;data&quot;</span><span class="p">,</span> <span class="n">additional_columns</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">})</span>
-</pre></div>
-</div>
-<p>Array storage and retrieval:</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">with</span> <span class="n">SQLite3</span><span class="p">(</span><span class="s2">&quot;data.db&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">db</span><span class="p">:</span>
-<span class="gp">... </span>    <span class="c1"># Save numpy array</span>
-<span class="gp">... </span>    <span class="n">db</span><span class="o">.</span><span class="n">save_array</span><span class="p">(</span>
-<span class="gp">... </span>        <span class="n">table_name</span><span class="o">=</span><span class="s2">&quot;measurements&quot;</span><span class="p">,</span>
-<span class="gp">... </span>        <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">((</span><span class="mi">1000</span><span class="p">,</span> <span class="mi">100</span><span class="p">)),</span>
-<span class="gp">... </span>        <span class="n">column</span><span class="o">=</span><span class="s2">&quot;data&quot;</span><span class="p">,</span>
-<span class="gp">... </span>        <span class="n">additional_columns</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;experiment_1&quot;</span><span class="p">,</span> <span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="mi">1234567890</span><span class="p">}</span>
-<span class="gp">... </span>    <span class="p">)</span>
-<span class="gp">... </span>    <span class="c1"># Load array</span>
-<span class="gp">... </span>    <span class="n">loaded</span> <span class="o">=</span> <span class="n">db</span><span class="o">.</span><span class="n">load_array</span><span class="p">(</span><span class="s2">&quot;measurements&quot;</span><span class="p">,</span> <span class="s2">&quot;data&quot;</span><span class="p">,</span> <span class="n">where</span><span class="o">=</span><span class="s2">&quot;name = &#39;experiment_1&#39;&quot;</span><span class="p">)</span>
-</pre></div>
-</div>
-<p>Generic object storage:</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">with</span> <span class="n">SQLite3</span><span class="p">(</span><span class="s2">&quot;data.db&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">db</span><span class="p">:</span>
-<span class="gp">... </span>    <span class="n">db</span><span class="o">.</span><span class="n">save_blob</span><span class="p">(</span>
-<span class="gp">... </span>        <span class="n">table_name</span><span class="o">=</span><span class="s2">&quot;objects&quot;</span><span class="p">,</span>
-<span class="gp">... </span>        <span class="n">data</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;weights&quot;</span><span class="p">:</span> <span class="n">array</span><span class="p">,</span> <span class="s2">&quot;params&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;lr&quot;</span><span class="p">:</span> <span class="mf">0.001</span><span class="p">}},</span>
-<span class="gp">... </span>        <span class="n">key</span><span class="o">=</span><span class="s2">&quot;model_v1&quot;</span>
-<span class="gp">... </span>    <span class="p">)</span>
-<span class="gp">... </span>    <span class="n">loaded_obj</span> <span class="o">=</span> <span class="n">db</span><span class="o">.</span><span class="n">load_blob</span><span class="p">(</span><span class="s2">&quot;objects&quot;</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s2">&quot;model_v1&quot;</span><span class="p">)</span>
-</pre></div>
-</div>
-</div>
-<div class="admonition-notes admonition">
-<p class="admonition-title">Notes</p>
-<ul class="simple">
-<li><p>Always use context manager (with statement) for proper resource cleanup</p></li>
-<li><p>BLOB columns automatically get metadata columns: {column}_dtype, {column}_shape, {column}_compressed</p></li>
-<li><p>Compression is enabled by default for arrays &gt; 1KB</p></li>
-<li><p>Thread-safe operations are supported</p></li>
-</ul>
-</div>
-<dl class="py method">
-<dt class="sig sig-object py" id="scitex_db.SQLite3.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">db_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_temp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">compress_by_default</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">autocommit</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'rwc'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">60.0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/scitex_db/_sqlite3/_SQLite3.html#SQLite3.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scitex_db.SQLite3.__init__" title="Link to this definition"></a></dt>
-<dd><p>Initialize SQLite database manager.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="scitex_db.register_post_load_hook">
+<span class="sig-prename descclassname"><span class="pre">scitex_db.</span></span><span class="sig-name descname"><span class="pre">register_post_load_hook</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fn</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/scitex_db/_observers.html#register_post_load_hook"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scitex_db.register_post_load_hook" title="Link to this definition"></a></dt>
+<dd><p>Register a function to run after every successful scitex-db read.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>db_path</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Path to the SQLite database file</p></li>
-<li><p><strong>use_temp</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>optional</em>) – Whether to use a temporary copy of the database, by default False</p></li>
-<li><p><strong>compress_by_default</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>optional</em>) – Whether to compress BLOB data by default when not explicitly specified, by default False</p></li>
-<li><p><strong>autocommit</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>optional</em>) – Whether to automatically commit transactions, by default False</p></li>
-<li><p><strong>mode</strong> (<em>{&quot;ro&quot;</em><em>, </em><em>&quot;rw&quot;</em><em>, </em><em>&quot;rwc&quot;}</em><em>, </em><em>optional</em>) – SQLite URI open mode, by default <code class="docutils literal notranslate"><span class="pre">&quot;rwc&quot;</span></code> — opens existing files
-for read-write and creates the file if missing. This preserves the
-previous behaviour (<code class="docutils literal notranslate"><span class="pre">sqlite3.connect(path)</span></code> without URI auto-created
-missing files). <code class="docutils literal notranslate"><span class="pre">&quot;rw&quot;</span></code> is the same minus auto-create (file must
-already exist). <code class="docutils literal notranslate"><span class="pre">&quot;ro&quot;</span></code> is read-only — useful when scanning
-inventory databases that must not be mutated.</p></li>
-<li><p><strong>timeout</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>optional</em>) – <code class="docutils literal notranslate"><span class="pre">sqlite3.connect</span></code> <code class="docutils literal notranslate"><span class="pre">timeout=</span></code> value (seconds), by default <code class="docutils literal notranslate"><span class="pre">60.0</span></code>
-(the previous hardcoded value). Use a smaller value when probing many
-DBs and you’d rather fail fast than wait on a lock.</p></li>
-</ul>
-</dd>
-</dl>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<dl class="simple">
-<dt>UserWarning</dt><dd><p>If not used with context manager, warns about potential resource leaks</p>
-</dd>
-</dl>
-</div>
-<dl class="field-list simple">
-<dt class="field-odd">Raises<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If <code class="docutils literal notranslate"><span class="pre">mode</span></code> is not one of <code class="docutils literal notranslate"><span class="pre">{&quot;ro&quot;,</span> <span class="pre">&quot;rw&quot;,</span> <span class="pre">&quot;rwc&quot;}</span></code>.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="scitex_db.SQLite3.__enter__">
-<span class="sig-name descname"><span class="pre">__enter__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/scitex_db/_sqlite3/_SQLite3.html#SQLite3.__enter__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scitex_db.SQLite3.__enter__" title="Link to this definition"></a></dt>
-<dd><p>Enter context manager.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="scitex_db.SQLite3.__exit__">
-<span class="sig-name descname"><span class="pre">__exit__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">exc_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exc_val</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exc_tb</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/scitex_db/_sqlite3/_SQLite3.html#SQLite3.__exit__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scitex_db.SQLite3.__exit__" title="Link to this definition"></a></dt>
-<dd><p>Exit context manager and ensure proper cleanup.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="scitex_db.SQLite3.__del__">
-<span class="sig-name descname"><span class="pre">__del__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/scitex_db/_sqlite3/_SQLite3.html#SQLite3.__del__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scitex_db.SQLite3.__del__" title="Link to this definition"></a></dt>
-<dd><p>Destructor with context manager usage warning.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="scitex_db.SQLite3.__call__">
-<span class="sig-name descname"><span class="pre">__call__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">return_summary</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">print_summary</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table_names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">limit</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/scitex_db/_sqlite3/_SQLite3.html#SQLite3.__call__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scitex_db.SQLite3.__call__" title="Link to this definition"></a></dt>
-<dd><p>Display database summary information.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>return_summary</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>optional</em>) – Whether to return summary dict, by default False</p></li>
-<li><p><strong>print_summary</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>optional</em>) – Whether to print summary to console, by default True</p></li>
-<li><p><strong>table_names</strong> (<em>Optional</em><em>[</em><em>List</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em><em>]</em><em>, </em><em>optional</em>) – Specific table names to summarize, by default None (all tables)</p></li>
-<li><p><strong>verbose</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>optional</em>) – Whether to show detailed information, by default True</p></li>
-<li><p><strong>limit</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>optional</em>) – Maximum number of rows to display per table, by default 5</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Summary dictionary if return_summary=True, else None</p>
-</dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)">dict</a> or None</p>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
 </dd>
 </dl>
 </dd></dl>
 
-<dl class="py property">
-<dt class="sig sig-object py" id="scitex_db.SQLite3.summary">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">summary</span></span><a class="headerlink" href="#scitex_db.SQLite3.summary" title="Link to this definition"></a></dt>
-<dd><p>Quick access to database summary.</p>
-</dd></dl>
-
-</dd></dl>
-
 <dl class="py function">
-<dt class="sig sig-object py" id="scitex_db.batch_health_check">
-<span class="sig-prename descclassname"><span class="pre">scitex_db.</span></span><span class="sig-name descname"><span class="pre">batch_health_check</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">db_paths</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fix_issues</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/scitex_db/_check_health.html#batch_health_check"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scitex_db.batch_health_check" title="Link to this definition"></a></dt>
-<dd><p>Run health check on multiple databases</p>
+<dt class="sig sig-object py" id="scitex_db.register_post_save_hook">
+<span class="sig-prename descclassname"><span class="pre">scitex_db.</span></span><span class="sig-name descname"><span class="pre">register_post_save_hook</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fn</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/scitex_db/_observers.html#register_post_save_hook"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scitex_db.register_post_save_hook" title="Link to this definition"></a></dt>
+<dd><p>Register a function to run after every successful scitex-db write.</p>
+<p>Hooks fire in registration order. They MUST NOT raise — exceptions
+are swallowed with <code class="docutils literal notranslate"><span class="pre">logger.debug</span></code>. A misbehaving observer must
+never break the host’s database access.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>db_paths</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em> of </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – List of database paths</p></li>
-<li><p><strong>verbose</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>default False</em>) – Print results for each database</p></li>
-<li><p><strong>fix_issues</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>default False</em>) – Attempt to fix issues</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Results for each database</p>
-</dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)">dict</a></p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="scitex_db.check_health">
-<span class="sig-prename descclassname"><span class="pre">scitex_db.</span></span><span class="sig-name descname"><span class="pre">check_health</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">db_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fix_issues</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/scitex_db/_check_health.html#check_health"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scitex_db.check_health" title="Link to this definition"></a></dt>
-<dd><p>Comprehensive health check for SQLite database</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>db_path</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Path to database file</p></li>
-<li><p><strong>verbose</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>default True</em>) – Print detailed results</p></li>
-<li><p><strong>fix_issues</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>default False</em>) – Attempt to fix detected issues</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Health check results</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)">dict</a></p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="scitex_db.delete_duplicates">
-<span class="sig-prename descclassname"><span class="pre">scitex_db.</span></span><span class="sig-name descname"><span class="pre">delete_duplicates</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/scitex_db/_delete_duplicates.html#delete_duplicates"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scitex_db.delete_duplicates" title="Link to this definition"></a></dt>
-<dd><p>Delete duplicate entries from an SQLite database table.</p>
-<div class="deprecated">
-<p><span class="versionmodified deprecated">Deprecated since version This: </span>function is deprecated as it’s SQLite3-specific.
-Use scitex.db._sqlite3.delete_sqlite3_duplicates() instead.</p>
-</div>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="scitex_db.delete_sqlite3_duplicates">
-<span class="sig-prename descclassname"><span class="pre">scitex_db.</span></span><span class="sig-name descname"><span class="pre">delete_sqlite3_duplicates</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lpath_db</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">columns</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'all'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">include_blob</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chunk_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dry_run</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/scitex_db/_sqlite3/_delete_duplicates.html#delete_sqlite3_duplicates"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scitex_db.delete_sqlite3_duplicates" title="Link to this definition"></a></dt>
-<dd><dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Tuple</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>], <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>]]</span></p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="scitex_db.inspect">
-<span class="sig-prename descclassname"><span class="pre">scitex_db.</span></span><span class="sig-name descname"><span class="pre">inspect</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lpath_db</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table_names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">skip_count</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/scitex_db/_inspect.html#inspect"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scitex_db.inspect" title="Link to this definition"></a></dt>
-<dd><p>Optimized database inspection.</p>
-<p>Example:
-&gt;&gt;&gt; inspect(‘path/to/database.db’)
-&gt;&gt;&gt; inspect(‘path/to/database.db’, [‘table1’], skip_count=True)</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>lpath_db</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span>) – Path to the SQLite database file</p></li>
-<li><p><strong>table_names</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">List</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]]</span>) – List of table names to inspect (None for all)</p></li>
-<li><p><strong>sample_size</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></span>) – Number of sample rows to retrieve</p></li>
-<li><p><strong>skip_count</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span>) – Skip row counting for large tables (much faster)</p></li>
-<li><p><strong>verbose</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span>) – Print inspection results</p></li>
-</ul>
-</dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">List</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]]</span></p>
-</dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>List of inspection results</p>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
 </dd>
 </dl>
 </dd></dl>
