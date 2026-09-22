@@ -45,6 +45,23 @@ services:
       - archive_timeout=300
       - -c
       - hot_standby=on
+      # LOGICAL, not replica. Physical standbys work at either level (logical is
+      # a superset), but LOGICAL replication is impossible without this — and
+      # logical replication is the only way a node can accept WRITES while
+      # partitioned. The always-on servers are physical standbys and do not need
+      # it; the laptops cannot be useful offline without it. Costs somewhat more
+      # WAL volume, which the 15-minute offsite lane already carries.
+      - -c
+      - wal_level=logical
+      # Raised from the default 10. Nine hosts means up to eight physical
+      # standbys, and each leaf package that owns its own sync gets a LOGICAL
+      # slot on top of that — 10 would run out and the failure is a replica that
+      # silently cannot connect. Restart-required, so it is changed in the SAME
+      # restart as wal_level rather than costing a second outage.
+      - -c
+      - max_wal_senders=${SCITEX_PG_MAX_WAL_SENDERS:-20}
+      - -c
+      - max_replication_slots=${SCITEX_PG_MAX_REPLICATION_SLOTS:-20}
     healthcheck:
       # pg_isready exits 0 only when the server accepts connections — a check
       # that can actually fail, unlike `docker ps`.
