@@ -29,6 +29,10 @@ from typing import Dict, List, Optional
 from ..._BaseMixins._BaseBatchMixin import _BaseBatchMixin
 import sqlite3
 
+import scitex_logging as slogging
+
+log = slogging.getLogger(__name__)
+
 
 class _BatchMixin:
     """Batch operations functionality"""
@@ -121,7 +125,7 @@ class _BatchMixin:
                         if result:
                             filtered_rows.append(row)
                     except Exception as e:
-                        print(f"Warning: Where clause evaluation failed for row: {e}")
+                        log.warning(f"Where clause evaluation failed for row: {e}")
                 rows = filtered_rows
             schema = self.get_table_schema(table_name)
             table_columns = set(schema["name"])

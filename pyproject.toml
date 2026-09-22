@@ -39,6 +39,7 @@ dependencies = [
     "numpy",
     "pandas",
     "scitex-core>=0.1.0",
+    "scitex-logging>=0.2.0",  # PS-220: status/diagnostic output via slogging
 ]
 
 [project.optional-dependencies]
@@ -101,6 +102,10 @@ packages = ["src/scitex_db"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-v --tb=short --cov=scitex_db --cov-report=term-missing"
+markers = [
+    "smoke: fast subprocess CLI happy-path tests (<60s)",
+    "e2e: end-to-end workflows against real subsystems (RUN_E2E=1)",
+]
 
 [tool.coverage.run]
 parallel = true

@@ -343,14 +343,14 @@ def test_inspect_basic_counts_two_user_rows(simple_users_db):
     assert results[0]["row_count"] == 2
 
 
-def test_inspect_verbose_writes_table_name_to_stdout(simple_users_db, capsys):
+def test_inspect_verbose_writes_table_name_to_stderr(simple_users_db, capsys):
     # Arrange
     target = simple_users_db
     # Act
     inspect(target, verbose=True)
     captured = capsys.readouterr()
     # Assert
-    assert "users" in captured.out
+    assert "users" in captured.err
 
 
 def test_inspect_specific_tables_returns_single_table(simple_users_db):

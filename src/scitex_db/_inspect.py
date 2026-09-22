@@ -13,6 +13,10 @@ import sqlite3
 from contextlib import contextmanager
 from typing import Any, Dict, List, Optional
 
+import scitex_logging as slogging
+
+log = slogging.getLogger(__name__)
+
 
 class OptimizedInspector:
     """Optimized database inspector with connection reuse and efficient queries."""
@@ -228,14 +232,14 @@ class OptimizedInspector:
 
     def _print_table_info(self, result: Dict):
         """Pretty print table information."""
-        print(f"\n{'='*60}")
-        print(f"Table: {result['table_name']}")
-        print(
+        log.info(f"\n{'='*60}")
+        log.info(f"Table: {result['table_name']}")
+        log.info(
             f"Rows: {result['row_count']}"
             + (" (approximate)" if result["is_approximate"] else "")
         )
-        print(f"Columns: {len(result['columns'])}")
-        print(f"-" * 60)
+        log.info(f"Columns: {len(result['columns'])}")
+        log.info(f"-" * 60)
 
         # Check if we have sample data
         if result["sample_data"]:
@@ -252,11 +256,11 @@ class OptimizedInspector:
                     data_cols.append(c)
 
             # Show first row in detail (like df.iloc[0])
-            print(
+            log.info(
                 f"\nFirst row (schema + data for all {len(all_cols)} columns):"
             )
-            print(f"  {'Column':<40} | {'Type':<20} | Value")
-            print(f"  {'-'*40}-|-{'-'*20}-|-{'-'*50}")
+            log.info(f"  {'Column':<40} | {'Type':<20} | Value")
+            log.info(f"  {'-'*40}-|-{'-'*20}-|-{'-'*50}")
 
             first_row = result["sample_data"][0]
 
@@ -294,7 +298,7 @@ class OptimizedInspector:
                 display_key = key if len(key) <= 40 else key[:37] + "..."
 
                 # Print in column format
-                print(
+                log.info(
                     f"  {display_key:<40} | {type_display:<20} | {display_value}"
                 )
 
@@ -312,14 +316,14 @@ class OptimizedInspector:
                     header_cols = data_cols + metadata_cols[:max(0, 5-len(data_cols))]
                     col_type = f"{len(data_cols)} data + {len(header_cols)-len(data_cols)} metadata columns"
                 
-                print(
+                log.info(
                     f"\nAdditional samples (rows 2-{max_row} of {total_samples}, {col_type}):"
                 )
 
                 # Print header
                 header = " | ".join(f"{col[:12]:<12}" for col in header_cols)
-                print(f"  {header}")
-                print(f"  {'-'*len(header)}")
+                log.info(f"  {header}")
+                log.info(f"  {'-'*len(header)}")
 
                 # Print rows 2-3
                 for row in result["sample_data"][1:3]:
@@ -329,10 +333,10 @@ class OptimizedInspector:
                         if len(val) > 12:
                             val = val[:9] + "..."
                         values.append(f"{val:<12}")
-                    print(f"  {' | '.join(values)}")
+                    log.info(f"  {' | '.join(values)}")
         else:
             # No data - show schema only
-            print("\nNo data in table. Schema:")
+            log.info("\nNo data in table. Schema:")
             for col in result["columns"]:
                 col_type = col["type"]
                 constraints = []
@@ -346,7 +350,7 @@ class OptimizedInspector:
                 constraint_str = (
                     f" ({', '.join(constraints)})" if constraints else ""
                 )
-                print(f"  {col['name']}: {col_type}{constraint_str}")
+                log.info(f"  {col['name']}: {col_type}{constraint_str}")
 
 
 def inspect(

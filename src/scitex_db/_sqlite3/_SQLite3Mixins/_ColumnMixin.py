@@ -10,10 +10,10 @@ __DIR__ = os.path.dirname(__FILE__)
 # ----------------------------------------
 
 import time
-import logging
+import scitex_logging as slogging
 from typing import Any, Dict, List, Optional, Tuple
 
-logger = logging.getLogger(__name__)
+logger = slogging.getLogger(__name__)
 
 
 class _ColumnMixin:

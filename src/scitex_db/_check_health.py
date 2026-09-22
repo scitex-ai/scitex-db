@@ -13,6 +13,9 @@ import sqlite3
 from typing import Any, Dict, List
 
 import pandas as pd
+import scitex_logging as slogging
+
+log = slogging.getLogger(__name__)
 
 
 def check_health(
@@ -145,7 +148,7 @@ def check_health(
             if fix_issues and results["issues"]:
                 if "CORRUPTED" in str(results["issues"]):
                     if verbose:
-                        print("Attempting to fix corruption with VACUUM...")
+                        log.info("Attempting to fix corruption with VACUUM...")
                     try:
                         cursor.execute("VACUUM")
                         conn.commit()
@@ -190,29 +193,29 @@ def check_health(
     )
 
     if verbose:
-        print(f"\nDatabase Health Check: {db_path}")
-        print(f"Status: {results['status']} (Score: {health_score}/100)")
-        print(f"File size: {results['stats'].get('file_size_mb', 0):.2f} MB")
-        print(f"Tables: {results['stats'].get('table_count', 0)}")
-        print(f"Total rows: {results['stats'].get('total_rows', 0)}")
+        log.info(f"\nDatabase Health Check: {db_path}")
+        log.info(f"Status: {results['status']} (Score: {health_score}/100)")
+        log.info(f"File size: {results['stats'].get('file_size_mb', 0):.2f} MB")
+        log.info(f"Tables: {results['stats'].get('table_count', 0)}")
+        log.info(f"Total rows: {results['stats'].get('total_rows', 0)}")
 
         # Loadability status
         loadability = results["loadability"]
-        print(
+        log.info(
             f"Loadability - Rows: {'✓' if loadability['rows'] else '✗'}, "
             f"Arrays: {'✓' if loadability['arrays'] else '✗'}, "
             f"Blobs: {'✓' if loadability['blobs'] else '✗'}"
         )
 
         if results["issues"]:
-            print(f"\nIssues found ({len(results['issues'])}):")
+            log.info(f"\nIssues found ({len(results['issues'])}):")
             for issue in results["issues"]:
-                print(f"  - {issue}")
+                log.info(f"  - {issue}")
 
         if results["recommendations"]:
-            print(f"\nRecommendations ({len(results['recommendations'])}):")
+            log.info(f"\nRecommendations ({len(results['recommendations'])}):")
             for rec in results["recommendations"]:
-                print(f"  - {rec}")
+                log.info(f"  - {rec}")
 
     return results
 
@@ -250,7 +253,7 @@ def is_rows_loadable(
                 return True
     except Exception as ee:
         if verbose:
-            print(f"Load failed for {db_path}/{table_name}: {ee}")
+            log.warning(f"Load failed for {db_path}/{table_name}: {ee}")
         return False
 
 
@@ -290,7 +293,7 @@ def is_arrays_loadable(
                 return True
     except Exception as ee:
         if verbose:
-            print(f"Array load failed for {db_path}/{table_name}: {ee}")
+            log.warning(f"Array load failed for {db_path}/{table_name}: {ee}")
         return False
 
 
@@ -330,7 +333,7 @@ def is_blobs_loadable(
                 return True
     except Exception as ee:
         if verbose:
-            print(f"Blob load failed for {db_path}/{table_name}: {ee}")
+            log.warning(f"Blob load failed for {db_path}/{table_name}: {ee}")
         return False
 
 
@@ -356,11 +359,11 @@ def batch_health_check(
     """
     results = {}
 
-    print(f"Running health check on {len(db_paths)} databases...")
+    log.info(f"Running health check on {len(db_paths)} databases...")
 
     for db_path in db_paths:
         if verbose:
-            print(f"\nChecking: {db_path}")
+            log.info(f"\nChecking: {db_path}")
 
         results[db_path] = check_health(
             db_path=db_path, verbose=verbose, fix_issues=fix_issues
@@ -371,10 +374,10 @@ def batch_health_check(
     issues = sum(1 for r in results.values() if r["status"] == "ISSUES_FOUND")
     critical = sum(1 for r in results.values() if r["status"] == "CRITICAL")
 
-    print(f"\nBatch Health Check Summary:")
-    print(f"  Healthy: {healthy}")
-    print(f"  Issues: {issues}")
-    print(f"  Critical: {critical}")
+    log.info(f"\nBatch Health Check Summary:")
+    log.info(f"  Healthy: {healthy}")
+    log.info(f"  Issues: {issues}")
+    log.info(f"  Critical: {critical}")
 
     return results
 
