@@ -38,7 +38,6 @@ dependencies = [
     "click>=8.0",
     "numpy",
     "pandas",
-    "scitex-core>=0.1.0",
     "scitex-logging>=0.2.0",  # PS-220: status/diagnostic output via slogging
 ]
 
