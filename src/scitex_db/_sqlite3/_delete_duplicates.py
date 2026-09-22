@@ -4,6 +4,7 @@
 # File: /ssh:sp:/home/ywatanabe/proj/scitex_repo/src/scitex/db/_sqlite3/_delete_duplicates.py
 # ----------------------------------------
 import os
+import sys
 
 __FILE__ = __file__
 __DIR__ = os.path.dirname(__FILE__)
@@ -14,6 +15,9 @@ import sqlite3
 from typing import List, Optional, Tuple, Union
 
 import pandas as pd
+import scitex_logging as slogging
+
+log = slogging.getLogger(__name__)
 
 """
 Functionality:
@@ -114,7 +118,7 @@ def _determine_columns(
         columns = [columns]
 
     columns_str = ", ".join(columns)
-    print(f"Columns considered for duplicates: {columns_str}")
+    log.info(f"Columns considered for duplicates: {columns_str}")
 
     return columns
 
@@ -122,7 +126,7 @@ def _determine_columns(
 def _fetch_as_df(
     cursor: sqlite3.Cursor, columns: List[str], table_name: str
 ) -> pd.DataFrame:
-    print("\nFetching all database entries...")
+    log.info("\nFetching all database entries...")
     columns_str = ", ".join(columns)
     query = f"SELECT {columns_str} FROM {table_name}"
     cursor.execute(query)
@@ -133,9 +137,9 @@ def _fetch_as_df(
 def _find_duplicated(df: pd.DataFrame) -> pd.DataFrame:
     df_duplicated = df[df.duplicated(keep="first")].copy()
     duplication_rate = len(df_duplicated) / (len(df) - len(df_duplicated))
-    print(f"\n{100 * duplication_rate:.2f}% of data was duplicated. Cleaning up...")
-    print(f"\nOriginal entries:\n{df.head()}")
-    print(f"\nDuplicated entries:\n{df_duplicated.head()}")
+    log.info(f"\n{100 * duplication_rate:.2f}% of data was duplicated. Cleaning up...")
+    log.debug(f"\nOriginal entries:\n{df.head()}")
+    log.debug(f"\nDuplicated entries:\n{df_duplicated.head()}")
     return df_duplicated
 
 
@@ -161,9 +165,13 @@ def verify_duplicated_index(
     is_verified = len(entries) >= 1
 
     if dry_run:
-        print(f"Expected duplicate entry: {tuple(duplicated_row)}")
-        print(f"Found entries: {entries}")
-        print(f"Verification {'succeeded' if is_verified else 'failed'}")
+        # PS-220 exception: --dry-run bodies are machine-readable data
+        # transport and stay on stdout (sys.stdout.write is not flagged).
+        sys.stdout.write(f"Expected duplicate entry: {tuple(duplicated_row)}\n")
+        sys.stdout.write(f"Found entries: {entries}\n")
+        sys.stdout.write(
+            f"Verification {'succeeded' if is_verified else 'failed'}\n"
+        )
 
     return select_query, is_verified
 
@@ -184,7 +192,8 @@ def _delete_entry(
         where_conditions = " AND ".join([f"{col} = ?" for col in columns])
         delete_query = f"DELETE FROM {table_name} WHERE {where_conditions} LIMIT 1"
         if dry_run:
-            print(f"[DRY RUN] Would delete entry:\n{duplicated_row}")
+            # PS-220 exception: --dry-run bodies stay on stdout.
+            sys.stdout.write(f"[DRY RUN] Would delete entry:\n{duplicated_row}\n")
         else:
             try:
                 cursor.execute(delete_query, tuple(duplicated_row))
@@ -197,9 +206,9 @@ def _delete_entry(
                     f"LIMIT 1)",
                     tuple(duplicated_row),
                 )
-            print(f"Deleted entry:\n{duplicated_row}")
+            log.info(f"Deleted entry:\n{duplicated_row}")
     else:
-        print(f"Skipping entry (not found or already deleted):\n{duplicated_row}")
+        log.info(f"Skipping entry (not found or already deleted):\n{duplicated_row}")
 
 
 def delete_sqlite3_duplicates(
@@ -239,7 +248,7 @@ def delete_sqlite3_duplicates(
 
         # Get total row count
         total_rows = cursor.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
-        print(f"Total rows in table: {total_rows}")
+        log.info(f"Total rows in table: {total_rows}")
 
         # Insert unique rows based on specified columns
         insert_query = f"""
@@ -253,7 +262,10 @@ def delete_sqlite3_duplicates(
         """
 
         if dry_run:
-            print(f"[DRY RUN] Would execute deduplication based on: {columns_str}")
+            # PS-220 exception: --dry-run bodies stay on stdout.
+            sys.stdout.write(
+                f"[DRY RUN] Would execute deduplication based on: {columns_str}\n"
+            )
         else:
             cursor.execute(insert_query)
             conn.commit()
@@ -274,14 +286,14 @@ def delete_sqlite3_duplicates(
             # Clean up temp table in dry run
             cursor.execute(f"DROP TABLE IF EXISTS {temp_table}")
 
-        print(f"Total rows processed: {total_rows}")
-        print(f"Total unique rows: {total_unique}")
-        print(f"Total duplicates removed: {total_duplicates}")
+        log.info(f"Total rows processed: {total_rows}")
+        log.info(f"Total unique rows: {total_unique}")
+        log.info(f"Total duplicates removed: {total_duplicates}")
 
         return total_rows, total_duplicates
 
     except Exception as error:
-        print(f"An error occurred: {error}")
+        log.error(f"An error occurred: {error}")
         return None, None
 
     finally:

@@ -16,9 +16,9 @@ from typing import Any as _Any
 from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
-import logging
+import scitex_logging as slogging
 
-logger = logging.getLogger(__name__)
+logger = slogging.getLogger(__name__)
 
 
 class _ArrayMixin:
@@ -334,7 +334,7 @@ class _ArrayMixin:
                 result[array_col] = None
 
         if verbose:
-            print(
+            logger.info(
                 f"Loaded {len(array_columns)} array columns from {table_name}"
             )
 

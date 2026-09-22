@@ -13,6 +13,10 @@ import sqlite3
 from typing import Any, Dict, List, Optional, Tuple
 from contextlib import contextmanager
 
+import scitex_logging as slogging
+
+log = slogging.getLogger(__name__)
+
 
 class OptimizedInspector:
     """Optimized database inspector with connection reuse and efficient queries."""
@@ -209,30 +213,30 @@ class OptimizedInspector:
     
     def _print_table_info(self, result: Dict):
         """Pretty print table information."""
-        print(f"\n{'='*60}")
-        print(f"Table: {result['table_name']}")
-        print(f"Rows: {result['row_count']}" + 
+        log.info(f"\n{'='*60}")
+        log.info(f"Table: {result['table_name']}")
+        log.info(f"Rows: {result['row_count']}" + 
               (" (approximate)" if result['is_approximate'] else ""))
-        print(f"-"*60)
+        log.info(f"-"*60)
         
         # Print column info
-        print("Columns:")
+        log.info("Columns:")
         for col in result['columns']:
             pk_marker = " [PK]" if col['pk'] else ""
             nn_marker = " NOT NULL" if col['notnull'] else ""
-            print(f"  {col['name']}: {col['type']}{pk_marker}{nn_marker}")
+            log.info(f"  {col['name']}: {col['type']}{pk_marker}{nn_marker}")
         
         # Print sample data
         if result['sample_data']:
-            print(f"\nSample data ({len(result['sample_data'])} rows):")
+            log.info(f"\nSample data ({len(result['sample_data'])} rows):")
             # Get column names that aren't metadata columns
             data_cols = [c for c in result['sample_data'][0].keys() 
                         if not c.endswith(('_dtype', '_shape', '_compressed'))]
             
             # Print header
             header = " | ".join(f"{col[:15]:<15}" for col in data_cols[:5])
-            print(f"  {header}")
-            print(f"  {'-'*len(header)}")
+            log.info(f"  {header}")
+            log.info(f"  {'-'*len(header)}")
             
             # Print rows
             for row in result['sample_data'][:3]:
@@ -242,7 +246,7 @@ class OptimizedInspector:
                     if len(val) > 15:
                         val = val[:12] + "..."
                     values.append(f"{val:<15}")
-                print(f"  {' | '.join(values)}")
+                log.info(f"  {' | '.join(values)}")
 
 
 def inspect_optimized(
@@ -286,16 +290,16 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         db_path = sys.argv[1]
         
-        print("Testing optimized version...")
+        log.info("Testing optimized version...")
         start = time.time()
         results = inspect_optimized(db_path, skip_count=True, verbose=False)
-        print(f"Optimized version took: {time.time() - start:.2f} seconds")
-        print(f"Inspected {len(results)} tables")
+        log.info(f"Optimized version took: {time.time() - start:.2f} seconds")
+        log.info(f"Inspected {len(results)} tables")
         
         # Show first table info
         if results:
-            print(f"\nFirst table: {results[0]['table_name']}")
-            print(f"Columns: {len(results[0]['columns'])}")
-            print(f"Sample rows: {len(results[0]['sample_data'])}")
+            log.info(f"\nFirst table: {results[0]['table_name']}")
+            log.info(f"Columns: {len(results[0]['columns'])}")
+            log.info(f"Sample rows: {len(results[0]['sample_data'])}")
 
 # EOF

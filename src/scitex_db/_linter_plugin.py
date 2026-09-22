@@ -10,6 +10,27 @@ AST detection, no attempt to see through wrapper functions.
 import ast
 
 
+def _load_scitex_dev():
+    """Import (Rule, Issue) from scitex-dev at call time.
+
+    PS-233: scitex-dev is a dev-only extra (pip install scitex-db[dev]).
+    The imports stay in a dedicated ``try/except ImportError`` so the
+    auditor counts them guarded, and they run lazily (not at module
+    level) because scitex-dev's linter imports this plugin module while
+    ``scitex_dev.linter`` itself is still initializing — a module-level
+    import would hit the partially initialized module and fail.
+    """
+    try:
+        from scitex_dev.linter._rules._base import Rule
+        from scitex_dev.linter.checker import Issue
+    except ImportError as exc:
+        raise ImportError(
+            "scitex-db linter plugin requires scitex-dev: "
+            "pip install scitex-db[dev]"
+        ) from exc
+    return Rule, Issue
+
+
 class _SQLite3ConstructionChecker(ast.NodeVisitor):
     """Flag `SQLite3(...)` construction (STX-DB001).
 
@@ -45,8 +66,7 @@ class _SQLite3ConstructionChecker(ast.NodeVisitor):
 
     def visit_Call(self, node):
         if self._is_sqlite3_construction(node):
-            from scitex_dev.linter._rules._base import Rule
-            from scitex_dev.linter.checker import Issue
+            Rule, Issue = _load_scitex_dev()
 
             rule = Rule(
                 id="STX-DB001",
@@ -85,7 +105,18 @@ class _SQLite3ConstructionChecker(ast.NodeVisitor):
 
 def get_plugin():
     """Return scitex-db linter rules, call mappings, and checkers."""
-    from scitex_dev.linter._rules._base import Rule
+    # NOTE: only Rule is imported here, not checker.Issue. scitex-dev's
+    # linter calls get_plugin() while `scitex_dev.linter.checker` is still
+    # initializing (it loads plugins mid-import), so importing Issue at
+    # this point raises ImportError from the partially initialized module.
+    # visit_Call runs at lint time and may import both (see above).
+    try:
+        from scitex_dev.linter._rules._base import Rule
+    except ImportError as exc:
+        raise ImportError(
+            "scitex-db linter plugin requires scitex-dev: "
+            "pip install scitex-db[dev]"
+        ) from exc
 
     DB001 = Rule(
         id="STX-DB001",

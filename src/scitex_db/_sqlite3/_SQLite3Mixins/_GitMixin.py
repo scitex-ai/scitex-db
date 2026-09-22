@@ -16,6 +16,10 @@ import time
 import zlib
 from typing import Any, Dict, List, Optional, Tuple
 
+import scitex_logging as slogging
+
+log = slogging.getLogger(__name__)
+
 
 class _GitMixin:
     """Git-like version control for SQLite databases using diff-based tracking."""
@@ -104,7 +108,7 @@ class _GitMixin:
         changes = self._git_calculate_changes(parent_hash)
 
         if not changes and parent_hash:
-            print("No changes to commit")
+            log.info("No changes to commit")
             return parent_hash
 
         # Generate commit hash
