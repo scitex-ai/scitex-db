@@ -3,26 +3,18 @@
 Inline utilities to avoid external dependencies.
 """
 
+import scitex_logging as slogging
+
+log = slogging.getLogger(__name__)
+
 
 def printc(message: str, c: str = "blue", **kwargs):
-    """Simple colored print with colorama fallback."""
-    try:
-        from colorama import Fore, Style, init
-        init(autoreset=True)
+    """Report a status message via scitex-logging.
 
-        colors = {
-            "red": Fore.RED,
-            "green": Fore.GREEN,
-            "yellow": Fore.YELLOW,
-            "blue": Fore.BLUE,
-            "magenta": Fore.MAGENTA,
-            "cyan": Fore.CYAN,
-            "white": Fore.WHITE,
-            "black": Fore.BLACK,
-        }
-
-        color_code = colors.get(c, "")
-        print(f"{color_code}{message}{Style.RESET_ALL}", **kwargs)
-    except ImportError:
-        # Fallback if colorama not available
-        print(message, **kwargs)
+    Kept under the historic ``printc`` name so existing callers
+    (``SQLite3``/``PostgreSQL`` display helpers) keep working. The
+    ``c`` colour and extra ``kwargs`` are accepted and ignored:
+    level-aware scitex-logging output carries its own aligned
+    ``INFO:``/``WARN:``/``ERRO:``/``SUCC:`` prefix (PS-220).
+    """
+    log.info(message)

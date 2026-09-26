@@ -46,3 +46,14 @@ def _ensure_subprocess_coverage_shim() -> None:
 
 
 _ensure_subprocess_coverage_shim()
+
+# PS-220: status/diagnostic output goes through scitex-logging, which
+# defaults to WARN (log.info is silent). Tests assert on that output, so
+# opt into INFO here — mirrors the pilot playbook (scitex-genai).
+os.environ.setdefault("SCITEX_LOGGING_LEVEL", "INFO")
+try:
+    import scitex_logging as _slogging
+
+    _slogging.set_level("INFO")
+except Exception:
+    pass

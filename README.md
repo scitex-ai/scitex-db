@@ -17,6 +17,7 @@
   <a href="https://pypi.org/project/scitex-db/"><img src="https://img.shields.io/pypi/v/scitex-db?label=pypi" alt="pypi"></a>
   <a href="https://pypi.org/project/scitex-db/"><img src="https://img.shields.io/pypi/pyversions/scitex-db?label=python" alt="python"></a>
   <a href="https://github.com/ywatanabe1989/scitex-db/actions/workflows/rtd-sphinx-build-on-ubuntu-latest.yml"><img src="https://img.shields.io/github/actions/workflow/status/ywatanabe1989/scitex-db/rtd-sphinx-build-on-ubuntu-latest.yml?branch=develop&label=docs" alt="docs"></a>
+  <a href='https://scitex-db.readthedocs.io/en/latest/'><img src='https://img.shields.io/readthedocs/scitex-db?label=docs' alt='Read the Docs'></a>
 </p>
 <p align="center">
   <a href="https://github.com/ywatanabe1989/scitex-db/actions/workflows/pytest-matrix-on-ubuntu-py3-11-3-12-3-13.yml"><img src="https://img.shields.io/github/actions/workflow/status/ywatanabe1989/scitex-db/pytest-matrix-on-ubuntu-py3-11-3-12-3-13.yml?branch=develop&label=tests" alt="tests"></a>
@@ -31,24 +32,9 @@
 
 | # | Problem | Solution |
 |---|---------|----------|
-| 1 | **Storing ndarrays in SQLite means `pickle.dumps → BLOB`** — no compression, no dtype/shape, no deterministic hashing | **`db.save_array(table, arr) / load_array(...)`** — typed compressed BLOBs round-trip with `dtype`, `shape`, `is_compressed`, `_hash` columns |
+| 1 | **Storing ndarrays in SQLite** — `pickle.dumps → BLOB` gives no compression, no dtype/shape tracking, no deterministic hashing | **`save_array` / `load_array`** — typed compressed BLOBs round-trip with dtype, shape, compression and hash columns |
 | 2 | **`sqlite3` API is low-level** — every project re-writes connect / transaction / execute boilerplate | **`with db.transaction(): ...`** — context-managed transactions, health checks, dedup, schema inspection built-in |
-| 3 | **Switching SQLite ↔ Postgres rewrites every call site** | **Mixin composition** — `SQLite3` and `PostgreSQL` share `_BaseMixins/`; the same call site works against either backend |
-
-## Installation
-
-```bash
-pip install scitex-db                 # SQLite3 only
-pip install scitex-db[postgresql]     # add psycopg2 driver
-pip install scitex-db[all]            # everything
-```
-
-### Configuration
-
-Defaults work out of the box. To override, drop a `config.yaml` next to
-your script, or point `SCITEX_DB_CONFIG` at one — see
-[`.env.example`](./.env.example) for the full env-var list and
-resolution order.
+| 3 | **SQLite ↔ Postgres** — the same call site works against either backend, so switching stores never rewrites callers | **Mixin composition** — `SQLite3` and `PostgreSQL` share `_BaseMixins/`; the same call site works against either backend |
 
 ## Quick Start
 
@@ -73,6 +59,60 @@ db.save_array("features", np.random.rand(1000, 50), column="embeddings",
               additional_columns={"model": "bert"})
 features = db.load_array("features", "embeddings", where="model = 'bert'")
 ```
+
+## Demo
+
+```bash
+scitex-db inspect-db experiments.db --tables results   # schema + row counts
+scitex-db check-health experiments.db --fix --yes      # vacuum, fix orphans
+```
+
+Two commands cover the daily loop: look at a database, then verify it
+is healthy. Both support `--json` for scripting.
+
+## Installation
+
+```bash
+uv pip install "scitex-db[all]"
+```
+
+<details>
+<summary>Per-backend extras</summary>
+
+| Extra | Command | Adds |
+|-------|---------|------|
+| *(none)* | `uv pip install scitex-db` | SQLite3 backend, NumPy-aware storage, CLI |
+| `postgresql` | `uv pip install "scitex-db[postgresql]"` | `psycopg2-binary` + `sqlalchemy` driver |
+| `git` | `uv pip install "scitex-db[git]"` | `GitPython` for the db-versioning mixin |
+| `all` | `uv pip install "scitex-db[all]"` | everything above, plus dev and docs |
+
+</details>
+
+### Configuration
+
+Defaults work out of the box. To override, drop a `config.yaml` next to
+your script, or point `SCITEX_DB_CONFIG` at one — see
+[`.env.example`](./.env.example) for the full env-var list and
+resolution order.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    U["user code"] --> A["SQLite3('exp.db')"]
+    U --> B["PostgreSQL(host=..., user=...)"]
+    A --> M["_BaseMixins (CRUD · schema · batch · maintenance)"]
+    B --> M
+    A -.-> SM["_SQLite3Mixins<br/>(backend overrides)"]
+    B -.-> PM["_PostgreSQLMixins<br/>(backend overrides)"]
+    M --> H["scitex-db check-health<br/>(fix orphans, vacuum)"]
+    M --> I["scitex-db inspect-db<br/>(schema + row counts)"]
+```
+
+<sub><b>Figure 1.</b> Backend composition — both drivers share `_BaseMixins/`; backend-specific behavior lives in override mixins, and maintenance CLIs sit on top.</sub>
+
+Each backend composes its `_*Mixins/` folder onto `_BaseMixins/`, so
+swapping `SQLite3` ↔ `PostgreSQL` does not change call sites.
 
 ## 2 Interfaces
 
@@ -129,42 +169,6 @@ Every subcommand supports `-h/--help`, `--json`, and the safety pair
 `--dry-run` / `--yes` where it mutates state.
 
 </details>
-
-## Architecture
-
-```
-scitex_db/
-├── __init__.py            ← public API (SQLite3, PostgreSQL, check_health, inspect)
-├── __main__.py            ← `scitex-db` CLI entry
-├── _BaseMixins/           ← backend-agnostic mixins (CRUD, schema, batch, ...)
-├── _sqlite3/              ← SQLite3 driver
-│   └── _SQLite3Mixins/    ← SQLite3-specific mixin overrides
-├── _postgresql/           ← PostgreSQL driver
-│   └── _PostgreSQLMixins/ ← PostgreSQL-specific mixin overrides
-├── _check_health.py       ← `scitex-db check-health`
-├── _inspect.py            ← `scitex-db inspect-db`
-├── _inspect_optimized.py  ← faster path for large DBs
-├── _delete_duplicates.py  ← duplicate-row cleanup
-├── _utils.py              ← shared helpers
-└── _skills/               ← agent-facing skill files
-```
-
-Each backend composes its `_*Mixins/` folder onto `_BaseMixins/`, so
-swapping `SQLite3` ↔ `PostgreSQL` does not change call sites.
-
-## Demo
-
-```mermaid
-flowchart LR
-    U["user code"] --> A["SQLite3('exp.db')"]
-    U --> B["PostgreSQL(host=..., user=...)"]
-    A --> M["_BaseMixins (CRUD · schema · batch · maintenance)"]
-    B --> M
-    A -.-> SM["_SQLite3Mixins<br/>(backend overrides)"]
-    B -.-> PM["_PostgreSQLMixins<br/>(backend overrides)"]
-    M --> H["scitex-db check-health<br/>(fix orphans, vacuum)"]
-    M --> I["scitex-db inspect-db<br/>(schema + row counts)"]
-```
 
 ## Part of SciTeX
 

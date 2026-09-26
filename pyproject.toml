@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "scitex-db"
-version = "0.2.1"
+version = "0.2.3"
 description = "Database utilities for scientific computing with SQLite3 and PostgreSQL"
 readme = "README.md"
 license = "AGPL-3.0-only"
@@ -38,7 +38,7 @@ dependencies = [
     "click>=8.0",
     "numpy",
     "pandas",
-    "scitex-core>=0.1.0",
+    "scitex-logging>=0.2.0",  # PS-220: status/diagnostic output via slogging
 ]
 
 [project.optional-dependencies]
@@ -79,6 +79,19 @@ all = [
 [project.scripts]
 scitex-db = "scitex_db.__main__:main"
 
+# PEP 735 toolchain group for the shared pytest-matrix installer.
+# The installer runs `uv pip install -e ".[all]" --group dev` when the
+# caller passes `dependency_group: dev`: `[all]` is the runtime extras,
+# this group is the test toolchain. Kept as the minimal set the suite
+# needs beyond the extras (mirrors the `dev` extra's test deps).
+[dependency-groups]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0.0",
+    "pytest-xdist>=3.0.0",
+    "coverage>=7.0",            # tests/conftest.py subprocess-coverage shim
+]
+
 [project.entry-points."scitex_dev.docs"]
 scitex-db = "scitex_db"
 
@@ -101,6 +114,10 @@ packages = ["src/scitex_db"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-v --tb=short --cov=scitex_db --cov-report=term-missing"
+markers = [
+    "smoke: fast subprocess CLI happy-path tests (<60s)",
+    "e2e: end-to-end workflows against real subsystems (RUN_E2E=1)",
+]
 
 [tool.coverage.run]
 parallel = true

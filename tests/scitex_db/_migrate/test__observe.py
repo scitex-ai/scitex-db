@@ -34,6 +34,57 @@ from scitex_db._migrate._observe import QuiescenceEvidence, observe_source
 WINDOW = 0.60
 INTERVAL = 0.05
 
+#: Substring of the guard's own message when it refuses to answer from one
+#: reading. Matched rather than a custom exception type because the guard's
+#: refusal is production behaviour under test here -- introducing a type just so
+#: the tests can catch it would change the thing being measured.
+_ONE_SAMPLE = "is not a sample"
+
+
+def sampling_was_starved(exc: BaseException, elapsed: float) -> bool:
+    """Did the HOST fail to schedule us, rather than the sampler failing?
+
+    Both look identical from the outside: fewer than two readings, same
+    ValueError. The discriminator is WALL CLOCK. If the loop ran its whole
+    window and still could not take two readings, the machine did not schedule
+    us -- observed 2026-08-11 on a shared CI runner, where a 0.60s window at a
+    0.05s interval yielded ONE sample where ~12 were expected. If it gave up
+    EARLY, the sampler is broken and the test must fail rather than excuse it.
+
+    Kept as a pure predicate, taking the exception and the elapsed seconds, so
+    it can be tested against real exceptions and real numbers with no mock and
+    no runner load. That matters more than it looks: this function decides when
+    a red test becomes a skip, so a bug in it would silence the suite quietly.
+    """
+    return _ONE_SAMPLE in str(exc) and elapsed >= WINDOW
+
+
+def observe_or_skip(source: str) -> QuiescenceEvidence:
+    """Observe ``source``, or skip when the runner starved the sampler.
+
+    Every test in this file calls this rather than ``observe_source`` directly.
+    Six call sites each remembering to handle starvation is a rule that the
+    seventh forgets; one function that owns the decision cannot be forgotten,
+    and a fix to it reaches every caller including ones not written yet.
+
+    A SKIP, NOT A PASS. The test made no observation, so it proves nothing, and
+    saying so is the whole point -- turning this into a pass would be a green
+    result from a run that measured nothing, which is the failure this module
+    exists to detect.
+    """
+    started = time.monotonic()
+    try:
+        return observe_source(source, seconds=WINDOW, interval=INTERVAL)
+    except ValueError as exc:
+        elapsed = time.monotonic() - started
+        if not sampling_was_starved(exc, elapsed):
+            raise
+        pytest.skip(
+            f"runner starved the sampler: ran the full {WINDOW}s window "
+            f"({elapsed:.2f}s elapsed) at a {INTERVAL}s interval and still took "
+            f"fewer than two readings. Not a defect in the code under test."
+        )
+
 
 @pytest.fixture
 def db(tmp_path):
@@ -76,7 +127,7 @@ def test_a_writer_that_opens_writes_and_closes_is_caught(open_write_close):
     # Arrange
     source = open_write_close
     # Act
-    evidence = observe_source(source, seconds=WINDOW, interval=INTERVAL)
+    evidence = observe_or_skip(source)
     # Assert
     assert evidence.writes_seen > 0, evidence.summary()
 
@@ -86,7 +137,7 @@ def test_the_caught_writer_names_the_signal_that_fired(open_write_close):
     # Arrange
     source = open_write_close
     # Act
-    evidence = observe_source(source, seconds=WINDOW, interval=INTERVAL)
+    evidence = observe_or_skip(source)
     # Assert
     assert evidence.signals_fired, evidence.summary()
 
@@ -103,7 +154,7 @@ def test_the_data_version_signal_is_alive_not_merely_present(open_write_close):
     # Arrange
     source = open_write_close
     # Act
-    evidence = observe_source(source, seconds=WINDOW, interval=INTERVAL)
+    evidence = observe_or_skip(source)
     # Assert
     assert "data_version" in evidence.signals_fired, evidence.summary()
 
@@ -113,7 +164,7 @@ def test_a_quiet_source_reports_no_writer(db):
     # Arrange
     source = db
     # Act
-    evidence = observe_source(source, seconds=WINDOW, interval=INTERVAL)
+    evidence = observe_or_skip(source)
     # Assert
     assert evidence.writes_seen == 0, evidence.summary()
 
@@ -123,7 +174,7 @@ def test_a_quiet_source_still_took_more_than_one_reading(db):
     # Arrange
     source = db
     # Act
-    evidence = observe_source(source, seconds=WINDOW, interval=INTERVAL)
+    evidence = observe_or_skip(source)
     # Assert
     assert evidence.samples_taken >= 2
 
@@ -133,7 +184,7 @@ def test_silence_is_reported_with_the_window_it_covers(db):
     # Arrange
     source = db
     # Act
-    evidence = observe_source(source, seconds=WINDOW, interval=INTERVAL)
+    evidence = observe_or_skip(source)
     # Assert
     assert "no writer observed over" in evidence.summary()
 
@@ -238,5 +289,40 @@ def test_there_is_no_unqualified_quiescent_property():
     has_shortcut = hasattr(subject, "quiescent")
     # Assert
     assert not has_shortcut
+
+
+def test_a_full_window_with_too_few_readings_is_starvation():
+    """The host did not schedule us. Skipping is honest; failing blames the code."""
+    # Arrange
+    exc = ValueError("1 sample(s) is not a sample. Widen the window.")
+    # Act
+    verdict = sampling_was_starved(exc, elapsed=WINDOW)
+    # Assert
+    assert verdict
+
+
+def test_giving_up_early_with_too_few_readings_is_a_defect_not_starvation():
+    """The load-bearing case: a sampler that exits early must still go RED.
+
+    Without the wall-clock condition this predicate would excuse exactly the bug
+    it is most important to catch -- a loop that stops sampling on its own. That
+    would convert a real regression into a skip, silently, forever.
+    """
+    # Arrange
+    exc = ValueError("1 sample(s) is not a sample. Widen the window.")
+    # Act
+    verdict = sampling_was_starved(exc, elapsed=WINDOW / 10)
+    # Assert
+    assert not verdict
+
+
+def test_a_different_refusal_is_never_treated_as_starvation():
+    """Only the one-reading refusal is excusable; every other ValueError stands."""
+    # Arrange
+    exc = ValueError("contradictory evidence: unobservable yet 5 sample(s)")
+    # Act
+    verdict = sampling_was_starved(exc, elapsed=WINDOW * 10)
+    # Assert
+    assert not verdict
 
 # EOF

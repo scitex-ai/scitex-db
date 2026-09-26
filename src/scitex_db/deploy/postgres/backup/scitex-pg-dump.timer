@@ -1,0 +1,15 @@
+[Unit]
+Description=Nightly primary dumps at 18:41 UTC (03:41 JST)
+
+[Timer]
+# UTC-EXPLICIT on purpose: compute-04's restore-verify timer documents how a
+# naive "05:11 JST" comment over a bare OnCalendar silently meant UTC. State
+# the timezone the scheduler actually uses.
+# 18:41 UTC = 03:41 JST — offset from compute-04's own 03:30 JST dump so the
+# offsite host does not receive two pushes in the same minute.
+OnCalendar=*-*-* 18:41:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

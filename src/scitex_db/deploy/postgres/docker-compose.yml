@@ -1,0 +1,72 @@
+# The fleet's PostgreSQL primary, declared.
+#
+# Captured 2026-08-27 from the container that was running UNDECLARED on
+# scitex-nas-03 (`docker inspect scitex-cards-pg18` showed empty labels — a
+# hand-typed `docker run`, reproducible by nobody). This file is the same
+# server, restartable by anyone.
+#
+# Addressing rule (operator, 2026-08-27): the primary lives on scitex-nas-03;
+# every other host runs a replica that keeps working while isolated and
+# resyncs when it returns. Sync logic belongs to each leaf package — this
+# file only provides the server.
+#
+# No address is baked in. LISTEN_ADDRESSES arrives from the environment or
+# .env beside this file, because an address written here would be silently
+# wrong on every host except the one it was copied from.
+services:
+  postgres:
+    image: postgres:18-trixie          # pinned major; matches the live data dir
+    container_name: scitex-pg18
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      PGDATA: /var/lib/postgresql/data
+      PGPASSFILE: /var/lib/postgresql/.pgpass
+    volumes:
+      - ${SCITEX_PG_DATA:?path to the data directory, e.g. ~/.scitex/pg/cards18}:/var/lib/postgresql/data
+      - ${SCITEX_PG_WAL_ARCHIVE:?path to the WAL archive dir}:/var/lib/postgresql/wal-archive
+      - ${SCITEX_PG_PGPASS:?path to a .pgpass file}:/var/lib/postgresql/.pgpass
+    command:
+      - -c
+      - port=${SCITEX_PG_PORT:-55432}
+      - -c
+      - listen_addresses=${SCITEX_PG_LISTEN:?comma-separated addresses to listen on}
+      - -c
+      - logging_collector=off
+      - -c
+      - log_destination=stderr
+      - -c
+      - unix_socket_directories=/var/run/postgresql
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=test ! -f /var/lib/postgresql/wal-archive/%f && cp -f %p /var/lib/postgresql/wal-archive/%f
+      - -c
+      - archive_timeout=300
+      - -c
+      - hot_standby=on
+      # LOGICAL, not replica. Physical standbys work at either level (logical is
+      # a superset), but LOGICAL replication is impossible without this — and
+      # logical replication is the only way a node can accept WRITES while
+      # partitioned. The always-on servers are physical standbys and do not need
+      # it; the laptops cannot be useful offline without it. Costs somewhat more
+      # WAL volume, which the 15-minute offsite lane already carries.
+      - -c
+      - wal_level=logical
+      # Raised from the default 10. Nine hosts means up to eight physical
+      # standbys, and each leaf package that owns its own sync gets a LOGICAL
+      # slot on top of that — 10 would run out and the failure is a replica that
+      # silently cannot connect. Restart-required, so it is changed in the SAME
+      # restart as wal_level rather than costing a second outage.
+      - -c
+      - max_wal_senders=${SCITEX_PG_MAX_WAL_SENDERS:-20}
+      - -c
+      - max_replication_slots=${SCITEX_PG_MAX_REPLICATION_SLOTS:-20}
+    healthcheck:
+      # pg_isready exits 0 only when the server accepts connections — a check
+      # that can actually fail, unlike `docker ps`.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p ${SCITEX_PG_PORT:-55432}"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s

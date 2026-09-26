@@ -1,0 +1,13 @@
+[Unit]
+Description=Every 15 min: primary WAL offsite (bounds the offsite exposure window)
+
+[Timer]
+# 15 minutes bounds the OFFSITE exposure window: archive_timeout is 300s, so a
+# segment reaches the local archive within 5 min and the offsite copy within
+# 20 min worst case. (Rationale inherited from compute-04's lane.)
+OnBootSec=5min
+OnUnitActiveSec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
