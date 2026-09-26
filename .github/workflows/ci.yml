@@ -43,6 +43,8 @@ concurrency:
 jobs:
   pytest-matrix:
     uses: scitex-ai/.github/.github/workflows/pytest-matrix.yml@main
+    with:
+      dependency_group: dev
     secrets: inherit
 
   import-smoke:

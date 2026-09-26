@@ -79,6 +79,19 @@ all = [
 [project.scripts]
 scitex-db = "scitex_db.__main__:main"
 
+# PEP 735 toolchain group for the shared pytest-matrix installer.
+# The installer runs `uv pip install -e ".[all]" --group dev` when the
+# caller passes `dependency_group: dev`: `[all]` is the runtime extras,
+# this group is the test toolchain. Kept as the minimal set the suite
+# needs beyond the extras (mirrors the `dev` extra's test deps).
+[dependency-groups]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0.0",
+    "pytest-xdist>=3.0.0",
+    "coverage>=7.0",            # tests/conftest.py subprocess-coverage shim
+]
+
 [project.entry-points."scitex_dev.docs"]
 scitex-db = "scitex_db"
 
