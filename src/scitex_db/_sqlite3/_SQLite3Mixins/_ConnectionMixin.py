@@ -94,6 +94,10 @@ class _ConnectionMixin:
         uri = f"file:{filename}?mode={mode}"
         self.conn = sqlite3.connect(uri, uri=True, timeout=timeout)
         self.cursor = self.conn.cursor()
+        # Explicit connect() changes must also govern subsequent reconnects.
+        self.db_path = db_path
+        self.mode = mode
+        self.timeout = timeout
 
         # PRAGMA tuning. ``ro`` is read-only so the journal-mode write and the
         # ``commit()`` at the bottom would error — skip them in that branch.
@@ -196,7 +200,7 @@ class _ConnectionMixin:
                 pass
 
     def reconnect(self, use_temp_db: bool = False) -> None:
-        """Reopen using the original access mode and connection timeout."""
+        """Reopen using the most recently selected path, mode and timeout."""
         if self.db_path:
             self.connect(
                 self.db_path, use_temp_db, mode=self.mode, timeout=self.timeout

@@ -149,3 +149,25 @@ def test_memory_database_keeps_special_semantics():
         actual_path = db.conn.execute("PRAGMA database_list").fetchone()[2]
     # Assert
     assert actual_path == ""
+
+
+@pytest.mark.parametrize("setting", ["file", "query_only", "busy_timeout"])
+def test_explicit_connect_updates_reconnect_configuration(tmp_path, setting):
+    # Arrange
+    first = tmp_path / "first.db"
+    second = tmp_path / "second.db"
+    _seed(first)
+    _seed(second)
+    expected = {"file": str(second), "query_only": 1, "busy_timeout": 137}
+    with SQLite3(str(first)) as db:
+        db.connect(str(second), mode="ro", timeout=0.137)
+        db.close()
+        # Act
+        db.reconnect()
+        actual = {
+            "file": db.conn.execute("PRAGMA database_list").fetchone()[2],
+            "query_only": db.conn.execute("PRAGMA query_only").fetchone()[0],
+            "busy_timeout": db.conn.execute("PRAGMA busy_timeout").fetchone()[0],
+        }
+        # Assert
+        assert actual[setting] == expected[setting]
