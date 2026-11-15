@@ -30,6 +30,7 @@ import shutil
 import sqlite3
 import tempfile
 import threading
+from urllib.parse import quote
 
 
 class _ConnectionMixin:
@@ -87,7 +88,10 @@ class _ConnectionMixin:
         # Always go through SQLite's URI form so the open mode is explicit.
         # ``mode='rwc'`` (default) matches the previous ``sqlite3.connect(path)``
         # behaviour of opening read-write and creating the file if missing.
-        uri = f"file:{path_to_connect}?mode={mode}"
+        # Encode literal path characters before adding our own URI options.
+        # Otherwise '?'/'#' truncate filenames and '%HH' selects another path.
+        filename = quote(os.fspath(path_to_connect), safe="/:")
+        uri = f"file:{filename}?mode={mode}"
         self.conn = sqlite3.connect(uri, uri=True, timeout=timeout)
         self.cursor = self.conn.cursor()
 
@@ -192,8 +196,11 @@ class _ConnectionMixin:
                 pass
 
     def reconnect(self, use_temp_db: bool = False) -> None:
+        """Reopen using the original access mode and connection timeout."""
         if self.db_path:
-            self.connect(self.db_path, use_temp_db)
+            self.connect(
+                self.db_path, use_temp_db, mode=self.mode, timeout=self.timeout
+            )
         else:
             raise ValueError("No database path specified for reconnection")
 
