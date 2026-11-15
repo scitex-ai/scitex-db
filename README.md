@@ -60,6 +60,12 @@ db.save_array("features", np.random.rand(1000, 50), column="embeddings",
 features = db.load_array("features", "embeddings", where="model = 'bert'")
 ```
 
+SQLite3 connections stay in their creating thread. For parallel readers, open
+a separate `SQLite3(path, mode="ro")` inside each worker process. See the
+[read-only worker guide](src/scitex_db/_skills/scitex-db/17_readonly-workers.md)
+for a tested spawn example and the distinction between SQL row selection and
+loading complete array BLOBs.
+
 ## Demo
 
 ```bash

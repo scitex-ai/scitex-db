@@ -47,11 +47,11 @@ class SQLite3(
     """SQLite database manager with automatic metadata handling, numpy array storage, and compression.
 
     This class provides a comprehensive interface for SQLite database operations with
-    automatic compression, thread-safe operations, and specialized numpy array handling.
+    automatic compression, managed connections, and specialized numpy array handling.
 
     Features:
         - Automatic compression for BLOB data (70-90% reduction)
-        - Thread-safe operations with proper connection management
+        - Connections stay in their creating thread; open a new one per worker
         - Metadata handling for BLOB columns
         - Batch processing support
         - Context manager support for proper resource cleanup
