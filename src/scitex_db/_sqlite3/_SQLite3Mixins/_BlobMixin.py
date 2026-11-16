@@ -9,6 +9,7 @@ __FILE__ = __file__
 __DIR__ = os.path.dirname(__FILE__)
 # ----------------------------------------
 
+from ast import literal_eval
 import pickle
 import zlib
 from typing import Any as _Any
@@ -250,7 +251,7 @@ class _BlobMixin:
             if data_type.startswith("ndarray:"):
                 _, dtype_str, shape_str = data_type.split(":", 2)
                 arr = np.frombuffer(data_bytes, dtype=np.dtype(dtype_str))
-                return arr.reshape(eval(shape_str))
+                return arr.reshape(literal_eval(shape_str))
             else:
                 return pickle.loads(data_bytes)
 
@@ -272,7 +273,7 @@ class _BlobMixin:
                 if data_type.startswith("ndarray:"):
                     _, dtype_str, shape_str = data_type.split(":", 2)
                     arr = np.frombuffer(data_bytes, dtype=np.dtype(dtype_str))
-                    results[key] = arr.reshape(eval(shape_str))
+                    results[key] = arr.reshape(literal_eval(shape_str))
                 else:
                     results[key] = pickle.loads(data_bytes)
 
