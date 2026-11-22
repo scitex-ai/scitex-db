@@ -451,7 +451,7 @@ class _ArrayMixin:
         if dtype_str and shape_str:
             return np.frombuffer(
                 binary_data, dtype=np.dtype(dtype_str)
-            ).reshape(eval(shape_str))
+            ).reshape(literal_eval(shape_str))
         elif dtype and shape:
             return np.frombuffer(binary_data, dtype=dtype).reshape(shape)
         return binary_data
