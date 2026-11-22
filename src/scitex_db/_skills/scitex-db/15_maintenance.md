@@ -50,8 +50,13 @@ key and NULL metadata. Default BLOB size placeholders are projected in SQLite
 using each value's runtime type and byte length, so the BLOB payload is not
 transferred into Python merely to format its label. Empty BLOBs, NULLs, text
 and mixed storage types retain their existing result semantics. Index metadata is
-not included. Large-table counts can be approximate; see the `is_approximate`
-field rather than assuming every `row_count` is an integer.
+not included. Counts below 100,000 are exact integers with
+`is_approximate=False`. The capped probe reports `row_count=">=100,000"` and
+`is_approximate=True` once it sees 100,000 rows, including a table with exactly
+that many rows. This is an inclusive lower bound, not an exact count or a claim
+of strictly more rows. `skip_count=True` returns `"Not counted"` and a null
+approximation flag. The existing count queries and 100,000-row probe cap are
+unchanged.
 
 Table names are literal SQLite identifiers, including spaces, reserved words,
 quotes, Unicode and dots within a name. Pass the native name without adding SQL
@@ -148,5 +153,6 @@ and `_check_health.py`. Behavioral controls:
 `tests/scitex_db/test__inspect_readonly.py` and
 `tests/scitex_db/_sqlite3/test__delete_duplicates_apply.py` and
 `tests/scitex_db/test__inspect_blob_projection.py` and
-`tests/scitex_db/test__inspect_identifiers.py`. The example's installed execution is a
+`tests/scitex_db/test__inspect_identifiers.py` and
+`tests/scitex_db/test__inspect_count_boundary.py`. The example's installed execution is a
 separate content check; static validation alone does not accept these claims.

@@ -176,8 +176,8 @@ class OptimizedInspector:
                         table_stats["row_count"] = cursor.fetchone()[0]
                         table_stats["is_approximate"] = False
                     else:
-                        # Large table, use approximate count
-                        table_stats["row_count"] = f">{approx_count:,}"
+                        # The capped probe proves an inclusive lower bound.
+                        table_stats["row_count"] = f">={approx_count:,}"
                         table_stats["is_approximate"] = True
                 else:
                     table_stats["row_count"] = "Not counted"
