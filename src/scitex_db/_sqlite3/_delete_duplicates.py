@@ -12,6 +12,7 @@ __DIR__ = os.path.dirname(__FILE__)
 # Time-stamp: "2024-11-11 14:16:58 (ywatanabe)"
 
 import sqlite3
+from pathlib import Path
 from typing import List, Optional, Tuple, Union
 
 import pandas as pd
@@ -219,8 +220,20 @@ def delete_sqlite3_duplicates(
     chunk_size: int = 10_000,
     dry_run: bool = True,
 ) -> Tuple[Optional[int], Optional[int]]:
+    """Return row and duplicate counts, previewing read-only by default.
+
+    Preview opens an existing SQLite file without rebuilding tables. Apply mode
+    rebuilds the target table and does not preserve its constraints or indexes.
+    Failures are logged and return ``(None, None)``.
+    """
+    conn = None
     try:
-        conn = sqlite3.connect(lpath_db)
+        if dry_run:
+            conn = sqlite3.connect(
+                Path(lpath_db).absolute().as_uri() + "?mode=ro", uri=True
+            )
+        else:
+            conn = sqlite3.connect(lpath_db)
         cursor = conn.cursor()
 
         # Vacuum the database to free up space
@@ -230,6 +243,22 @@ def delete_sqlite3_duplicates(
 
         columns = _determine_columns(cursor, table_name, columns, include_blob)
         columns_str = ", ".join(columns)
+
+        if dry_run:
+            total_rows, total_unique = cursor.execute(
+                "SELECT COALESCE(SUM(group_size), 0), COUNT(*) "
+                f"FROM (SELECT COUNT(*) AS group_size FROM {table_name} "
+                f"GROUP BY {columns_str})"
+            ).fetchone()
+            total_duplicates = total_rows - total_unique
+            # PS-220 exception: --dry-run bodies stay on stdout.
+            sys.stdout.write(
+                f"[DRY RUN] Would execute deduplication based on: {columns_str}\n"
+            )
+            log.info(f"Total rows processed: {total_rows}")
+            log.info(f"Total unique rows: {total_unique}")
+            log.info(f"Total duplicates identified: {total_duplicates}")
+            return total_rows, total_duplicates
 
         # Drop temp table if exists from previous run
         temp_table = f"{table_name}_temp"
@@ -261,14 +290,8 @@ def delete_sqlite3_duplicates(
             WHERE rn = 1
         """
 
-        if dry_run:
-            # PS-220 exception: --dry-run bodies stay on stdout.
-            sys.stdout.write(
-                f"[DRY RUN] Would execute deduplication based on: {columns_str}\n"
-            )
-        else:
-            cursor.execute(insert_query)
-            conn.commit()
+        cursor.execute(insert_query)
+        conn.commit()
 
         # Count unique rows
         total_unique = cursor.execute(f"SELECT COUNT(*) FROM {temp_table}").fetchone()[
@@ -276,15 +299,11 @@ def delete_sqlite3_duplicates(
         ]
         total_duplicates = total_rows - total_unique
 
-        if not dry_run:
-            # Replace original table with deduplicated one
-            cursor.execute(f"DROP TABLE {table_name}")
-            cursor.execute(f"ALTER TABLE {temp_table} RENAME TO {table_name}")
-            cursor.execute("VACUUM")
-            conn.commit()
-        else:
-            # Clean up temp table in dry run
-            cursor.execute(f"DROP TABLE IF EXISTS {temp_table}")
+        # Replace original table with deduplicated one
+        cursor.execute(f"DROP TABLE {table_name}")
+        cursor.execute(f"ALTER TABLE {temp_table} RENAME TO {table_name}")
+        cursor.execute("VACUUM")
+        conn.commit()
 
         log.info(f"Total rows processed: {total_rows}")
         log.info(f"Total unique rows: {total_unique}")
@@ -297,7 +316,8 @@ def delete_sqlite3_duplicates(
         return None, None
 
     finally:
-        conn.close()
+        if conn is not None:
+            conn.close()
 
 
 # EOF

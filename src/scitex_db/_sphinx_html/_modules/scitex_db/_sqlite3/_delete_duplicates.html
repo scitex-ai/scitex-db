@@ -114,6 +114,7 @@
 <span class="c1"># Time-stamp: "2024-11-11 14:16:58 (ywatanabe)"</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">sqlite3</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
@@ -323,8 +324,20 @@
     <span class="n">chunk_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10_000</span><span class="p">,</span>
     <span class="n">dry_run</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">"""Return row and duplicate counts, previewing read-only by default.</span>
+
+<span class="sd">    Preview opens an existing SQLite file without rebuilding tables. Apply mode</span>
+<span class="sd">    rebuilds the target table and does not preserve its constraints or indexes.</span>
+<span class="sd">    Failures are logged and return ``(None, None)``.</span>
+<span class="sd">    """</span>
+    <span class="n">conn</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="k">try</span><span class="p">:</span>
-        <span class="n">conn</span> <span class="o">=</span> <span class="n">sqlite3</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">lpath_db</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">dry_run</span><span class="p">:</span>
+            <span class="n">conn</span> <span class="o">=</span> <span class="n">sqlite3</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+                <span class="n">Path</span><span class="p">(</span><span class="n">lpath_db</span><span class="p">)</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span><span class="o">.</span><span class="n">as_uri</span><span class="p">()</span> <span class="o">+</span> <span class="s2">"?mode=ro"</span><span class="p">,</span> <span class="n">uri</span><span class="o">=</span><span class="kc">True</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">conn</span> <span class="o">=</span> <span class="n">sqlite3</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">lpath_db</span><span class="p">)</span>
         <span class="n">cursor</span> <span class="o">=</span> <span class="n">conn</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span>
 
         <span class="c1"># Vacuum the database to free up space</span>
@@ -334,6 +347,22 @@
 
         <span class="n">columns</span> <span class="o">=</span> <span class="n">_determine_columns</span><span class="p">(</span><span class="n">cursor</span><span class="p">,</span> <span class="n">table_name</span><span class="p">,</span> <span class="n">columns</span><span class="p">,</span> <span class="n">include_blob</span><span class="p">)</span>
         <span class="n">columns_str</span> <span class="o">=</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">columns</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">dry_run</span><span class="p">:</span>
+            <span class="n">total_rows</span><span class="p">,</span> <span class="n">total_unique</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+                <span class="s2">"SELECT COALESCE(SUM(group_size), 0), COUNT(*) "</span>
+                <span class="sa">f</span><span class="s2">"FROM (SELECT COUNT(*) AS group_size FROM </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2"> "</span>
+                <span class="sa">f</span><span class="s2">"GROUP BY </span><span class="si">{</span><span class="n">columns_str</span><span class="si">}</span><span class="s2">)"</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()</span>
+            <span class="n">total_duplicates</span> <span class="o">=</span> <span class="n">total_rows</span> <span class="o">-</span> <span class="n">total_unique</span>
+            <span class="c1"># PS-220 exception: --dry-run bodies stay on stdout.</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"[DRY RUN] Would execute deduplication based on: </span><span class="si">{</span><span class="n">columns_str</span><span class="si">}</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Total rows processed: </span><span class="si">{</span><span class="n">total_rows</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Total unique rows: </span><span class="si">{</span><span class="n">total_unique</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Total duplicates identified: </span><span class="si">{</span><span class="n">total_duplicates</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">total_rows</span><span class="p">,</span> <span class="n">total_duplicates</span>
 
         <span class="c1"># Drop temp table if exists from previous run</span>
         <span class="n">temp_table</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">_temp"</span>
@@ -365,14 +394,8 @@
 <span class="s2">            WHERE rn = 1</span>
 <span class="s2">        """</span>
 
-        <span class="k">if</span> <span class="n">dry_run</span><span class="p">:</span>
-            <span class="c1"># PS-220 exception: --dry-run bodies stay on stdout.</span>
-            <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"[DRY RUN] Would execute deduplication based on: </span><span class="si">{</span><span class="n">columns_str</span><span class="si">}</span><span class="se">\n</span><span class="s2">"</span>
-            <span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">insert_query</span><span class="p">)</span>
-            <span class="n">conn</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+        <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">insert_query</span><span class="p">)</span>
+        <span class="n">conn</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
 
         <span class="c1"># Count unique rows</span>
         <span class="n">total_unique</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SELECT COUNT(*) FROM </span><span class="si">{</span><span class="n">temp_table</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()[</span>
@@ -380,15 +403,11 @@
         <span class="p">]</span>
         <span class="n">total_duplicates</span> <span class="o">=</span> <span class="n">total_rows</span> <span class="o">-</span> <span class="n">total_unique</span>
 
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">dry_run</span><span class="p">:</span>
-            <span class="c1"># Replace original table with deduplicated one</span>
-            <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">"DROP TABLE </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-            <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">"ALTER TABLE </span><span class="si">{</span><span class="n">temp_table</span><span class="si">}</span><span class="s2"> RENAME TO </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-            <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">"VACUUM"</span><span class="p">)</span>
-            <span class="n">conn</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="c1"># Clean up temp table in dry run</span>
-            <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">"DROP TABLE IF EXISTS </span><span class="si">{</span><span class="n">temp_table</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="c1"># Replace original table with deduplicated one</span>
+        <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">"DROP TABLE </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">"ALTER TABLE </span><span class="si">{</span><span class="n">temp_table</span><span class="si">}</span><span class="s2"> RENAME TO </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">"VACUUM"</span><span class="p">)</span>
+        <span class="n">conn</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
 
         <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Total rows processed: </span><span class="si">{</span><span class="n">total_rows</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
         <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Total unique rows: </span><span class="si">{</span><span class="n">total_unique</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
@@ -401,7 +420,8 @@
         <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
 
     <span class="k">finally</span><span class="p">:</span>
-        <span class="n">conn</span><span class="o">.</span><span class="n">close</span><span class="p">()</span></div>
+        <span class="k">if</span> <span class="n">conn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">conn</span><span class="o">.</span><span class="n">close</span><span class="p">()</span></div>
 
 
 
