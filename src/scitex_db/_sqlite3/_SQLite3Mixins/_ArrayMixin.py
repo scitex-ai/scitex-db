@@ -452,7 +452,7 @@ class _ArrayMixin:
             return np.frombuffer(
                 binary_data, dtype=np.dtype(dtype_str)
             ).reshape(literal_eval(shape_str))
-        elif dtype and shape:
+        elif dtype is not None and shape is not None:
             return np.frombuffer(binary_data, dtype=dtype).reshape(shape)
         return binary_data
 
@@ -468,7 +468,8 @@ class _ArrayMixin:
         dtype : np.dtype, optional
             Fallback dtype if metadata missing
         shape : tuple, optional
-            Fallback shape if metadata missing
+            Fallback shape if metadata missing. Use () for a scalar payload;
+            None means no shape hint.
 
         Returns
         -------
@@ -509,7 +510,7 @@ class _ArrayMixin:
                     )
                     for _, row in df.iterrows()
                 ]
-            elif dtype and shape:
+            elif dtype is not None and shape is not None:
                 arrays = [
                     self.binary_to_array(x, dtype=dtype, shape=shape)
                     for x in df[col]
@@ -600,10 +601,19 @@ class _ArrayMixin:
                     ),
                     axis=1,
                 )
-            elif dtype and shape:
-                df[col] = df[col].apply(
-                    lambda x: self.binary_to_array(x, dtype=dtype, shape=shape)
-                )
+            elif dtype is not None and shape is not None:
+                if isinstance(shape, tuple) and not shape and len(df.index) > 0:
+                    # Row-wise apply keeps scalar ndarray cells and their dtype.
+                    df[col] = df.apply(
+                        lambda row: self.binary_to_array(
+                            row[col], dtype=dtype, shape=shape
+                        ),
+                        axis=1,
+                    )
+                else:
+                    df[col] = df[col].apply(
+                        lambda x: self.binary_to_array(x, dtype=dtype, shape=shape)
+                    )
         return df
 
 # EOF
