@@ -5,6 +5,7 @@
 
 THIS_FILE = "/home/ywatanabe/proj/scitex_repo/src/scitex/db/_SQLite3Mixins/_ImportExportMixin.py"
 
+from numbers import Integral
 from typing import List
 
 import pandas as pd
@@ -63,7 +64,7 @@ class _ImportExportMixin:
             columns = None
         try:
             if (
-                not isinstance(batch_size, int)
+                not isinstance(batch_size, Integral)
                 or isinstance(batch_size, bool)
                 or batch_size <= 0
             ):

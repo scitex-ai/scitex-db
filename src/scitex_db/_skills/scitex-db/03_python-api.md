@@ -49,7 +49,8 @@ dimension; [14_numpy-blob.md](14_numpy-blob.md) gives a checked save/load exampl
 ## CSV export batches
 
 `SQLite3.save_to_csv(table_name, output_path, ..., batch_size=10000)` requires a
-positive integer batch size; booleans, zero, negatives and other types raise
+positive integer batch size, including NumPy integers; booleans, zero, negatives
+and other types raise
 `ValueError` before SQL executes or an output file is created or overwritten.
 The error message identifies `batch_size`. Positive batches preserve CSV headers
 and rows, including empty tables and quoted values. Filesystem or query errors

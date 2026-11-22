@@ -2,6 +2,7 @@
 
 import csv
 
+import numpy as np
 import pytest
 
 from scitex_db import SQLite3
@@ -65,7 +66,7 @@ def test_invalid_export_batch_preserves_existing_output(tmp_path, batch_size):
     }
 
 
-@pytest.mark.parametrize("batch_size,row_count", [(1, 5), (2, 5), (10, 5), (2, 0)])
+@pytest.mark.parametrize("batch_size,row_count", [(1, 5), pytest.param(np.int64(2), 5, id="numpy-integer-batch"), (10, 5), (2, 0)])
 def test_valid_export_batch_preserves_csv_rows(tmp_path, batch_size, row_count):
     # Arrange
     target = tmp_path / "export.csv"
