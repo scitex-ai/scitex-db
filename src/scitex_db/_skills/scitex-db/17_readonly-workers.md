@@ -19,6 +19,9 @@ Save it as `readonly_workers.py` and run `python readonly_workers.py signal.db`.
 It opens existing storage read-only and performs no writes. The main guard and
 explicit spawn context keep process startup portable. Each task creates its own
 connection; a worker may execute multiple tasks.
+The example sets native math-library thread counts to one before importing
+SQLite3, which imports NumPy. This keeps the process pool from multiplying
+BLAS threads; it does not change SQLite connection thread ownership.
 
 ```python
 from concurrent.futures import ProcessPoolExecutor
@@ -26,6 +29,14 @@ from multiprocessing import get_context
 import json
 import os
 import sys
+
+for name in (
+    "OPENBLAS_NUM_THREADS",
+    "OMP_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "NUMEXPR_NUM_THREADS",
+):
+    os.environ[name] = "1"
 
 from scitex_db import SQLite3
 
