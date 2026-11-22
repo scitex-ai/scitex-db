@@ -9,6 +9,10 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Forward each row's compression flag in `get_array_dict` and normalize
+  integer/text flags in `decode_array_columns`, matching the main array reader.
+  Numeric DataFrames from `get_rows` can decode raw and compressed payloads
+  from both wrapper-created and pre-existing native SQLite tables.
 - Parse `binary_to_array` shape metadata with `ast.literal_eval`, matching the
   main array reader. Python expressions in shape strings are rejected instead
   of executed, including calls through the DataFrame decoding helpers.

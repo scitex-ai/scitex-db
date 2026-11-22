@@ -1,5 +1,8 @@
 """Exercise stored shape parsing against actual SQLite array records."""
 
+import sqlite3
+from contextlib import closing
+
 import numpy as np
 import pytest
 
@@ -198,3 +201,113 @@ def test_binary_helper_compressed_metadata_does_not_execute_python(tmp_path):
         pass
     # Assert
     assert not marker.exists()
+
+
+def _frame_table(path, table_kind):
+    if table_kind == "native":
+        with closing(sqlite3.connect(path)) as connection:
+            connection.execute("CREATE TABLE arrays (id INTEGER PRIMARY KEY, data BLOB)")
+            connection.commit()
+    else:
+        with SQLite3(str(path)) as db:
+            db.create_table("arrays", {"id": "INTEGER PRIMARY KEY", "data": "BLOB"})
+
+
+def _stored_frame(path, array, compress, table_kind):
+    _frame_table(path, table_kind)
+    with SQLite3(str(path)) as db:
+        db.save_array("arrays", array, additional_columns={"id": 1}, compress=compress, verbose=False)
+    with SQLite3(str(path), mode="ro") as db:
+        return db.get_rows("arrays", order_by="id", return_as="dataframe")
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("reader", ["get_array_dict", "decode_array_columns"])
+@pytest.mark.parametrize("compress", [False, True])
+@pytest.mark.parametrize("size", [128, 2048])
+@pytest.mark.parametrize("dtype", ["float32", "int16", ">i4"])
+def test_stored_frame_compression_preserves_values(tmp_path, reader, compress, size, dtype, table_kind):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    expected = np.arange(size, dtype=dtype)
+    frame = _stored_frame(path, expected, compress, table_kind)
+    # Act
+    actual = _read_helper(path, frame, reader)
+    # Assert
+    assert np.array_equal(actual, expected)
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("reader", ["get_array_dict", "decode_array_columns"])
+@pytest.mark.parametrize("compress", [False, True])
+@pytest.mark.parametrize("size", [128, 2048])
+@pytest.mark.parametrize("dtype", ["float32", "int16", ">i4"])
+def test_stored_frame_compression_preserves_dtype_conversion(tmp_path, reader, compress, size, dtype, table_kind):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame = _stored_frame(path, np.arange(size, dtype=dtype), compress, table_kind)
+    expected_dtype = np.dtype(dtype).newbyteorder("=") if reader == "get_array_dict" else np.dtype(dtype)
+    # Act
+    actual = _read_helper(path, frame, reader)
+    # Assert
+    assert actual.dtype == expected_dtype
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("reader", ["get_array_dict", "decode_array_columns"])
+@pytest.mark.parametrize("compress", [False, True])
+@pytest.mark.parametrize("size", [128, 2048])
+def test_stored_frame_decoding_preserves_database_bytes(tmp_path, reader, compress, size, table_kind):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame = _stored_frame(path, np.arange(size, dtype=np.float32), compress, table_kind)
+    before = path.read_bytes()
+    # Act
+    _read_helper(path, frame, reader)
+    # Assert
+    assert path.read_bytes() == before
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("compress", [False, True])
+@pytest.mark.parametrize("size", [128, 2048])
+def test_stored_frame_has_native_compression_flag(tmp_path, compress, size, table_kind):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    array = np.arange(size, dtype=np.float32)
+    flag = int(compress and array.nbytes > 1024)
+    expected_flag = str(flag) if table_kind == "native" else flag
+    # Act
+    frame = _stored_frame(path, array, compress, table_kind)
+    # Assert
+    assert frame["data_is_compressed"].iloc[0] == expected_flag
+
+
+def _mixed_frame(path, first, second, table_kind):
+    _frame_table(path, table_kind)
+    with SQLite3(str(path)) as db:
+        db.save_array("arrays", first, additional_columns={"id": 1}, compress=False, verbose=False)
+        db.save_array("arrays", second, additional_columns={"id": 2}, compress=True, verbose=False)
+    with SQLite3(str(path), mode="ro") as db:
+        return db.get_rows("arrays", order_by="id", return_as="dataframe")
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("reader", ["get_array_dict", "decode_array_columns"])
+@pytest.mark.parametrize("dtype", ["float32", "int16"])
+def test_stored_frame_mixed_compression_decodes_each_row(tmp_path, reader, dtype, table_kind):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    first = np.arange(2048, dtype=dtype)
+    second = first + 1
+    frame = _mixed_frame(path, first, second, table_kind)
+    expected = np.stack([first, second])
+    # Act
+    with SQLite3(str(path), mode="ro") as db:
+        if reader == "get_array_dict":
+            actual = db.get_array_dict(frame, columns=["data"])["data"]
+        else:
+            decoded = db.decode_array_columns(frame, columns=["data"])
+            actual = np.stack(decoded["data"].tolist())
+    # Assert
+    assert np.array_equal(actual, expected)

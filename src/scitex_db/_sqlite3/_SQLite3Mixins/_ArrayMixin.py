@@ -492,7 +492,8 @@ class _ArrayMixin:
             if f"{col}_dtype" in df.columns and f"{col}_shape" in df.columns:
                 arrays = [
                     self.binary_to_array(
-                        row[col], row[f"{col}_dtype"], row[f"{col}_shape"]
+                        row[col], row[f"{col}_dtype"], row[f"{col}_shape"],
+                        compressed=row.get(f"{col}_is_compressed") in [1, "1", True],
                     )
                     for _, row in df.iterrows()
                 ]
@@ -569,7 +570,7 @@ class _ArrayMixin:
                         row[col],
                         row[f"{col}_dtype"],
                         row[f"{col}_shape"],
-                        compressed=row.get(f"{col}_is_compressed", False),
+                        compressed=row.get(f"{col}_is_compressed") in [1, "1", True],
                     ),
                     axis=1,
                 )
