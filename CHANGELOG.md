@@ -9,6 +9,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Documentation
 
+- Correct installation dependencies,PostgreSQL driver and standalone namespace
+  guidance; distinguish installed profile checks from umbrella/native adoption.
+
 - Consolidate quick starts around a disposable verified SQLite example; correct
   context-manager, maintenance-keyword, backend and health-provider guidance.
 

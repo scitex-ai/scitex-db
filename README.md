@@ -204,10 +204,12 @@ current whole-BLOB loader; it does not provide chunked time-series reads.
 
 ## Part of SciTeX
 
-`scitex-db` is part of [**SciTeX**](https://scitex.ai). Install via the
-umbrella with `pip install scitex[db]`, then import as `scitex.db` or
-invoke `scitex db <subcommand>` — the standalone `scitex-db` package
-remains the source of truth.
+`scitex-db` is part of [**SciTeX**](https://scitex.ai). The standalone
+distribution provides `scitex_db` and the `scitex-db` command; see the
+[installation guide](src/scitex_db/_skills/scitex-db/01_installation.md).
+Any umbrella facade or forwarding belongs to the separately installed
+umbrella distribution. Its availability and behavior are not established by
+installing `scitex-db` or by assuming that `scitex.db` is the same module.
 
 >Four Freedoms for Research
 >
