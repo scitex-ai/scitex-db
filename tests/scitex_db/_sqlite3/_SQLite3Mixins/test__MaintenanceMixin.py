@@ -49,3 +49,72 @@ def test_vacuum_into_copies_to_the_literal_filename(tmp_path, filename, as_path)
         "source_rows": expected_rows,
         "files": sorted(["source.db", filename]),
     }
+
+
+@pytest.mark.parametrize("error_type", [None, ValueError, RuntimeError])
+def test_backup_closes_destination_after_callback(tmp_path, error_type):
+    # Arrange
+    import sys
+
+    source = tmp_path / "source.db"
+    target = tmp_path / "backup.db"
+    destinations = []
+    progress_calls = []
+    observation = {"active": False, "target": False}
+
+    def observe_connection(event, args):
+        if not observation["active"]:
+            return
+        if event == "sqlite3.connect":
+            observation["target"] = args[0] == str(target)
+        elif event == "sqlite3.connect/handle" and observation["target"]:
+            destinations.append(args[0])
+            observation["target"] = False
+
+    def progress(copied, total):
+        progress_calls.append((copied, total))
+        if error_type is not None:
+            raise error_type("intentional callback failure")
+
+    # Act
+    with SQLite3(str(source)) as db:
+        db.execute("CREATE TABLE readings (id INTEGER PRIMARY KEY)")
+        db.execute("INSERT INTO readings VALUES (7)")
+        db.conn.commit()
+        sys.addaudithook(observe_connection)
+        observation["active"] = True
+        try:
+            db.backup(str(target), pages=1, progress=progress)
+        except ValueError as error:
+            wrapped = str(error).startswith("Failed to create backup:")
+        else:
+            wrapped = False
+        finally:
+            observation["active"] = False
+        try:
+            destinations[0].execute("SELECT 1")
+        except sqlite3.ProgrammingError:
+            closed = True
+        else:
+            closed = False
+        finally:
+            for connection in destinations:
+                connection.close()
+        observed = {
+            "destination_closed": closed,
+            "native_connections": all(type(c) is sqlite3.Connection for c in destinations),
+            "connections": len(destinations),
+            "callback_seen": bool(progress_calls),
+            "wrapped_error": wrapped,
+            "source_rows": db.execute("SELECT id FROM readings").fetchall(),
+        }
+        destinations.clear()
+    # Assert
+    assert observed == {
+        "destination_closed": True,
+        "native_connections": True,
+        "connections": 1,
+        "callback_seen": True,
+        "wrapped_error": error_type is not None,
+        "source_rows": [(7,)],
+    }

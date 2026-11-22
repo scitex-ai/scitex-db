@@ -42,10 +42,9 @@ class _MaintenanceMixin:
                     if progress:
                         progress(total - remaining, total)
 
-                backup_conn = sqlite3.connect(backup_path)
-                with backup_conn:
-                    self.conn.backup(backup_conn, pages=pages, progress=_progress)
-                backup_conn.close()
+                with contextlib.closing(sqlite3.connect(backup_path)) as backup_conn:
+                    with backup_conn:
+                        self.conn.backup(backup_conn, pages=pages, progress=_progress)
             except (sqlite3.Error, Exception) as err:
                 raise ValueError(f"Failed to create backup: {err}")
 
