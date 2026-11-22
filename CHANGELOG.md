@@ -35,6 +35,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Reject non-boolean DDL run flags before collecting statements or opening a
+  cursor, preventing truthy strings such as `"False"` from running schema changes.
+
 - Validate the required DDL version even when the observed store version is
   unknown, preventing invalid inputs from authorizing schema changes.
 

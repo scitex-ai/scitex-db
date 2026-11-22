@@ -57,8 +57,10 @@ constructor enforces `executed + skipped == submitted`. The original proposal
 specified a tuple of skipped statements; that is not the implemented field.
 Per-statement skip reasons remain a proposal difference, not an available API.
 
-`execute_ddl(conn, statements, *, run=True)` filters out non-string and blank
-entries, then executes each remaining string through one cursor. `submitted`
+`execute_ddl(conn, statements, *, run=True)` requires an actual boolean `run`;
+other types (including `"False"`, integers and `None`) raise before statement
+collection or cursor creation. It filters out non-string and blank entries,
+then executes each remaining string through one cursor. `submitted`
 counts these usable inputs, including deliberate skips. With `run=False`, no
 cursor is opened and every usable input is counted as skipped. With `run=True`,
 SQL errors propagate; no partial-success result is returned. The caller owns
