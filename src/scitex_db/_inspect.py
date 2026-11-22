@@ -79,16 +79,18 @@ class OptimizedInspector:
 
         with self.connection() as cursor:
             for table_name in table_names:
+                quoted_table = '"' + table_name.replace('"', '""') + '"'
                 # Get column info
-                cursor.execute(f"PRAGMA table_info({table_name})")
+                cursor.execute(f"PRAGMA table_info({quoted_table})")
                 columns = cursor.fetchall()
 
                 # Get primary key info more efficiently
                 cursor.execute(
-                    f"""
-                    SELECT name FROM pragma_table_info('{table_name}')
+                    """
+                    SELECT name FROM pragma_table_info(?)
                     WHERE pk > 0
-                """
+                """,
+                    (table_name,),
                 )
                 pk_columns = {row[0] for row in cursor.fetchall()}
 
@@ -131,12 +133,13 @@ class OptimizedInspector:
 
         with self.connection() as cursor:
             for table_name in table_names:
+                quoted_table = '"' + table_name.replace('"', '""') + '"'
                 table_stats = {}
 
                 # A zero-row descriptor also includes generated/visible view columns.
                 sample_columns = "*"
                 if skip_blob_content:
-                    cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")
+                    cursor.execute(f"SELECT * FROM {quoted_table} LIMIT 0")
                     names = [description[0] for description in cursor.description]
                     projections = []
                     for name in names:
@@ -148,7 +151,7 @@ class OptimizedInspector:
                         )
                     sample_columns = ", ".join(projections)
                 cursor.execute(
-                    f"SELECT {sample_columns} FROM {table_name} LIMIT {sample_size}"
+                    f"SELECT {sample_columns} FROM {quoted_table} LIMIT {sample_size}"
                 )
                 table_stats["columns"] = [
                     desc[0] for desc in cursor.description
@@ -161,7 +164,7 @@ class OptimizedInspector:
                     cursor.execute(
                         f"""
                         SELECT COUNT(*) FROM (
-                            SELECT 1 FROM {table_name} LIMIT 100000
+                            SELECT 1 FROM {quoted_table} LIMIT 100000
                         )
                     """
                     )
@@ -169,7 +172,7 @@ class OptimizedInspector:
 
                     if approx_count < 100000:
                         # Small table, get exact count
-                        cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+                        cursor.execute(f"SELECT COUNT(*) FROM {quoted_table}")
                         table_stats["row_count"] = cursor.fetchone()[0]
                         table_stats["is_approximate"] = False
                     else:

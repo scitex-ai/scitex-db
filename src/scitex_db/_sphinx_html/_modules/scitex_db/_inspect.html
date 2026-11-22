@@ -181,16 +181,18 @@
 
         <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="p">()</span> <span class="k">as</span> <span class="n">cursor</span><span class="p">:</span>
             <span class="k">for</span> <span class="n">table_name</span> <span class="ow">in</span> <span class="n">table_names</span><span class="p">:</span>
+                <span class="n">quoted_table</span> <span class="o">=</span> <span class="s1">'"'</span> <span class="o">+</span> <span class="n">table_name</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">'"'</span><span class="p">,</span> <span class="s1">'""'</span><span class="p">)</span> <span class="o">+</span> <span class="s1">'"'</span>
                 <span class="c1"># Get column info</span>
-                <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">"PRAGMA table_info(</span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">)"</span><span class="p">)</span>
+                <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">"PRAGMA table_info(</span><span class="si">{</span><span class="n">quoted_table</span><span class="si">}</span><span class="s2">)"</span><span class="p">)</span>
                 <span class="n">columns</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span>
 
                 <span class="c1"># Get primary key info more efficiently</span>
                 <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">"""</span>
-<span class="s2">                    SELECT name FROM pragma_table_info('</span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">')</span>
-<span class="s2">                    WHERE pk &gt; 0</span>
-<span class="s2">                """</span>
+<span class="w">                    </span><span class="sd">"""</span>
+<span class="sd">                    SELECT name FROM pragma_table_info(?)</span>
+<span class="sd">                    WHERE pk &gt; 0</span>
+<span class="sd">                """</span><span class="p">,</span>
+                    <span class="p">(</span><span class="n">table_name</span><span class="p">,),</span>
                 <span class="p">)</span>
                 <span class="n">pk_columns</span> <span class="o">=</span> <span class="p">{</span><span class="n">row</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">cursor</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()}</span>
 
@@ -233,12 +235,13 @@
 
         <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="p">()</span> <span class="k">as</span> <span class="n">cursor</span><span class="p">:</span>
             <span class="k">for</span> <span class="n">table_name</span> <span class="ow">in</span> <span class="n">table_names</span><span class="p">:</span>
+                <span class="n">quoted_table</span> <span class="o">=</span> <span class="s1">'"'</span> <span class="o">+</span> <span class="n">table_name</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">'"'</span><span class="p">,</span> <span class="s1">'""'</span><span class="p">)</span> <span class="o">+</span> <span class="s1">'"'</span>
                 <span class="n">table_stats</span> <span class="o">=</span> <span class="p">{}</span>
 
                 <span class="c1"># A zero-row descriptor also includes generated/visible view columns.</span>
                 <span class="n">sample_columns</span> <span class="o">=</span> <span class="s2">"*"</span>
                 <span class="k">if</span> <span class="n">skip_blob_content</span><span class="p">:</span>
-                    <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SELECT * FROM </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2"> LIMIT 0"</span><span class="p">)</span>
+                    <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SELECT * FROM </span><span class="si">{</span><span class="n">quoted_table</span><span class="si">}</span><span class="s2"> LIMIT 0"</span><span class="p">)</span>
                     <span class="n">names</span> <span class="o">=</span> <span class="p">[</span><span class="n">description</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">description</span> <span class="ow">in</span> <span class="n">cursor</span><span class="o">.</span><span class="n">description</span><span class="p">]</span>
                     <span class="n">projections</span> <span class="o">=</span> <span class="p">[]</span>
                     <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">names</span><span class="p">:</span>
@@ -250,7 +253,7 @@
                         <span class="p">)</span>
                     <span class="n">sample_columns</span> <span class="o">=</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">projections</span><span class="p">)</span>
                 <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">"SELECT </span><span class="si">{</span><span class="n">sample_columns</span><span class="si">}</span><span class="s2"> FROM </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2"> LIMIT </span><span class="si">{</span><span class="n">sample_size</span><span class="si">}</span><span class="s2">"</span>
+                    <span class="sa">f</span><span class="s2">"SELECT </span><span class="si">{</span><span class="n">sample_columns</span><span class="si">}</span><span class="s2"> FROM </span><span class="si">{</span><span class="n">quoted_table</span><span class="si">}</span><span class="s2"> LIMIT </span><span class="si">{</span><span class="n">sample_size</span><span class="si">}</span><span class="s2">"</span>
                 <span class="p">)</span>
                 <span class="n">table_stats</span><span class="p">[</span><span class="s2">"columns"</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
                     <span class="n">desc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">desc</span> <span class="ow">in</span> <span class="n">cursor</span><span class="o">.</span><span class="n">description</span>
@@ -263,7 +266,7 @@
                     <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
                         <span class="sa">f</span><span class="s2">"""</span>
 <span class="s2">                        SELECT COUNT(*) FROM (</span>
-<span class="s2">                            SELECT 1 FROM </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2"> LIMIT 100000</span>
+<span class="s2">                            SELECT 1 FROM </span><span class="si">{</span><span class="n">quoted_table</span><span class="si">}</span><span class="s2"> LIMIT 100000</span>
 <span class="s2">                        )</span>
 <span class="s2">                    """</span>
                     <span class="p">)</span>
@@ -271,7 +274,7 @@
 
                     <span class="k">if</span> <span class="n">approx_count</span> <span class="o">&lt;</span> <span class="mi">100000</span><span class="p">:</span>
                         <span class="c1"># Small table, get exact count</span>
-                        <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SELECT COUNT(*) FROM </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+                        <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SELECT COUNT(*) FROM </span><span class="si">{</span><span class="n">quoted_table</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
                         <span class="n">table_stats</span><span class="p">[</span><span class="s2">"row_count"</span><span class="p">]</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
                         <span class="n">table_stats</span><span class="p">[</span><span class="s2">"is_approximate"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
                     <span class="k">else</span><span class="p">:</span>
