@@ -220,3 +220,98 @@ def test_inspect_json_retains_default_sample_limit(inspection_case):
     row = json.loads(result.stdout)[0]
     # Assert
     assert (result.returncode, row["row_count"], [sample["id"] for sample in row["sample_data"]], unchanged) == (0, 8, [1, 2, 3, 4, 5], True)
+
+
+@pytest.fixture
+def health_cli_files(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    paths = [tmp_path / "first.db", tmp_path / "second.db"]
+    for path in paths:
+        with closing(sqlite3.connect(path)) as connection:
+            connection.execute("CREATE TABLE samples(id INTEGER PRIMARY KEY)")
+            connection.execute("INSERT INTO samples VALUES(7)")
+            connection.commit()
+    yield paths, dict(os.environ, HOME=str(home), SCITEX_LOGGING_LEVEL="INFO")
+
+
+def _health_cli_result(case, before, after, multiple=False, deadline=60):
+    paths, environment = case
+    selected = paths if multiple else paths[:1]
+    snapshots = {path: path.read_bytes() for path in paths}
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "scitex_db", *before, "check-health", *map(str, selected), *after],
+            cwd=paths[0].parent,
+            env=environment,
+            capture_output=True,
+            text=True,
+            timeout=deadline,
+        )
+        observed = {"exit": result.returncode, "stdout": result.stdout, "stderr": result.stderr, "timed_out": False}
+    except subprocess.TimeoutExpired as exc:
+        observed = {"exit": None, "stdout": repr(exc.stdout), "stderr": repr(exc.stderr), "timed_out": True}
+    observed["bytes_unchanged"] = all(path.read_bytes() == content for path, content in snapshots.items())
+    (paths[0].parent / "health-cli.json").write_text(json.dumps(observed, indent=2) + "\n")
+    return observed
+
+
+def _missing_health_provider(observed):
+    return (
+        observed["exit"] == 1
+        and observed["stdout"] == ""
+        and "cannot find the 'scitex' loadability provider" in observed["stderr"]
+        and "No checks or repairs were attempted" in observed["stderr"]
+        and not observed["timed_out"]
+        and observed["bytes_unchanged"]
+    )
+
+
+@pytest.mark.parametrize(
+    "before,after",
+    [([], []), ([], ["--quiet"]), ([], ["--json"]), (["--json"], []),
+     ([], ["--fix", "--yes"]), ([], ["--fix", "--dry-run"])],
+)
+def test_health_cli_names_missing_provider(health_cli_files, before, after):
+    # Arrange
+    case = health_cli_files
+    # Act
+    observed = _health_cli_result(case, before, after)
+    # Assert
+    assert _missing_health_provider(observed)
+
+
+def test_health_cli_preflight_rejects_multiple_paths(health_cli_files):
+    # Arrange
+    case = health_cli_files
+    # Act
+    observed = _health_cli_result(case, [], [], multiple=True)
+    # Assert
+    assert _missing_health_provider(observed)
+
+
+@pytest.mark.parametrize("options", [[], ["--json"]])
+def test_health_cli_preserves_fix_confirmation(health_cli_files, options):
+    # Arrange
+    arguments = ["--fix", *options]
+    # Act
+    observed = _health_cli_result(health_cli_files, [], arguments)
+    # Assert
+    assert (
+        observed["exit"] == 2 and observed["stdout"] == ""
+        and "without --yes/-y" in observed["stderr"]
+        and not observed["timed_out"] and observed["bytes_unchanged"]
+    )
+
+
+@pytest.mark.parametrize("options", [[], ["--fix", "--yes"]])
+def test_health_cli_preflight_precedes_locked_database_access(health_cli_files, options):
+    # Arrange
+    paths, _ = health_cli_files
+    # Act
+    with closing(sqlite3.connect(paths[0])) as owner:
+        owner.execute("BEGIN EXCLUSIVE")
+        observed = _health_cli_result(health_cli_files, [], options, deadline=5)
+        rows = owner.execute("SELECT id FROM samples").fetchall()
+    # Assert
+    assert _missing_health_provider(observed) and rows == [(7,)]

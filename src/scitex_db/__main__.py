@@ -142,12 +142,17 @@ def inspect_db(ctx, db_path, tables, quiet, as_json):
 def check_health(db_paths, fix, quiet, dry_run, yes, as_json):
     """Check database health and optionally repair issues.
 
+    A missing scitex loadability provider is reported before database scans or
+    repairs. This presence check does not validate the provider's implementation.
+
     \b
     Example:
         $ scitex-db check-health ./mydb.sqlite
         $ scitex-db check-health ./db1.sqlite ./db2.sqlite
         $ scitex-db check-health ./mydb.sqlite --fix --yes
     """
+    from importlib.util import find_spec
+
     from ._check_health import batch_health_check
     from ._check_health import check_health as _check
 
@@ -161,6 +166,12 @@ def check_health(db_paths, fix, quiet, dry_run, yes, as_json):
             err=True,
         )
         sys.exit(2)
+
+    if find_spec("scitex") is None:
+        raise click.ClickException(
+            "check-health cannot find the 'scitex' loadability provider. "
+            "No checks or repairs were attempted."
+        )
 
     if len(db_paths) == 1:
         _check(db_paths[0], verbose=not quiet, fix_issues=fix)

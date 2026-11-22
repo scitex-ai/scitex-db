@@ -71,6 +71,10 @@ placeholders. Non-finite sample numbers cause a nonzero exit with empty
 stdout, and `--quiet` does not suppress JSON. See the
 [inspection contract and owning tests](10_cli-reference.md#scitex-db-inspect-db).
 `check-health` JSON serialization remains unimplemented.
+Its current loadability helpers also require `scitex`, which the core install
+does not supply. A missing provider produces a named CLI error before database
+scans or repairs; `--fix` without `--yes` still refuses first. Provider presence
+does not establish that health checks or repairs will succeed.
 
 For per-command flags, run `scitex-db <command> --help` or
 `scitex-db --help-recursive`.

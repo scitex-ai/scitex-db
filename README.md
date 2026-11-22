@@ -81,6 +81,10 @@ size placeholders. `--quiet` does not suppress JSON. Non-finite sample numbers
 produce an error instead of invalid JSON. See the
 [CLI reference](src/scitex_db/_skills/scitex-db/10_cli-reference.md#scitex-db-inspect-db).
 JSON serialization for `check-health` remains unimplemented.
+When the `scitex` loadability provider cannot be found, `check-health` now
+reports that missing dependency before scans or repairs. Core installs do not
+supply that provider. This preflight does not implement or validate a health
+provider; `--fix` without `--yes` still refuses first.
 
 ## Installation
 
