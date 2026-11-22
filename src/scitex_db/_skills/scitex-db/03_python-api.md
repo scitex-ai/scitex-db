@@ -58,6 +58,14 @@ caller rollback, ordinary/NumPy append imports, quoted values and extra-column
 filtering. Transaction atomicity for failures during valid chunked imports,
 concurrent imports and network storage remain unqualified.
 
+CSV reader initialization precedes the import transaction. Missing files raise
+`FileNotFoundError`; empty files and directory paths raise `ValueError`, before
+SQL executes or pending caller work is committed. The reader closes on exit.
+Native refusal controls live in
+`tests/scitex_db/_sqlite3/_SQLite3Mixins/test__ImportExportMixin_sources.py`.
+Later parsing/write failures can still occur after the transaction starts;
+valid-import failure atomicity remains unqualified.
+
 ## CSV export batches
 
 `SQLite3.save_to_csv(table_name, output_path, ..., batch_size=10000)` requires a

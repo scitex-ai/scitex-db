@@ -9,6 +9,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Open the CSV reader before entering the import transaction so missing, empty
+  and directory sources preserve pending caller work; close the reader on exit.
+
 - Validate CSV import batch and chunk sizes before opening a transaction,
   preserving pending caller work and target schema/data on invalid-size refusal.
 

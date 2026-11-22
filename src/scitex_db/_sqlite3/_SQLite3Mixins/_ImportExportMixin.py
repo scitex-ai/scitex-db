@@ -25,34 +25,42 @@ class _ImportExportMixin:
         """Import CSV with positive, non-bool integer batch and chunk sizes.
 
         Refuse invalid sizes before entering the transaction or reading CSV.
+        Open the CSV reader before entering the transaction; always close it.
         """
         for name, size in (("batch_size", batch_size), ("chunk_size", chunk_size)):
             if not isinstance(size, Integral) or isinstance(size, bool) or size <= 0:
                 raise ValueError(
                     f"Failed to import from CSV: {name} must be a positive integer"
                 )
-        with self.transaction():
-            try:
-                # Determine target table columns so we can drop CSV columns
-                # the table doesn't have (e.g. exporting an `id` PRIMARY KEY
-                # and importing into a table without that column).
-                target_cols = set(self.get_table_schema(table_name)["name"].tolist())
-                for chunk in pd.read_csv(csv_path, chunksize=chunk_size):
-                    extra = [c for c in chunk.columns if c not in target_cols]
-                    if extra:
-                        chunk = chunk.drop(columns=extra)
-                    chunk.to_sql(
-                        table_name,
-                        self.conn,
-                        if_exists=if_exists,
-                        index=False,
-                        chunksize=batch_size,
-                    )
-                    if_exists = "append"
-            except FileNotFoundError:
-                raise FileNotFoundError(f"CSV file not found: {csv_path}")
-            except Exception as err:
-                raise ValueError(f"Failed to import from CSV: {err}")
+        try:
+            chunks = pd.read_csv(csv_path, chunksize=chunk_size)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"CSV file not found: {csv_path}")
+        except Exception as err:
+            raise ValueError(f"Failed to import from CSV: {err}")
+        with chunks:
+            with self.transaction():
+                try:
+                    # Determine target table columns so we can drop CSV columns
+                    # the table doesn't have (e.g. exporting an `id` PRIMARY KEY
+                    # and importing into a table without that column).
+                    target_cols = set(self.get_table_schema(table_name)["name"].tolist())
+                    for chunk in chunks:
+                        extra = [c for c in chunk.columns if c not in target_cols]
+                        if extra:
+                            chunk = chunk.drop(columns=extra)
+                        chunk.to_sql(
+                            table_name,
+                            self.conn,
+                            if_exists=if_exists,
+                            index=False,
+                            chunksize=batch_size,
+                        )
+                        if_exists = "append"
+                except FileNotFoundError:
+                    raise FileNotFoundError(f"CSV file not found: {csv_path}")
+                except Exception as err:
+                    raise ValueError(f"Failed to import from CSV: {err}")
 
     def save_to_csv(
         self,
