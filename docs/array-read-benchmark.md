@@ -6,7 +6,9 @@ Run the reviewed tool from a checkout with its normal core dependencies:
 python scripts/benchmark_array_reads.py --output /tmp/db-array-baseline-001
 ```
 
-The output directory must be new and its parent must exist. Existing paths,
+The output directory must be new and its parent must exist.
+Directory names are treated literally, including URI delimiters; database
+access stays inside the new fixture directory. Existing paths,
 including symlinks, are refused before fixture creation. The tool creates
 only synthetic data in that directory; it does not accept an existing database.
 The default fixture is 1,000,000 samples by eight channels, float32, with 100

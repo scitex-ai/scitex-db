@@ -198,3 +198,28 @@ def test_worker_memory_metrics_explicitly_identify_the_source(measured_run):
         and (value is None or value > 0)
         for name, value in metrics
     )
+
+
+def test_uri_shaped_output_directory_preserves_existing_prefix_database(tmp_path):
+    # Arrange
+    decoy = tmp_path / "literal"
+    with closing(sqlite3.connect(decoy)) as conn:
+        conn.execute("CREATE TABLE keep (value TEXT)")
+        conn.execute("INSERT INTO keep VALUES ('preserve')")
+        conn.commit()
+    before = decoy.read_bytes()
+    output = tmp_path / "literal?mode=rw&ignored="
+    # Act
+    process = subprocess.run(
+        [sys.executable, "-I", str(SCRIPT), "--output", str(output), *SMALL],
+        capture_output=True,
+        timeout=30,
+        env=THREAD_ENV,
+    )
+    # Assert
+    assert (
+        process.returncode,
+        decoy.read_bytes(),
+        (output / "plain.db").is_file(),
+        (output / "compressed.db").is_file(),
+    ) == (0, before, True, True)

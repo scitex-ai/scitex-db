@@ -7,6 +7,7 @@ metric definitions and the distinction from chunked/out-of-core storage.
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import hashlib
 import inspect
 import json
@@ -65,6 +66,18 @@ def _rss_metrics():
     return {"peak_rss_bytes": peak, "peak_rss_metric": metric, "ru_maxrss_bytes": raw}
 
 
+@contextmanager
+def _open_store(output, mode, access="rwc"):
+    """Keep fixed database basenames inside the literal fixture directory."""
+    previous = Path.cwd()
+    os.chdir(output)
+    try:
+        with SQLite3(mode + ".db", mode=access, timeout=1) as db:
+            yield db
+    finally:
+        os.chdir(previous)
+
+
 def _prepare(output, config):
     rng = np.random.default_rng(config["seed"])
     data = rng.standard_normal((config["samples"], config["channels"])).astype(
@@ -82,7 +95,7 @@ def _prepare(output, config):
     )
     np.save(output / "signal.npy", data, allow_pickle=False)
     for mode in MODES[1:]:
-        with SQLite3(str(output / (mode + ".db"))) as db:
+        with _open_store(output, mode) as db:
             db.create_table("signal", {"id": "INTEGER PRIMARY KEY", "data": "BLOB"})
             db.save_array(
                 "signal",
@@ -116,7 +129,7 @@ def _worker(output, mode):
         data = np.load(output / "signal.npy", allow_pickle=False)
         result = _timed_read(lambda: data, config)
     else:
-        with SQLite3(str(output / (mode + ".db")), mode="ro", timeout=1) as db:
+        with _open_store(output, mode, "ro") as db:
             shape = (config["samples"], config["channels"])
             result = _timed_read(
                 lambda: db.load_array("signal", "data", ids=1, verbose=False).reshape(
