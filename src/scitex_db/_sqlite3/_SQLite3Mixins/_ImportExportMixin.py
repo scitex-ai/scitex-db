@@ -52,12 +52,22 @@ class _ImportExportMixin:
         where: str = None,
         batch_size: int = 10_000,
     ) -> None:
+        """Export CSV using a positive, non-bool integer batch size.
+
+        Invalid batch sizes raise ValueError before SQL or output changes.
+        """
         # When the caller passes ["*"] (or no value), select all columns by
         # leaving columns=None so get_rows emits SELECT * — passing ["*"]
         # would produce SELECT "*" and a CSV with a literal "*" header.
         if columns is None or columns == ["*"]:
             columns = None
         try:
+            if (
+                not isinstance(batch_size, int)
+                or isinstance(batch_size, bool)
+                or batch_size <= 0
+            ):
+                raise ValueError("batch_size must be a positive integer")
             df = self.get_rows(
                 columns=columns,
                 table_name=table_name,
