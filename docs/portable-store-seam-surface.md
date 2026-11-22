@@ -178,17 +178,31 @@ with TemporaryDirectory() as directory:
 assert not path.exists()
 ```
 
-## Unimplemented linter requirement and adoption
+## Environment-to-path warning and adoption
 
 The registered `scitex_dev.linter.plugins` provider is
-`scitex_db._linter_plugin:get_plugin`. It currently defines `STX-DB001` for
-literal `SQLite3(...)` construction, with plain AST limits. `STX-DB002` remains
-an open proposal to flag literal `Path(<environment lookup>)` shapes for
-`*_DB|*_URL|*_DSN|*_STORE*` names. Do not treat it as an installed bypass guard.
-It must state false-positive/indirection limits if implemented.
-`tests/scitex_db/test__linter_plugin.py` checks actual rule IDs, declared entry
-points and the explicit still-unimplemented proposal. No exemption is added by
-this documentation change.
+`scitex_db._linter_plugin:get_plugin`. It defines `STX-DB001` for literal
+`SQLite3(...)` construction and `STX-DB002` for direct environment-to-path
+coercion. The latter warns once per `Path(...)` or `pathlib.Path(...)` call
+with a positional argument that is a literal-key `os.environ[...]`,
+`environ[...]`, `os.environ.get(...)`, `environ.get(...)`, `os.getenv(...)`
+or `getenv(...)` lookup. Lookup calls accept a first positional key or literal
+`key=`. Names match case-insensitive `*_DB`, `*_URL`, `*_DSN`, or `*_STORE*`.
+
+This is a warning, not a source rewrite, runtime refusal or DSN detector. A
+matching variable may hold a legitimate filesystem path. Imports and bindings
+are not resolved: shadowed canonical names can warn; aliases, intermediate
+variables, wrappers and dynamic keys can be missed. Review the value's intended
+contract and use `resolve_store(env=...)` when selecting a database backend.
+The linter does not read the environment, open a database or evaluate source.
+
+Owners: `_linter_plugin.py` and `_linter_env_path.py`.
+`tests/scitex_db/test__linter_plugin.py` checks existing behavior, rule IDs,
+entry points and prose. `test__linter_env_path.py` exercises the real Dev
+linter dispatcher for matches, exclusions, one warning per call and original
+source positions. The former DB002 proposal exemption is removed; no rule or
+audit waiver is added. Transaction lifecycle and native PostgreSQL requirements
+above remain outstanding. Installing a plugin is not proof of consumer adoption.
 
 Future changes must retain effect-based checks and negative controls for the
 guards they advertise; do not rename merged public names without an alias.
