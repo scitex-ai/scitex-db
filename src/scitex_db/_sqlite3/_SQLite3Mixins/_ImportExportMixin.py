@@ -24,7 +24,7 @@ class _ImportExportMixin:
     ) -> None:
         """Import CSV with positive, non-bool integer batch and chunk sizes.
 
-        Refuse invalid sizes before entering the transaction or reading CSV.
+        Refuse invalid sizes or policies before transaction entry or CSV reads.
         Open the CSV reader before entering the transaction; always close it.
         """
         for name, size in (("batch_size", batch_size), ("chunk_size", chunk_size)):
@@ -32,6 +32,10 @@ class _ImportExportMixin:
                 raise ValueError(
                     f"Failed to import from CSV: {name} must be a positive integer"
                 )
+        if not isinstance(if_exists, str) or if_exists not in ("append", "replace", "fail"):
+            raise ValueError(
+                "Failed to import from CSV: if_exists must be 'append', 'replace' or 'fail'"
+            )
         try:
             chunks = pd.read_csv(csv_path, chunksize=chunk_size)
         except FileNotFoundError:

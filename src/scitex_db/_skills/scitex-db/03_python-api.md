@@ -46,7 +46,7 @@ Use a context manager for each connection; see
 For arrays, `load_array` requires a column name and returns a leading row
 dimension; [14_numpy-blob.md](14_numpy-blob.md) gives a checked save/load example.
 
-## CSV import sizes
+## CSV import preconditions
 
 `SQLite3.load_from_csv(..., batch_size=10000, chunk_size=100000)` requires
 positive integers for both sizes, including NumPy integers; booleans are refused.
@@ -57,6 +57,14 @@ Native controls in `test__ImportExportMixin.py` cover replace-mode refusal,
 caller rollback, ordinary/NumPy append imports, quoted values and extra-column
 filtering. Transaction atomicity for failures during valid chunked imports,
 concurrent imports and network storage remain unqualified.
+
+`if_exists` accepts the case-sensitive strings `"append"`, `"replace"` or `"fail"`.
+Invalid policies raise `ValueError` naming `if_exists` before reading CSV or
+entering the transaction, preserving pending work, rows, schema and indexes.
+Native controls in `test__ImportExportMixin_policy.py` cover invalid types/values,
+missing-source precedence and all three supported policies across multiple
+chunks. A valid `"fail"` policy still refuses an existing table inside the
+transaction; valid-policy failures do not gain a pending-work guarantee.
 
 CSV reader initialization precedes the import transaction. Missing files raise
 `FileNotFoundError`; empty files and directory paths raise `ValueError`, before
