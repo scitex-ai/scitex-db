@@ -164,9 +164,11 @@ metadata-backed scalar path. Native controls:
 file below, with empty/NULL frame and missing-component controls alongside.
 This does not add fallback-hint handling to the main `load_array` reader.
 
-For DataFrame decoding with dtype/shape companion metadata, both helpers honor
-each row's compression flag: integer `1`, text `"1"` and `True`
-mean compressed, matching the main reader. A missing flag means raw bytes.
+Both DataFrame helpers honor per-row `{column}_is_compressed` flags with
+companion metadata or fallback hints: `1`, `"1"` and `True` mean compressed.
+A missing flag means raw bytes. Native fallback controls:
+`test_fallback_flag_rows_match_metadata_values` in the adjacent test file
+`test__ArrayMixin_fallback_flags.py`.
 
 The array reader tests below cover numeric payloads with explicit and inferred columns,
 including raw/compressed rows in the same DataFrame. Wrapper-created tables

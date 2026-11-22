@@ -14,6 +14,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Honor provided per-row compression flags with raw array dtype/shape fallback
+  hints, retaining the existing no-flag and empty-frame paths.
+
 - Fill NULL rows in floating array dictionaries with NaN arrays, matching the
   main reader while retaining existing non-floating handling.
 
