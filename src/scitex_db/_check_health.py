@@ -371,14 +371,17 @@ def batch_health_check(
         )
 
     # Summary
-    healthy = sum(1 for r in results.values() if r["status"] == "HEALTHY")
-    issues = sum(1 for r in results.values() if r["status"] == "ISSUES_FOUND")
-    critical = sum(1 for r in results.values() if r["status"] == "CRITICAL")
+    healthy = sum(1 for r in results.values() if r.get("status") == "HEALTHY")
+    issues = sum(1 for r in results.values() if r.get("status") == "ISSUES_FOUND")
+    critical = sum(1 for r in results.values() if r.get("status") == "CRITICAL")
+
+    incomplete = sum(1 for r in results.values() if "status" not in r)
 
     log.info(f"\nBatch Health Check Summary:")
     log.info(f"  Healthy: {healthy}")
     log.info(f"  Issues: {issues}")
     log.info(f"  Critical: {critical}")
+    log.info(f"  Incomplete: {incomplete}")
 
     return results
 
