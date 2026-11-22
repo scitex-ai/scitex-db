@@ -10,6 +10,7 @@ __DIR__ = os.path.dirname(__FILE__)
 # ----------------------------------------
 
 import sqlite3
+from contextlib import closing
 from typing import Any, Dict, List
 
 import pandas as pd
@@ -58,7 +59,7 @@ def check_health(
     results["stats"]["file_size_mb"] = os.path.getsize(db_path) / (1024 * 1024)
 
     try:
-        with sqlite3.connect(db_path, timeout=10.0) as conn:
+        with closing(sqlite3.connect(db_path, timeout=10.0)) as conn, conn:
             cursor = conn.cursor()
             results["accessible"] = True
 
