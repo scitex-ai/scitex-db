@@ -62,12 +62,15 @@ class _ConnectionMixin:
         self.close()
 
     def _create_temp_copy(self, db_path: str) -> str:
-        """Creates temporary copy of database."""
-        temp_dir = tempfile.gettempdir()
-        self.temp_path = os.path.join(
-            temp_dir, f"temp_{os.path.basename(db_path)}"
-        )
-        shutil.copy2(db_path, self.temp_path)
+        """Copy to a unique owned file; this is not a live SQLite snapshot."""
+        descriptor, temp_path = tempfile.mkstemp(prefix="scitex-db-", suffix=".db")
+        os.close(descriptor)
+        try:
+            shutil.copy2(db_path, temp_path)
+        except BaseException:
+            os.remove(temp_path)
+            raise
+        self.temp_path = temp_path
         return self.temp_path
 
     def connect(
