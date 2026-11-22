@@ -7,6 +7,12 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Parse `binary_to_array` shape metadata with `ast.literal_eval`, matching the
+  main array reader. Python expressions in shape strings are rejected instead
+  of executed, including calls through the DataFrame decoding helpers.
+
 ## [0.2.1] — 2026-08-02
 
 ### Added

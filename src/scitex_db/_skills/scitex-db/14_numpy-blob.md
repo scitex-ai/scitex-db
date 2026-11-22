@@ -53,6 +53,16 @@ store dtype, shape, compression flag and hash; they are not a combined binary
 header. `load_arrays` reconstructs arrays from that metadata and stacks the
 selected rows. The example checks its float32 shape and values.
 
+Shape strings are parsed as Python literals by both `load_arrays` and
+`binary_to_array`; executable Python expressions are rejected. The latter
+parser also serves `get_array_dict` and `decode_array_columns`. Existing
+literal tuple, list and integer shape forms remain accepted by the helper.
+
+The array reader tests below check raw and compressed native payloads through
+`binary_to_array`, and legacy uncompressed DataFrames containing payload, dtype
+and shape through both DataFrame helpers. They retain the existing dtype and
+stacking conversions; this does not establish compressed DataFrame parity.
+
 ## Large arrays
 
 BLOB reads load and decode each selected payload completely. Selecting a row
