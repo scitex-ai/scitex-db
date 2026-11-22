@@ -42,7 +42,7 @@ The Python `store.resolve_store(env=...)` helper separately reads the
 caller-named environment variable; it is not a CLI configuration loader.
 
 Owning behavior: `scitex_db.__main__.main` and `inspect_db`. The actual
-subprocess controls in `tests/scitex_db/test_cli_configuration.py` exercise
+subprocess controls in `tests/scitex_db/test___main__.py` exercise
 valid/malformed project, environment-selected, user and `.env` locations,
 explicit table selection, unchanged fixture bytes and the help disclosure.
 These observations qualify the selected current limitation, not a loader.
