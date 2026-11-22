@@ -278,8 +278,8 @@
                         <span class="n">table_stats</span><span class="p">[</span><span class="s2">"row_count"</span><span class="p">]</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
                         <span class="n">table_stats</span><span class="p">[</span><span class="s2">"is_approximate"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
                     <span class="k">else</span><span class="p">:</span>
-                        <span class="c1"># Large table, use approximate count</span>
-                        <span class="n">table_stats</span><span class="p">[</span><span class="s2">"row_count"</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"&gt;</span><span class="si">{</span><span class="n">approx_count</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2">"</span>
+                        <span class="c1"># The capped probe proves an inclusive lower bound.</span>
+                        <span class="n">table_stats</span><span class="p">[</span><span class="s2">"row_count"</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"&gt;=</span><span class="si">{</span><span class="n">approx_count</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2">"</span>
                         <span class="n">table_stats</span><span class="p">[</span><span class="s2">"is_approximate"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="n">table_stats</span><span class="p">[</span><span class="s2">"row_count"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"Not counted"</span>
