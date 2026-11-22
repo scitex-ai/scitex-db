@@ -1,5 +1,6 @@
 """Real SQLite checks for file identity and reconnect access policy."""
 
+from contextlib import closing
 import sqlite3
 
 import pytest
@@ -11,9 +12,10 @@ _FILENAMES = ["recording?.db", "recording#.db", "recording%3f.db", "日本語 si
 
 
 def _seed(path):
-    with sqlite3.connect(path) as conn:
+    with closing(sqlite3.connect(path)) as conn:
         conn.execute("CREATE TABLE signal (sample INTEGER)")
         conn.execute("INSERT INTO signal VALUES (42)")
+        conn.commit()
 
 
 @pytest.fixture
