@@ -568,3 +568,91 @@ def test_dictionary_rejected_selection_preserves_frame(tmp_path, table_kind, mis
             pass
     # Assert
     assert frame.equals(original)
+
+
+
+def _null_array_frame(path, table_kind, row_count, metadata, compress, other_present=False):
+    _, expected = _discovery_frame(path, table_kind, ("signal", "other"), compress)
+    columns = ["signal"] if other_present else list(expected)
+    assignments = [f"{name} = NULL" for name in columns]
+    if metadata == "null":
+        assignments.extend(f"{name}_{suffix} = NULL" for name in columns for suffix in ("dtype", "shape", "is_compressed", "hash"))
+    with SQLite3(str(path)) as db:
+        for row_id in range(2, row_count + 1):
+            db.save_arrays("arrays", expected, additional_columns={"id": row_id}, compress=compress, verbose=False)
+        db.execute("UPDATE arrays SET " + ", ".join(assignments))
+    with SQLite3(str(path), mode="ro") as db:
+        frame = db.get_rows("arrays", order_by="id", return_as="dataframe")
+    return frame, expected
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("row_count", [1, 3])
+@pytest.mark.parametrize("metadata", ["retained", "null"])
+@pytest.mark.parametrize("compress", [False, True])
+@pytest.mark.parametrize("selection", ["default", "explicit"])
+def test_all_null_dictionary_columns_match_absence_policy(tmp_path, table_kind, row_count, metadata, compress, selection):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame, _ = _null_array_frame(path, table_kind, row_count, metadata, compress)
+    options = {} if selection == "default" else {"columns": ["signal", "other"]}
+    # Act
+    actual = _invoke_default(path, frame, "get_array_dict", **options)
+    # Assert
+    assert all(actual[name] is None for name in ("signal", "other"))
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("row_count", [1, 3])
+@pytest.mark.parametrize("metadata", ["retained", "null"])
+@pytest.mark.parametrize("compress", [False, True])
+def test_main_reader_all_null_columns_return_none(tmp_path, table_kind, row_count, metadata, compress):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    _null_array_frame(path, table_kind, row_count, metadata, compress)
+    # Act
+    with SQLite3(str(path), mode="ro") as db:
+        actual = db.load_arrays("arrays", columns=["signal", "other"], verbose=False)
+    # Assert
+    assert all(actual[name] is None for name in ("signal", "other"))
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("row_count", [1, 3])
+def test_all_null_dictionary_hint_column_returns_none(tmp_path, table_kind, row_count):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame, _ = _null_array_frame(path, table_kind, row_count, "null", True)
+    frame = frame[["signal"]].copy()
+    # Act
+    actual = _invoke_default(path, frame, "get_array_dict", dtype=np.dtype("float32"), shape=(2048,))
+    # Assert
+    assert actual["signal"] is None
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("compress", [False, True])
+@pytest.mark.parametrize("selection", ["default", "explicit"])
+def test_all_null_dictionary_column_does_not_hide_populated_neighbor(tmp_path, table_kind, compress, selection):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame, expected = _null_array_frame(path, table_kind, 3, "retained", compress, other_present=True)
+    options = {} if selection == "default" else {"columns": ["signal", "other"]}
+    # Act
+    actual = _invoke_default(path, frame, "get_array_dict", **options)
+    # Assert
+    assert np.array_equal(actual["other"], np.stack([expected["other"]] * 3))
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("compress", [False, True])
+@pytest.mark.parametrize("selection", ["default", "explicit"])
+def test_all_null_dictionary_absence_is_per_column(tmp_path, table_kind, compress, selection):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame, _ = _null_array_frame(path, table_kind, 3, "retained", compress, other_present=True)
+    options = {} if selection == "default" else {"columns": ["signal", "other"]}
+    # Act
+    actual = _invoke_default(path, frame, "get_array_dict", **options)
+    # Assert
+    assert actual["signal"] is None

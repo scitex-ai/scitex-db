@@ -45,6 +45,10 @@ with SQLite3("arrays.db", compress_by_default=True) as db:
     original_empty = empty_frame.copy(deep=True)
     assert db.get_array_dict(empty_frame) == {"data": None}
     assert db.decode_array_columns(empty_frame).equals(original_empty)
+
+    null_frame = frame.copy()
+    null_frame["data"] = None
+    assert db.get_array_dict(null_frame)["data"] is None
 ```
 
 Run the example in a new directory: it creates synthetic `arrays.db`.
@@ -84,6 +88,16 @@ array dtype or shape. `decode_array_columns` returns the same empty frame
 without changing its schema or dtypes. A stored row containing a zero-length
 NumPy array remains a present array with its original shape and dtype.
 
+A selected column whose payloads are all SQL `NULL` also maps to `None` in
+`get_array_dict`, matching `load_arrays`. This applies per column, including
+when its companion metadata values are NULL; a neighboring populated array
+column still stacks normally. The example checks an all-None DataFrame copy;
+native SQLite NULL controls and owning-reader comparisons live in
+`test_all_null_dictionary_columns_match_absence_policy` and
+`test_main_reader_all_null_columns_return_none` in the array reader test file
+below. This does not establish behavior for a mixture of valid and NULL
+payloads within the same column.
+
 For `get_array_dict`, each explicitly selected column must have both dtype and
 shape companion columns, or the call must provide usable `dtype` and `shape`
 hints. An unsupported selection raises `ValueError`, including on empty frames;
@@ -101,8 +115,8 @@ The array reader tests below cover numeric payloads with explicit and inferred c
 including raw/compressed rows in the same DataFrame. Wrapper-created tables
 use BOOLEAN metadata; saving arrays to pre-existing native tables can add TEXT
 metadata. Both formats retain the existing dtype and stacking conversions.
-Malformed/null metadata, generic BLOBs, PostgreSQL and large-scale behavior
-remain outside this selected coverage.
+Malformed metadata on present payloads, mixed valid/NULL rows, generic BLOBs,
+PostgreSQL and large-scale behavior remain outside this selected coverage.
 
 ## Large arrays
 

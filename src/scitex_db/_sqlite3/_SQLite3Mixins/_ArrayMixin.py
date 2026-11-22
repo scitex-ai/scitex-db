@@ -474,7 +474,7 @@ class _ArrayMixin:
         -------
         dict
             Dictionary mapping column names to stacked arrays. Columns with
-            no rows map to None, matching load_arrays.
+            no rows or only NULL payloads map to None, matching load_arrays.
 
         Raises
         ------
@@ -519,7 +519,9 @@ class _ArrayMixin:
                     f"Array column {col!r} requires dtype/shape metadata "
                     "or both dtype and shape hints"
                 )
-            result[col] = np.stack(arrays) if arrays else None
+            result[col] = (
+                np.stack(arrays) if any(arr is not None for arr in arrays) else None
+            )
 
         return result
 
