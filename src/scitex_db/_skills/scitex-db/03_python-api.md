@@ -46,6 +46,19 @@ Use a context manager for each connection; see
 For arrays, `load_array` requires a column name and returns a leading row
 dimension; [14_numpy-blob.md](14_numpy-blob.md) gives a checked save/load example.
 
+## CSV export batches
+
+`SQLite3.save_to_csv(table_name, output_path, ..., batch_size=10000)` requires a
+positive integer batch size, including NumPy integers; booleans, zero, negatives
+and other types raise
+`ValueError` before SQL executes or an output file is created or overwritten.
+The error message identifies `batch_size`. Positive batches preserve CSV headers
+and rows, including empty tables and quoted values. Filesystem or query errors
+during a valid export can still leave partial output. Native controls live in
+`tests/scitex_db/_sqlite3/_SQLite3Mixins/test__ImportExportMixin.py`; they use a
+SQLite VM-step limit to bound the zero-size regression. Concurrent exports,
+network storage and large-data memory/I/O performance remain unqualified.
+
 ## SQLite maintenance helpers
 
 These standalone helpers take a database file path, not a backend connection

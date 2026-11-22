@@ -9,6 +9,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Reject invalid SQLite CSV export batch sizes before SQL or output changes,
+  preventing zero-size loops and accidental output truncation.
+
 - Close SQLite backup destination connections even when a progress callback
   raises, preserving the existing callback and wrapped-error behavior.
 
