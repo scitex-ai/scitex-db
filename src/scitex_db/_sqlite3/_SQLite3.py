@@ -50,7 +50,7 @@ class SQLite3(
     automatic compression, managed connections, and specialized numpy array handling.
 
     Features:
-        - Automatic compression for BLOB data (70-90% reduction)
+        - Configurable compression for BLOB data; savings depend on the data
         - Connections stay in their creating thread; open a new one per worker
         - Metadata handling for BLOB columns
         - Batch processing support
@@ -89,9 +89,9 @@ class SQLite3(
 
     Notes:
         - Always use context manager (with statement) for proper resource cleanup
-        - BLOB columns automatically get metadata columns: {column}_dtype, {column}_shape, {column}_compressed
-        - Compression is enabled by default for arrays > 1KB
-        - Thread-safe operations are supported
+        - Array metadata uses {column}_dtype, {column}_shape, {column}_is_compressed and {column}_hash
+        - Array compression follows compress_by_default (False by default) or the per-call override, for payloads over 1024 bytes
+        - Live connections must stay in their creating thread
     """
 
     def __init__(

@@ -15,7 +15,7 @@ THIS_FILE = "/home/ywatanabe/proj/scitex_repo/src/scitex/db/_SQLite3Mixins/_Conn
 
 """
 1. Functionality:
-   - Manages SQLite database connections with thread-safe operations
+   - Manages SQLite database connections in their creating thread
    - Handles database journal files and transaction states
 2. Input:
    - Database file path

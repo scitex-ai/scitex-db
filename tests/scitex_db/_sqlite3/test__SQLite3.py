@@ -9,6 +9,7 @@ Each test exercises a single behaviour with one assertion in the
 AAA-marker shape required by STX-TQ001/TQ002/TQ003/TQ007.
 """
 
+from contextlib import closing
 import json
 import os
 import subprocess
@@ -778,16 +779,51 @@ def test_sqlite3_exposes_mixin_method(method, db_path):
 def documented_worker_result(tmp_path_factory):
     root = tmp_path_factory.mktemp("documented-workers")
     path = root / "signal.db"
-    with sqlite3.connect(path) as conn:
+    with closing(sqlite3.connect(path)) as conn:
         conn.execute("CREATE TABLE signal (sample INTEGER PRIMARY KEY, value REAL)")
         conn.executemany("INSERT INTO signal VALUES (?, ?)", [(n, n / 2) for n in range(64)])
+        conn.commit()
     guide = Path(__file__).resolve().parents[3] / "src/scitex_db/_skills/scitex-db/17_readonly-workers.md"
     code = guide.read_text().split("```python\n", 1)[1].split("\n```", 1)[0]
     script = root / "readonly_workers.py"
     script.write_text(code)
-    run = subprocess.run([sys.executable, str(script), str(path)], capture_output=True, text=True, timeout=60, check=True)
+    run = subprocess.run([sys.executable, str(script), str(path)], cwd=root, capture_output=True, text=True, timeout=60, check=True)
     (root / "result.json").write_text(run.stdout)
     yield json.loads(run.stdout)
+
+
+@pytest.fixture
+def documented_array_path(tmp_path_factory):
+    root = tmp_path_factory.mktemp("documented-arrays")
+    guide = Path(__file__).resolve().parents[3] / "src/scitex_db/_skills/scitex-db/14_numpy-blob.md"
+    code = guide.read_text().split("```python\n", 1)[1].split("\n```", 1)[0]
+    script = root / "numpy_blob_example.py"
+    script.write_text(code)
+    subprocess.run([sys.executable, str(script)], cwd=root, capture_output=True, text=True, timeout=60, check=True)
+    yield root / "arrays.db"
+
+
+@pytest.mark.parametrize("row_id,offset", [(1, 0), (2, 1)])
+def test_documented_arrays_keep_shape_dtype_and_values(documented_array_path, row_id, offset):
+    # Arrange
+    expected = np.arange(2048, dtype=np.float32).reshape(512, 4) + offset
+    # Act
+    with SQLite3(str(documented_array_path), mode="ro") as db:
+        actual = db.load_array("m", "data", ids=row_id, verbose=False)
+    # Assert
+    assert (actual.shape, actual.dtype, actual.tobytes()) == (
+        (1, 512, 4), expected.dtype, expected.tobytes()
+    )
+
+
+def test_documented_arrays_store_requested_compression_flags(documented_array_path):
+    # Arrange
+    path = documented_array_path
+    # Act
+    with closing(sqlite3.connect(path)) as conn:
+        flags = conn.execute("SELECT id, data_is_compressed FROM m ORDER BY id").fetchall()
+    # Assert
+    assert flags == [(1, 1), (2, 0)]
 
 
 def test_documented_workers_read_expected_rows(documented_worker_result):
