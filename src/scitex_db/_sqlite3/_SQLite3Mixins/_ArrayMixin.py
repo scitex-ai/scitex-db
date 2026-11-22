@@ -476,6 +476,8 @@ class _ArrayMixin:
         dict
             Dictionary mapping column names to stacked arrays. Columns with
             no rows or only NULL payloads map to None, matching load_arrays.
+            If the first present array is floating, NULL rows use NaN arrays
+            with that array's shape and dtype before stacking.
 
         Raises
         ------
@@ -520,6 +522,17 @@ class _ArrayMixin:
                     f"Array column {col!r} requires dtype/shape metadata "
                     "or both dtype and shape hints"
                 )
+            if any(arr is None for arr in arrays):
+                reference = next((arr for arr in arrays if arr is not None), None)
+                if isinstance(reference, np.ndarray) and np.issubdtype(
+                    reference.dtype, np.floating
+                ):
+                    arrays = [
+                        np.full(reference.shape, np.nan, dtype=reference.dtype)
+                        if arr is None else arr
+                        for arr in arrays
+                    ]
+
             result[col] = (
                 np.stack(arrays) if any(arr is not None for arr in arrays) else None
             )
