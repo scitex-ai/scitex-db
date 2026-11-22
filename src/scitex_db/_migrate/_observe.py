@@ -40,6 +40,8 @@ import sqlite3
 import time
 from dataclasses import dataclass
 
+from ._introspect import connect_readonly
+
 __all__ = ["QuiescenceEvidence", "observe_source"]
 
 
@@ -220,9 +222,7 @@ def observe_source(
     # rather than inside the loop because that is the difference between a live
     # `data_version` signal and a dead one.
     try:
-        watcher: sqlite3.Connection | None = sqlite3.connect(
-            f"file:{source_path}?mode=ro", uri=True
-        )
+        watcher: sqlite3.Connection | None = connect_readonly(source_path)
     except sqlite3.Error:
         watcher = None
 
