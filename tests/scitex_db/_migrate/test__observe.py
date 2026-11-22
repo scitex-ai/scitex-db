@@ -86,10 +86,13 @@ def observe_or_skip(source: str) -> QuiescenceEvidence:
         )
 
 
-@pytest.fixture
-def db(tmp_path):
+@pytest.fixture(params=[
+    "source.db", "source#fragment.db", "source?mode=rw&ignored=",
+    "source%23name.db", "データ #1?.db",
+])
+def db(tmp_path, request):
     """A real SQLite database with one row, closed before the test looks."""
-    path = tmp_path / "source.db"
+    path = tmp_path / request.param
     conn = sqlite3.connect(path)
     conn.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, v TEXT)")
     conn.execute("INSERT INTO t (v) VALUES ('seed')")
