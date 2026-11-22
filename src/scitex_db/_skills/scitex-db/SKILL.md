@@ -68,3 +68,5 @@ rule and empirical verification table.
 * [15_maintenance](15_maintenance.md) — `check_health`, `delete_duplicates`, `inspect`
 * [11_quick-start](11_quick-start.md), [12_python-api](12_python-api.md) — historical leaves
 * [10_cli-reference](10_cli-reference.md) — historical CLI notes
+
+* [17_readonly-workers](17_readonly-workers.md) — Worker-local read-only connections and thread limits

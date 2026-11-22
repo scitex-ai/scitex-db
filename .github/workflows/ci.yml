@@ -77,3 +77,6 @@ jobs:
     uses: scitex-ai/.github/.github/workflows/rtd-sphinx-build.yml@cd4e545a20a1e35385ffe88f4a963ae3c500819b
     with:
       runs_on: ${{ vars.CI_RUNS_ON || '["ubuntu-latest"]' }}
+      fail_on_warning: true
+      upload_artifact: true
+      bundle_dir: src/scitex_db/_sphinx_html

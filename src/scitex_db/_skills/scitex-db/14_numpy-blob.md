@@ -8,9 +8,10 @@ tags: [scitex-db-numpy-blob, scitex-db]
 
 # Numpy BLOB Storage
 
-The `_BaseBlobMixin` lets you stash ndarrays directly as BLOB columns
-with optional compression (zlib). Typical size reduction for float64
-arrays is 70–90%.
+`SQLite3.save_array` stores numeric NumPy arrays in BLOB columns through
+`_ArrayMixin.save_arrays`. Compression uses zlib when requested and the
+payload exceeds 1,024 bytes. Savings depend on dtype and values; measure
+stored size and CPU cost on representative data instead of assuming a percentage.
 
 ## Save / load
 
@@ -18,38 +19,54 @@ arrays is 70–90%.
 import numpy as np
 from scitex_db import SQLite3
 
-arr = np.random.randn(2000, 2000)
+arr = np.arange(2048, dtype=np.float32).reshape(512, 4)
 
 with SQLite3("arrays.db", compress_by_default=True) as db:
     db.create_table("m", {"id": "INTEGER PRIMARY KEY", "data": "BLOB"})
-    row_id = db.save_array("m", arr, column="data")
+    db.save_array("m", arr, additional_columns={"id": 1}, verbose=False)
+    db.save_array("m", arr, additional_columns={"id": 2}, compress=False, verbose=False)
+    db.save_array("m", arr + 1, ids=2, compress=False, verbose=False)
 
-    back = db.load_array("m", row_id=row_id, column="data")
-    assert back.shape == arr.shape
+    first = db.load_array("m", "data", ids=1, verbose=False)
+    updated = db.load_array("m", "data", ids=2, verbose=False)
+    assert first.shape == (1, 512, 4)
+    np.testing.assert_array_equal(first[0], arr)
+    np.testing.assert_array_equal(updated[0], arr + 1)
 ```
 
-`save_array(table, ndarray, column=…, row=None)` inserts a new row if
-`row` is `None`, otherwise updates `row`.
+Run the example in a new directory: it creates synthetic `arrays.db`.
+Choose insertion IDs explicitly with `additional_columns`; `ids=2` updates
+the existing row in this example. `load_array` requires the array column name
+and returns a leading row dimension even when selecting one row. A save call
+does not return an inserted row ID.
 
 ## Per-call compression override
 
-```python
-db.save_array("m", arr, column="data", compress=False)   # force raw
-```
+`compress_by_default=False` is the constructor default. The example enables
+it and overrides it with `compress=False` for the second row. The compression
+flag and companion metadata are stored per array column and row.
 
 ## Payload format
 
-Serialization: `dtype + shape + optionally-zlib-compressed .tobytes()`.
-Deserialization reads the header, then reshapes/decompresses. Round-
-trips exactly, including `dtype` and endianness on the same platform.
+The BLOB contains array bytes, optionally zlib-compressed. Companion columns
+store dtype, shape, compression flag and hash; they are not a combined binary
+header. `load_arrays` reconstructs arrays from that metadata and stacks the
+selected rows. The example checks its float32 shape and values.
 
 ## Large arrays
 
-For arrays >~100 MB, consider writing to disk (scitex-io) and storing
-only the path. BLOB reads load the full payload into memory.
+BLOB reads load and decode each selected payload completely. Selecting a row
+ID is not a sample-range read within a recording. Qualify the working set and
+compression trade-off on the actual data; chunked/range storage remains
+separate work. Keep each connection in its creating thread; see
+[read-only workers](17_readonly-workers.md).
 
 ## PostgreSQL
 
-Same API via `PostgreSQL`; backend uses `BYTEA`. Compression and header
-format are backend-shared so arrays saved from one backend can be
-migrated to the other at the byte level.
+PostgreSQL and migration need backend-specific checks. This SQLite example
+does not establish compatible storage bytes or cross-backend migration.
+
+Behavioral controls: `tests/scitex_db/_sqlite3/test__SQLite3.py` runs this
+specific example in an owned directory and checks values, dtype, stacked shape
+and stored compression flags. Array reader controls also live in
+`tests/scitex_db/_sqlite3/_SQLite3Mixins/test__ArrayMixin.py`.

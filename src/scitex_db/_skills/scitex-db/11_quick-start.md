@@ -22,7 +22,9 @@ with SQLite3("experiments.db", compress_by_default=True) as db:
     rows = db.get_rows("results", where="value > 3.0")
 ```
 
-Writes are thread-safe; the context manager commits + closes cleanly.
+Keep each SQLite3 connection in its creating thread. Open a fresh connection
+inside each reader process; see [read-only workers](17_readonly-workers.md).
+The context manager commits on clean exit, rolls back on error and closes.
 
 ## PostgreSQL
 
