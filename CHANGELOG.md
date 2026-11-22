@@ -9,6 +9,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Documentation
 
+- Correct migration observation imports, evidence/refusal boundaries, advisory
+  locking and stored-schema-text guidance; state native PostgreSQL coverage limits.
+
 - Correct the mixin guide's base-inheritance and backend method-name claims;
   replace stale coverage counts with source owners and actual test scope.
 
