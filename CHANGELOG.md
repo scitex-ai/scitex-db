@@ -14,6 +14,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Fill NULL rows in floating array dictionaries with NaN arrays, matching the
+  main reader while retaining existing non-floating handling.
+
 - Honor explicit scalar `shape=()` fallback hints in binary and DataFrame array
   helpers by checking hint presence instead of truthiness.
 

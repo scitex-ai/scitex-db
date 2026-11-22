@@ -875,3 +875,91 @@ def test_mixed_null_reader_preserves_main_database_bytes(tmp_path, reader, table
     _read_mixed_null_result(path, frame, reader)
     # Assert
     assert path.read_bytes() == before
+
+
+
+def _floating_null_stacks(path, frame, dtype=None, shape=None, explicit=False):
+    options = {"columns": ["data"]} if explicit else {}
+    with SQLite3(str(path), mode="ro") as db:
+        expected = db.load_arrays("arrays", columns=["data"], verbose=False)["data"]
+        actual = db.get_array_dict(frame, dtype=dtype, shape=shape, **options)["data"]
+    return actual, expected
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("dtype", ["float32", "float64", ">f4"])
+@pytest.mark.parametrize("missing_id", [1, 2, 3])
+@pytest.mark.parametrize("compress", [False, True])
+@pytest.mark.parametrize("explicit", [False, True])
+def test_floating_null_dictionary_matches_main(tmp_path, table_kind, dtype, missing_id, compress, explicit):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame, _, _ = _mixed_null_frame(path, table_kind, dtype, missing_id, compress)
+    # Act
+    actual, expected = _floating_null_stacks(path, frame, explicit=explicit)
+    # Assert
+    assert (actual.shape, actual.dtype) == (expected.shape, expected.dtype) and np.array_equal(actual, expected, equal_nan=True)
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("dtype", ["float32", "float64", ">f4"])
+@pytest.mark.parametrize("missing_id", [1, 2, 3])
+def test_floating_null_raw_hint_matches_main(tmp_path, table_kind, dtype, missing_id):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame, _, _ = _mixed_null_frame(path, table_kind, dtype, missing_id, False)
+    frame = frame[["data"]].copy()
+    # Act
+    actual, expected = _floating_null_stacks(path, frame, dtype=np.dtype(dtype), shape=(512, 4))
+    # Assert
+    assert (actual.shape, actual.dtype) == (expected.shape, expected.dtype) and np.array_equal(actual, expected, equal_nan=True)
+
+
+def _scalar_floating_null_frame(path, table_kind, dtype, missing_id):
+    _frame_table(path, table_kind)
+    with SQLite3(str(path)) as db:
+        for row_id in (1, 2, 3):
+            db.save_array("arrays", np.full((), row_id, dtype=np.dtype(dtype)), additional_columns={"id": row_id}, verbose=False)
+        db.execute("UPDATE arrays SET data = NULL, data_dtype = NULL, data_shape = NULL, data_is_compressed = NULL, data_hash = NULL WHERE id = ?", (missing_id,))
+    with SQLite3(str(path), mode="ro") as db:
+        return db.get_rows("arrays", order_by="id", return_as="dataframe")
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("dtype", ["float32", "float64", ">f4"])
+@pytest.mark.parametrize("missing_id", [1, 2, 3])
+@pytest.mark.parametrize("explicit", [False, True])
+def test_floating_null_scalar_matches_main(tmp_path, table_kind, dtype, missing_id, explicit):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame = _scalar_floating_null_frame(path, table_kind, dtype, missing_id)
+    # Act
+    actual, expected = _floating_null_stacks(path, frame, explicit=explicit)
+    # Assert
+    assert (actual.shape, actual.dtype) == (expected.shape, expected.dtype) and np.array_equal(actual, expected, equal_nan=True)
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("compress", [False, True])
+def test_floating_null_dictionary_preserves_input_frame(tmp_path, table_kind, compress):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame, _, _ = _mixed_null_frame(path, table_kind, "float32", 2, compress)
+    before = frame.copy(deep=True)
+    # Act
+    _floating_null_stacks(path, frame)
+    # Assert
+    assert frame.equals(before)
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("compress", [False, True])
+def test_floating_null_dictionary_preserves_main_database_bytes(tmp_path, table_kind, compress):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame, _, _ = _mixed_null_frame(path, table_kind, "float32", 2, compress)
+    before = path.read_bytes()
+    # Act
+    _floating_null_stacks(path, frame)
+    # Assert
+    assert path.read_bytes() == before

@@ -67,6 +67,8 @@ with SQLite3("arrays.db", compress_by_default=True) as db:
     np.testing.assert_array_equal(mixed[0], arr)
     assert np.isnan(mixed[1]).all()
     mixed_frame = db.get_rows("nullable", order_by="id")
+    mixed_stacked = db.get_array_dict(mixed_frame)["data"]
+    assert np.array_equal(mixed_stacked, mixed, equal_nan=True)
     mixed_decoded = db.decode_array_columns(mixed_frame.copy())
     assert mixed_decoded["data"].iloc[1] is None
 ```
@@ -125,14 +127,12 @@ NaN array using the first present array's shape and dtype before stacking.
 The existing NumPy stacking conversion still applies, including byte order.
 When every selected payload is NULL, the column result remains `None`.
 
-`decode_array_columns` retains `None` in missing cells and decodes present
-cells. Handle this difference when switching from a stacked result.
-`get_array_dict` currently raises `ValueError` while stacking these mixed
-non-scalar records; alignment with main-reader NULL filling remains an
-unresolved bug. Cross-reader NULL and integer-promotion policy remains open.
+`get_array_dict` uses the same NaN fill when its first present array has a
+floating dtype. The decoder retains `None` cells. All-NULL dictionary columns
+return `None`; integer/bool/complex NULL policies remain unchanged.
 
 Owning `_ArrayMixin` methods are covered by
-`test_mixed_null_floating_main_reader_fills_nan` and
+`test_floating_null_dictionary_matches_main` and
 `test_mixed_null_decoder_retains_none_cell`, with adjacent dtype/shape,
 present-value and main-file byte checks in the array reader test file below.
 Main: float32, float64, big-endian float32; decoder: float32. Both schemas,
@@ -172,7 +172,7 @@ The array reader tests below cover numeric payloads with explicit and inferred c
 including raw/compressed rows in the same DataFrame. Wrapper-created tables
 use BOOLEAN metadata; saving arrays to pre-existing native tables can add TEXT
 metadata. Both formats retain the existing dtype and stacking conversions.
-Dictionary alignment for mixed valid/NULL rows, non-floating NULL policies,
+Non-floating NULL policies,
 malformed metadata on present payloads, generic BLOBs, PostgreSQL and large-scale
 behavior remain outside this selected result.
 
