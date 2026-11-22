@@ -7,6 +7,11 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Documentation
+
+- Describe existing floating mixed-NULL reader results and the unresolved
+  array-dictionary alignment gap, with native behavioral controls.
+
 ### Fixed
 
 - Honor explicit scalar `shape=()` fallback hints in binary and DataFrame array
