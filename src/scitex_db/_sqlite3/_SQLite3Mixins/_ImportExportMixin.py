@@ -22,6 +22,15 @@ class _ImportExportMixin:
         batch_size: int = 10_000,
         chunk_size: int = 100_000,
     ) -> None:
+        """Import CSV with positive, non-bool integer batch and chunk sizes.
+
+        Refuse invalid sizes before entering the transaction or reading CSV.
+        """
+        for name, size in (("batch_size", batch_size), ("chunk_size", chunk_size)):
+            if not isinstance(size, Integral) or isinstance(size, bool) or size <= 0:
+                raise ValueError(
+                    f"Failed to import from CSV: {name} must be a positive integer"
+                )
         with self.transaction():
             try:
                 # Determine target table columns so we can drop CSV columns

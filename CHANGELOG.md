@@ -9,6 +9,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Validate CSV import batch and chunk sizes before opening a transaction,
+  preserving pending caller work and target schema/data on invalid-size refusal.
+
 - Reject invalid SQLite CSV export batch sizes before SQL or output changes,
   preventing zero-size loops and accidental output truncation.
 

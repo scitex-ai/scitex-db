@@ -46,6 +46,18 @@ Use a context manager for each connection; see
 For arrays, `load_array` requires a column name and returns a leading row
 dimension; [14_numpy-blob.md](14_numpy-blob.md) gives a checked save/load example.
 
+## CSV import sizes
+
+`SQLite3.load_from_csv(..., batch_size=10000, chunk_size=100000)` requires
+positive integers for both sizes, including NumPy integers; booleans are refused.
+Invalid sizes raise `ValueError` naming the parameter before entering the
+transaction, executing SQL or reading CSV. Pending caller work remains available
+for rollback, and target rows, schema and indexes are preserved on this refusal.
+Native controls in `test__ImportExportMixin.py` cover replace-mode refusal,
+caller rollback, ordinary/NumPy append imports, quoted values and extra-column
+filtering. Transaction atomicity for failures during valid chunked imports,
+concurrent imports and network storage remain unqualified.
+
 ## CSV export batches
 
 `SQLite3.save_to_csv(table_name, output_path, ..., batch_size=10000)` requires a
