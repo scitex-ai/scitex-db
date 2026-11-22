@@ -46,7 +46,10 @@ concurrent/WAL behavior and large-database performance remain unqualified.
 `inspect(db_path, table_names=None, sample_size=5, verbose=True, ...)` returns
 a list of table dictionaries with `table_name`, `columns`, `row_count`,
 `is_approximate` and `sample_data`. Column dictionaries include type, primary
-key and NULL metadata. BLOB samples use size placeholders. Index metadata is
+key and NULL metadata. Default BLOB size placeholders are projected in SQLite
+using each value's runtime type and byte length, so the BLOB payload is not
+transferred into Python merely to format its label. Empty BLOBs, NULLs, text
+and mixed storage types retain their existing result semantics. Index metadata is
 not included. Large-table counts can be approximate; see the `is_approximate`
 field rather than assuming every `row_count` is an integer.
 
@@ -55,6 +58,12 @@ Inspection opens an existing file through a SQLite read-only URI. The reusable
 before lazy open or after close makes the next open fail without recreating it.
 Connection reuse and the metadata result format are preserved; concurrent/WAL
 behavior remains outside this selected qualification.
+`inspect_fast(skip_blob_content=False)` still returns native bytes. Direct
+`get_table_stats_batch` calls also keep raw bytes by default; its new optional
+`skip_blob_content=True` enables SQL projection. Row counting and sample limits
+are unchanged. Selected 16 MiB fixture checks measure Python allocations only,
+not RSS, SQLite native heap, disk I/O or out-of-RAM/chunked/range performance.
+Large sample counts can still consume substantial memory.
 
 `check_health(db_path, verbose=True, fix_issues=False)` returns a report with
 `database_path`, `exists`, `accessible`, `integrity`, `tables`, `issues`,
@@ -132,5 +141,6 @@ and `_check_health.py`. Behavioral controls:
 `tests/scitex_db/test__inspect.py` and
 `tests/scitex_db/test__check_health_batch.py` and
 `tests/scitex_db/test__inspect_readonly.py` and
-`tests/scitex_db/_sqlite3/test__delete_duplicates_apply.py`. The example's installed execution is a
+`tests/scitex_db/_sqlite3/test__delete_duplicates_apply.py` and
+`tests/scitex_db/test__inspect_blob_projection.py`. The example's installed execution is a
 separate content check; static validation alone does not accept these claims.
