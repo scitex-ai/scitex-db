@@ -9,6 +9,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Documentation
 
+- Correct the mixin guide's base-inheritance and backend method-name claims;
+  replace stale coverage counts with source owners and actual test scope.
+
 - Describe existing floating mixed-NULL reader results and the unresolved
   array-dictionary alignment gap, with native behavioral controls.
 
