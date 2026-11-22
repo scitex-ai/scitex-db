@@ -9,6 +9,7 @@ __FILE__ = __file__
 __DIR__ = os.path.dirname(__FILE__)
 # ----------------------------------------
 
+from ast import literal_eval
 import hashlib
 import zlib
 from typing import Any
@@ -308,7 +309,7 @@ class _ArrayMixin:
                         blob = zlib.decompress(blob)
                     arr = np.frombuffer(
                         blob, dtype=np.dtype(row[f"{array_col}_dtype"])
-                    ).reshape(eval(row[f"{array_col}_shape"]))
+                    ).reshape(literal_eval(row[f"{array_col}_shape"]))
                     valid_arrays.append(arr)
 
             if valid_arrays:
@@ -326,7 +327,7 @@ class _ArrayMixin:
                             blob = zlib.decompress(blob)
                         arr = np.frombuffer(
                             blob, dtype=np.dtype(row[f"{array_col}_dtype"])
-                        ).reshape(eval(row[f"{array_col}_shape"]))
+                        ).reshape(literal_eval(row[f"{array_col}_shape"]))
                     arrays.append(arr)
 
                 result[array_col] = np.stack(arrays) if arrays else None
