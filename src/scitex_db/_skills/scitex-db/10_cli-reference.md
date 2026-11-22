@@ -81,9 +81,12 @@ this guard.
 Owning source: `scitex_db.__main__.check_health`. Actual controls in
 `tests/scitex_db/test___main__.py` cover ordinary/quiet/JSON/global-JSON,
 confirmed-fix/dry-run, multiple paths, consent priority and a real exclusive
-SQLite lock. The locked controls keep their owned child below five seconds,
-shorter than the unchanged native scan's ten-second connection timeout.
-Database bytes and seeded rows remain unchanged. These controls qualify the
+SQLite lock. A competing native reader must first confirm `database is locked`.
+Byte snapshots are taken outside the owning transaction: opening and closing
+another file handle inside it can release process-scoped SQLite locks. The
+CLI child remains bounded to five seconds, shorter than the unchanged native
+scan's ten-second connection timeout. This does not claim every legacy lock
+error waits for that timeout. Database bytes and seeded rows remain unchanged. These controls qualify the
 missing-provider path only; provider-present health/loadability/repair
 behavior remains unverified.
 

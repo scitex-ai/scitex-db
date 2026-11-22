@@ -235,10 +235,10 @@ def health_cli_files(tmp_path):
     yield paths, dict(os.environ, HOME=str(home), SCITEX_LOGGING_LEVEL="INFO")
 
 
-def _health_cli_result(case, before, after, multiple=False, deadline=60):
+def _health_cli_result(case, before, after, multiple=False, deadline=60, check_bytes=True):
     paths, environment = case
     selected = paths if multiple else paths[:1]
-    snapshots = {path: path.read_bytes() for path in paths}
+    snapshots = {path: path.read_bytes() for path in paths} if check_bytes else {}
     try:
         result = subprocess.run(
             [sys.executable, "-m", "scitex_db", *before, "check-health", *map(str, selected), *after],
@@ -251,7 +251,7 @@ def _health_cli_result(case, before, after, multiple=False, deadline=60):
         observed = {"exit": result.returncode, "stdout": result.stdout, "stderr": result.stderr, "timed_out": False}
     except subprocess.TimeoutExpired as exc:
         observed = {"exit": None, "stdout": repr(exc.stdout), "stderr": repr(exc.stderr), "timed_out": True}
-    observed["bytes_unchanged"] = all(path.read_bytes() == content for path, content in snapshots.items())
+    observed["bytes_unchanged"] = (all(path.read_bytes() == content for path, content in snapshots.items()) if check_bytes else None)
     (paths[0].parent / "health-cli.json").write_text(json.dumps(observed, indent=2) + "\n")
     return observed
 
@@ -304,14 +304,38 @@ def test_health_cli_preserves_fix_confirmation(health_cli_files, options):
     )
 
 
+def _native_health_lock_probe(path):
+    program = """
+from contextlib import closing
+import json,sqlite3,sys
+try:
+    with closing(sqlite3.connect(sys.argv[1],timeout=0.05)) as connection:
+        rows=connection.execute('SELECT id FROM samples').fetchall()
+    result={"blocked":False,"rows":rows}
+except sqlite3.OperationalError as exc:
+    result={"blocked":str(exc)=="database is locked","error":str(exc)}
+print(json.dumps(result))
+"""
+    result = subprocess.run([sys.executable, "-I", "-c", program, str(path)], capture_output=True, text=True, timeout=5)
+    return {"exit": result.returncode, **json.loads(result.stdout)}
+
+
 @pytest.mark.parametrize("options", [[], ["--fix", "--yes"]])
 def test_health_cli_preflight_precedes_locked_database_access(health_cli_files, options):
     # Arrange
     paths, _ = health_cli_files
+    snapshots = {path: path.read_bytes() for path in paths}
     # Act
     with closing(sqlite3.connect(paths[0])) as owner:
         owner.execute("BEGIN EXCLUSIVE")
-        observed = _health_cli_result(health_cli_files, [], options, deadline=5)
+        contention = _native_health_lock_probe(paths[0])
+        observed = _health_cli_result(health_cli_files, [], options, deadline=5, check_bytes=False)
         rows = owner.execute("SELECT id FROM samples").fetchall()
+        active = owner.in_transaction
+    observed["bytes_unchanged"] = all(path.read_bytes() == content for path, content in snapshots.items())
+    observed["independent_native_contention"] = contention
+    observed["owner_transaction_active_during_CLI"] = active
+    observed["bytes_verified_after_transaction_closed"] = True
+    (paths[0].parent / "health-cli.json").write_text(json.dumps(observed, indent=2) + "\n")
     # Assert
-    assert _missing_health_provider(observed) and rows == [(7,)]
+    assert _missing_health_provider(observed) and contention["exit"] == 0 and contention["blocked"] and active and rows == [(7,)]
