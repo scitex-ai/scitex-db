@@ -50,9 +50,12 @@ core-only install. The CLI preflight described in
 [10_cli-reference.md](10_cli-reference.md) reports that missing provider before
 scanning; it does not complete the health check.
 
-`batch_health_check` aggregates per-path reports when it completes, but its
-missing-file aggregation currently raises `KeyError("status")`. Completed
-health checks, repair behavior and that aggregation gap remain unqualified.
+`batch_health_check` returns the per-path reports unchanged and logs a summary.
+Reports without a `status`, such as missing-file early returns, count as
+`Incomplete`; no healthy/critical classification or score is invented. Empty
+input returns an empty dictionary, and repeated paths retain one mapping entry.
+This does not complete existing-file scans: the provider, completed health
+checks and repair behavior remain unqualified.
 
 ## Disposable preview example
 
@@ -67,7 +70,7 @@ from contextlib import closing
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from scitex_db import check_health, delete_sqlite3_duplicates, inspect
+from scitex_db import batch_health_check, check_health, delete_sqlite3_duplicates, inspect
 
 with TemporaryDirectory() as directory:
     path = Path(directory) / "maintenance.db"
@@ -93,11 +96,14 @@ with TemporaryDirectory() as directory:
     report = check_health(str(missing), verbose=False, fix_issues=False)
     assert report["exists"] is False and report["issues"] and not missing.exists()
     assert not {"status", "health_score", "ok", "fixed"}.intersection(report)
+    batch = batch_health_check([str(missing)], verbose=False, fix_issues=False)
+    assert batch == {str(missing): report} and not missing.exists()
     print(json.dumps({"preview": preview, "tables": len(tables), "missing": report["exists"]}))
 ```
 
 Source: `_sqlite3/_delete_duplicates.py`, `_delete_duplicates.py`, `_inspect.py`
 and `_check_health.py`. Behavioral controls:
 `tests/scitex_db/_sqlite3/test__delete_duplicates_preview.py` and the existing
-`tests/scitex_db/test__inspect.py`. The example's installed execution is a
+`tests/scitex_db/test__inspect.py` and
+`tests/scitex_db/test__check_health_batch.py`. The example's installed execution is a
 separate content check; static validation alone does not accept these claims.
