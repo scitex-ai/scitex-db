@@ -9,6 +9,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Documentation
 
+- Update the portable-store proposal to current location/DDL/transaction/report
+  contracts while retaining unmet lifecycle, native PostgreSQL and linter requirements.
+
 - Consolidate CLI guidance and correct help depth, JSON flag scope, limited
   API/MCP inventories and skill installation destination/side-effect contracts.
 
