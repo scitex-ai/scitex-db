@@ -84,6 +84,16 @@ array dtype or shape. `decode_array_columns` returns the same empty frame
 without changing its schema or dtypes. A stored row containing a zero-length
 NumPy array remains a present array with its original shape and dtype.
 
+For `get_array_dict`, each explicitly selected column must have both dtype and
+shape companion columns, or the call must provide usable `dtype` and `shape`
+hints. An unsupported selection raises `ValueError`, including on empty frames;
+it never returns a preceding column's arrays under another name. This check
+validates metadata presence, not metadata values. Controls:
+`test_dictionary_missing_metadata_rejects_selection` and
+`test_dictionary_scalar_selection_rejects_previous_array_reuse` in the array
+reader test file named below. The in-place decoder's selection behavior is
+unchanged.
+
 Both honor each row's compression flag: integer `1`, text `"1"` and `True`
 mean compressed, matching the main reader. A missing flag means raw bytes.
 

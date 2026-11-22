@@ -9,6 +9,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Reject array-dictionary selections without dtype/shape metadata or usable hints
+  instead of reusing a preceding column's arrays or raising an unbound-local error.
+
 - Handle zero-row DataFrames in array helpers: the dictionary maps recognized
   columns to `None`, matching `load_arrays`, and the in-place decoder preserves
   the empty frame without a Pandas assignment error. Present zero-length

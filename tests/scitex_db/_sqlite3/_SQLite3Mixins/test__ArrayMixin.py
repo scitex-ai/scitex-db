@@ -511,3 +511,60 @@ def test_present_zero_length_array_is_not_absence(tmp_path, reader, table_kind):
     actual = _read_helper(path, frame, reader)
     # Assert
     assert (actual.shape, actual.dtype) == (expected.shape, expected.dtype)
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("missing", ["dtype", "shape", "both"])
+@pytest.mark.parametrize("after_valid", [False, True])
+@pytest.mark.parametrize("rows", [slice(None), slice(0)], ids=["populated", "empty"])
+def test_dictionary_missing_metadata_rejects_selection(tmp_path, table_kind, missing, after_valid, rows):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame, _ = _discovery_frame(path, table_kind, ("signal", "other"))
+    removed = [f"other_{part}" for part in ("dtype", "shape") if missing in (part, "both")]
+    frame = frame.drop(columns=removed)
+    frame = frame.iloc[rows].copy()
+    columns = ["signal", "other"] if after_valid else ["other", "signal"]
+    with SQLite3(str(path), mode="ro") as db:
+        # Act
+        rejection = pytest.raises(ValueError, match="other.*requires.*dtype.*shape")
+        # Assert
+        with rejection:
+            db.get_array_dict(frame, columns=columns)
+
+
+@pytest.mark.parametrize("column", ["label", "id"])
+@pytest.mark.parametrize("after_valid", [False, True])
+def test_dictionary_scalar_selection_rejects_previous_array_reuse(tmp_path, column, after_valid):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame, _ = _discovery_frame(path, "native", ("signal", "other"))
+    columns = ["signal", column] if after_valid else [column, "signal"]
+    with SQLite3(str(path), mode="ro") as db:
+        # Act
+        rejection = pytest.raises(ValueError, match=f"{column}.*requires.*dtype.*shape")
+        # Assert
+        with rejection:
+            db.get_array_dict(frame, columns=columns)
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("missing", ["dtype", "shape", "both"])
+@pytest.mark.parametrize("after_valid", [False, True])
+@pytest.mark.parametrize("rows", [slice(None), slice(0)], ids=["populated", "empty"])
+def test_dictionary_rejected_selection_preserves_frame(tmp_path, table_kind, missing, after_valid, rows):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame, _ = _discovery_frame(path, table_kind, ("signal", "other"))
+    removed = [f"other_{part}" for part in ("dtype", "shape") if missing in (part, "both")]
+    frame = frame.drop(columns=removed).iloc[rows].copy()
+    columns = ["signal", "other"] if after_valid else ["other", "signal"]
+    original = frame.copy(deep=True)
+    # Act
+    with SQLite3(str(path), mode="ro") as db:
+        try:
+            db.get_array_dict(frame, columns=columns)
+        except ValueError:
+            pass
+    # Assert
+    assert frame.equals(original)
