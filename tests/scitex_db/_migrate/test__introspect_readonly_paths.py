@@ -26,7 +26,7 @@ def stores(tmp_path, request):
             conn.execute("CREATE TABLE sample (value TEXT)")
             conn.execute("INSERT INTO sample VALUES (?)", (value,))
             conn.commit()
-    return literal, decoy
+    yield literal, decoy
 
 
 def test_readonly_connection_selects_the_literal_filename(stores):
