@@ -1,29 +1,55 @@
 ---
 description: |
-  [TOPIC] Cli Reference
-  [DETAILS] See file body for details.
+  [TOPIC] CLI reference
+  [DETAILS] Actual inspection, consent/provider limits, discovery and skill commands.
 tags: [scitex-db-cli-reference, scitex-db]
 ---
 
-
 # CLI Reference
 
-`scitex-db` ships a console entry point declared in `pyproject.toml`:
+The console entry is `scitex_db.__main__:main`, declared in `pyproject.toml`.
+Use `scitex-db --help` and each nested command's own `--help` for its options.
 
-```toml
-[project.scripts]
-scitex-db = "scitex_db.__main__:main"
-```
+## Root options and command boundaries
 
-## Sub-commands
+| Root option | Current behavior |
+|---|---|
+| `-V`, `--version` | Print the installed distribution version and exit |
+| `-h`, `--help` | Print root help and exit |
+| `--help-recursive` | Print root and immediate subcommand/group help; nested command help is not traversed |
+| `--json` | Store a root flag consumed by `inspect-db`; other callbacks below require their own `--json` |
 
-| Sub-command      | Purpose                                    |
-|------------------|--------------------------------------------|
-| `inspect-db`     | Inspect a database's structure (tables, schemas, row counts) |
-| `check-health`   | Check database health and optionally repair issues |
-| `list-python-apis` | List the public Python API surface of `scitex_db` |
-| `mcp`            | MCP (Model Context Protocol) server management |
-| `skills`         | List / get / install agent-facing skills |
+`--quiet`, `--dry-run` and `--yes` are command-specific. Root `--json` alone
+still leaves `list-python-apis`, `mcp list-tools` and `skills list/get` in human
+output mode. Accepted root flags do not establish JSON serialization for health.
+The source owners are `main`, `_print_help_recursive` and the individual
+callbacks in `scitex_db.__main__`; skill callbacks live in `scitex_db._skills`.
+
+For nested help, use `scitex-db mcp list-tools --help` or
+`scitex-db skills get --help`.
+
+## Configuration limit
+
+Configuration files are not implemented. Pass database paths and options
+explicitly. `./config.yaml`, `$SCITEX_DB_CONFIG`, `~/.scitex/db/config.yaml`
+and automatic `.env` loading do not set CLI defaults. Valid and malformed
+files are ignored; a successful command does not validate them. Portable
+`.scitex/db` configuration remains intended, with no supported precedence.
+Python `store.resolve_store(env=...)` separately reads a caller-named variable.
+
+Owners: `scitex_db.__main__.main` and `inspect_db`. Actual subprocess controls
+in `tests/scitex_db/test___main__.py` check configuration locations/content,
+explicit table selection, unchanged fixture bytes and help disclosure.
+
+## Commands
+
+| Command | Current scope |
+|---|---|
+| `inspect-db` | Read-only SQLite path inspection; human summary or JSON |
+| `check-health` | Provider preflight and consent guard; provider-present scans/repairs remain separately unqualified |
+| `list-python-apis` | Fixed advertised list of three maintenance helpers, not exhaustive API introspection |
+| `mcp list-tools` | Empty tool inventory; no MCP server start/serve command |
+| `skills list/get/install` | Bundled guidance discovery, retrieval and local installation |
 
 ### scitex-db inspect-db
 
@@ -60,19 +86,28 @@ controls in `tests/scitex_db/test___main__.py` check JSON flag positions,
 quiet/human behavior, schema/types/Unicode/null/BLOB samples, table selection,
 the five-row sample limit, non-finite refusal and unchanged database bytes.
 
+Paths must already exist and name files. A missing path is refused without
+creating a database. Human summaries use the package logger (stderr in the
+reviewed default environment); JSON uses stdout. Read-only opening of the main
+SQLite file does not establish a universal no-side-effect sandbox for WAL or
+other sidecars. The owning read-only controls are
+`tests/scitex_db/test__inspect_readonly.py`; count-boundary and CLI controls
+above cover their own behaviors.
+
 ### scitex-db check-health
 
-```
-scitex-db check-health <db_path> [<db_path> ...] [--fix] [--quiet] [--dry-run] [--json]
+```text
+scitex-db check-health <db_path> [<db_path> ...] [--fix] [--yes] [--quiet] [--dry-run] [--json]
 ```
 
-* One path → calls `check_health(path, fix_issues=--fix)`
-* Many paths → calls `batch_health_check(paths, fix_issues=--fix)`
-* `--fix` — attempt to repair where possible
-* `--quiet` — minimal output
-* `--dry-run` — preview what --fix would do
-* `--json` — accepted by the current callback, but health-result JSON
-  serialization remains unimplemented; this is not the inspection JSON path
+Paths must already exist. One path dispatches to the Python `check_health`;
+multiple paths dispatch to `batch_health_check`. `--fix` requests repair and
+requires `--yes`/`-y`, except that `--fix --dry-run` clears the repair flag first.
+That combination prints a generic banner and continues the non-repair path;
+it does not produce an issue-by-issue repair plan. `--dry-run` alone also
+continues the non-repair health path. With a provider present, neither form is
+a promise to avoid database access. `--quiet` reduces human output. The accepted
+`--json` flag does not serialize health results.
 
 When the `scitex` loadability provider cannot be found, the CLI exits with
 code 1, empty stdout and a named missing-provider error on stderr before any
@@ -82,30 +117,81 @@ still refuses with code 2 before this preflight; `--fix --dry-run` never
 repairs. Neither health JSON nor provider functionality is implemented by
 this guard.
 
-Owning source: `scitex_db.__main__.check_health`. Actual controls in
+Owner: `scitex_db.__main__.check_health`. Actual subprocess controls in
 `tests/scitex_db/test___main__.py` cover ordinary/quiet/JSON/global-JSON,
 confirmed-fix/dry-run, multiple paths, consent priority and a real exclusive
-SQLite lock. A competing native reader must first confirm `database is locked`.
-Byte snapshots are taken outside the owning transaction: opening and closing
-another file handle inside it can release process-scoped SQLite locks. The
-CLI child remains bounded to five seconds, shorter than the unchanged native
-scan's ten-second connection timeout. This does not claim every legacy lock
-error waits for that timeout. Database bytes and seeded rows remain unchanged. These controls qualify the
-missing-provider path only; provider-present health/loadability/repair
-behavior remains unverified.
+SQLite lock. They qualify missing-provider refusal and file/row preservation;
+provider-present health/loadability/repair behavior remains unverified.
 
 ### scitex-db list-python-apis
 
-```
-scitex-db list-python-apis [--json]
+```bash
+scitex-db list-python-apis --json
 ```
 
-Lists the public Python API surface of `scitex_db`.
+The callback returns `{"apis": [...]}` containing only
+`scitex_db._inspect.inspect`, `scitex_db._check_health.check_health` and
+`scitex_db._check_health.batch_health_check`. It does not enumerate classes,
+array helpers or every public export. This describes the current limited
+inventory; broader predictable API discovery remains an unresolved contract.
+Use the command-level flag shown above for JSON.
+
+### scitex-db mcp list-tools
+
+```bash
+scitex-db mcp list-tools --json
+```
+
+The result is `{"tools": []}`. Human mode prints `(no MCP tools registered)`.
+The group provides this inventory command only; it does not start a server or
+expose database operations as live MCP tools. No server availability is claimed.
 
 ### scitex-db skills
 
-```
-scitex-db skills {list|get|install}
+```bash
+scitex-db skills list --json
+scitex-db skills get 10_cli-reference --json
 ```
 
-Agent-facing skill management. See `scitex-db skills --help` for details.
+`list` returns name/path objects for bundled Markdown files. `get` accepts a
+file stem or that stem plus `.md`, and returns name/path/content in JSON mode.
+Both traverse the leaf skill directory recursively and exclude `SKILL.md`.
+A missing name exits nonzero. The root skill is retrieved through the owning
+Dev provider; leaf `get SKILL` does not retrieve it. Installed names and bytes
+must be checked independently of a static source reference.
+
+Installation defaults to a symlink at `~/.scitex/dev/skills/scitex-db`.
+`--dest` names its parent directory: the installer appends `scitex-db`.
+`--no-link` copies the skill directory instead, including `SKILL.md`.
+An existing target file/link is removed or an existing target directory is
+replaced. The installer is non-interactive; `--yes` is accepted but unused.
+Choose a dedicated destination when trying it.
+
+The following is a preview with a placeholder destination; it makes no copy or
+link. Substitute an owned directory before an actual installation.
+
+```bash
+scitex-db skills install --dest /owned/skill-parent --no-link --dry-run
+```
+
+`--claude-symlink` additionally targets `~/.claude/skills/scitex` at the skill
+parent directory. Existing non-symlink entries there are left in place with a
+warning; this does not prove that an agent discovers or uses the installed
+skills. Default-home and Claude integration are not qualified by the owned
+custom-destination checks below.
+
+## Behavioral evidence and remaining scope
+
+Existing leaf subprocess controls in `tests/scitex_db/test___main__.py` cover
+configuration disclosure, inspection values and flags, and missing-provider
+health/consent behavior. Inspection and count-boundary tests are named above.
+`tests/scitex_db/test__skills.py` checks selected Python method names in skill
+examples statically; it does not execute every CLI example or install skills.
+
+The reviewed owned CLI fixtures separately check help depth, root versus
+command JSON, the three advertised helper names, empty MCP inventory, exact
+leaf/owning-provider skill bytes, and custom-destination dry-run/symlink/copy
+results. Source and installed-command evidence do not qualify public wheels,
+minimum Python/platforms, native PostgreSQL, provider-present health/repair,
+agent adoption, generated/served docs or hosted availability. Static Markdown
+checks and successful builds do not establish those results.
