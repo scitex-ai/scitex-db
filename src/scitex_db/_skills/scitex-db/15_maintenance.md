@@ -40,6 +40,12 @@ key and NULL metadata. BLOB samples use size placeholders. Index metadata is
 not included. Large-table counts can be approximate; see the `is_approximate`
 field rather than assuming every `row_count` is an integer.
 
+Inspection opens an existing file through a SQLite read-only URI. The reusable
+`OptimizedInspector.connection()` cursor rejects SQL writes. Removing the file
+before lazy open or after close makes the next open fail without recreating it.
+Connection reuse and the metadata result format are preserved; concurrent/WAL
+behavior remains outside this selected qualification.
+
 `check_health(db_path, verbose=True, fix_issues=False)` returns a report with
 `database_path`, `exists`, `accessible`, `integrity`, `tables`, `issues`,
 `stats`, `recommendations` and `loadability`. A completed scan also adds
@@ -92,6 +98,7 @@ with TemporaryDirectory() as directory:
     )
     assert len(tables) == 1 and tables[0]["table_name"] == "measurements"
     assert tables[0]["row_count"] == 3 and len(tables[0]["sample_data"]) == 1
+    assert path.read_bytes() == original
     missing = Path(directory) / "missing.db"
     report = check_health(str(missing), verbose=False, fix_issues=False)
     assert report["exists"] is False and report["issues"] and not missing.exists()
@@ -105,5 +112,6 @@ Source: `_sqlite3/_delete_duplicates.py`, `_delete_duplicates.py`, `_inspect.py`
 and `_check_health.py`. Behavioral controls:
 `tests/scitex_db/_sqlite3/test__delete_duplicates_preview.py` and the existing
 `tests/scitex_db/test__inspect.py` and
-`tests/scitex_db/test__check_health_batch.py`. The example's installed execution is a
+`tests/scitex_db/test__check_health_batch.py` and
+`tests/scitex_db/test__inspect_readonly.py`. The example's installed execution is a
 separate content check; static validation alone does not accept these claims.
