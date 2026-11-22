@@ -30,6 +30,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Documentation
 
+- Qualify observer dispatch, notifications before commit, live cursor ownership and
+  callback exception isolation; preserve executable logic and public annotations.
+
 - Qualify read-only worker guidance: WAL readers can create sidecars in writable
   directories while main-database content remains read-only.
 
