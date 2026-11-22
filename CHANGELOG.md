@@ -9,6 +9,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Preserve the configured SQLite connection timeout in writable modes instead
+  of replacing it with an undocumented five-minute busy-handler budget.
+
 - Refuse invalid CSV import `if_exists` policies before CSV reads or transaction
   entry, preserving pending caller work on invalid-policy refusal.
 

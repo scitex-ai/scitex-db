@@ -107,7 +107,7 @@ class _ConnectionMixin:
                 # WAL mode settings (write-only)
                 self.cursor.execute("PRAGMA journal_mode = WAL")
                 self.cursor.execute("PRAGMA synchronous = NORMAL")
-                self.cursor.execute("PRAGMA busy_timeout = 300000")  # 5 minutes
+                # Keep the busy handler configured by sqlite3.connect(timeout=...).
                 self.cursor.execute("PRAGMA mmap_size = 30000000000")
                 self.cursor.execute("PRAGMA temp_store = MEMORY")
                 self.cursor.execute("PRAGMA cache_size = -2000")

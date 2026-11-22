@@ -46,6 +46,16 @@ Use a context manager for each connection; see
 For arrays, `load_array` requires a column name and returns a leading row
 dimension; [14_numpy-blob.md](14_numpy-blob.md) gives a checked save/load example.
 
+## SQLite lock waits
+
+`SQLite3(path, timeout=60.0)` preserves SQLite's configured busy-handler budget
+in `ro`, `rw` and `rwc` modes, including explicit `connect` and later `reconnect`.
+The default is 60 seconds; `timeout=0.137` initializes `PRAGMA busy_timeout` to
+137 milliseconds. Zero selects no busy waiting; pass `timeout=300.0` explicitly
+for five minutes. This is SQLite lock-wait policy, not an overall operation or
+filesystem-I/O deadline. Native policy and reconnect controls live in
+`tests/scitex_db/_sqlite3/_SQLite3Mixins/test__ConnectionMixin_timeout.py`.
+
 ## Observer dispatch limits
 
 `register_post_save_hook` and `register_post_load_hook` append process-local,
