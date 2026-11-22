@@ -60,10 +60,17 @@ These observations qualify the selected current limitation, not a loader.
 
 ```bash
 scitex-db inspect-db trials.db
-scitex-db check-health trials.db --json
+scitex-db inspect-db trials.db --json
 scitex-db list-python-apis
 scitex-db mcp --help
 ```
+
+For inspection, `scitex-db --json inspect-db trials.db` also works. JSON
+contains table schemas, counts and up to five sample rows; BLOBs are size
+placeholders. Non-finite sample numbers cause a nonzero exit with empty
+stdout, and `--quiet` does not suppress JSON. See the
+[inspection contract and owning tests](10_cli-reference.md#scitex-db-inspect-db).
+`check-health` JSON serialization remains unimplemented.
 
 For per-command flags, run `scitex-db <command> --help` or
 `scitex-db --help-recursive`.

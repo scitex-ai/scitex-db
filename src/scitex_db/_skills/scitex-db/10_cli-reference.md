@@ -28,15 +28,33 @@ scitex-db = "scitex_db.__main__:main"
 ### scitex-db inspect-db
 
 ```
-scitex-db inspect-db <db_path> [--tables TBL [TBL ...]] [--quiet] [--json]
+scitex-db inspect-db <db_path> [--tables TBL]... [--quiet] [--json]
 ```
 
 * `db_path` — SQLite3 file
 * `--tables` — only inspect the named tables (default: all)
 * `--quiet` — minimal output
-* `--json` — machine-readable JSON output
+* `--json` — emit the inspection result as standard JSON; the global flag
+  `scitex-db --json inspect-db ...` has the same effect
 
-Wraps `scitex_db.inspect()`.
+Wraps `scitex_db.inspect()`. JSON is a list of tables with `table_name`,
+`columns`, `row_count`, `is_approximate` and `sample_data`. Sample values retain
+SQLite integers, finite reals, strings and nulls. The default is up to five
+sample rows per table. BLOB samples are strings such as `<BLOB 3 bytes>`, not
+raw bytes or decoded scientific arrays. Repeated `--tables` flags select
+and order the tables. `--quiet` suppresses human output, not JSON output.
+Non-finite numbers such as infinity cannot be encoded as standard JSON:
+the command exits nonzero, writes the error to stderr and leaves stdout empty.
+
+```bash
+scitex-db inspect-db trials.db --tables trials --tables participants --json
+scitex-db --json inspect-db trials.db
+```
+
+The owning callback is `scitex_db.__main__.inspect_db`. Actual subprocess
+controls in `tests/scitex_db/test___main__.py` check JSON flag positions,
+quiet/human behavior, schema/types/Unicode/null/BLOB samples, table selection,
+the five-row sample limit, non-finite refusal and unchanged database bytes.
 
 ### scitex-db check-health
 
@@ -49,7 +67,8 @@ scitex-db check-health <db_path> [<db_path> ...] [--fix] [--quiet] [--dry-run] [
 * `--fix` — attempt to repair where possible
 * `--quiet` — minimal output
 * `--dry-run` — preview what --fix would do
-* `--json` — machine-readable JSON output
+* `--json` — accepted by the current callback, but health-result JSON
+  serialization remains unimplemented; this is not the inspection JSON path
 
 ### scitex-db list-python-apis
 

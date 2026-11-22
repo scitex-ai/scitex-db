@@ -74,7 +74,13 @@ scitex-db check-health experiments.db --fix --yes      # vacuum, fix orphans
 ```
 
 Two commands cover the daily loop: look at a database, then verify it
-is healthy. Both support `--json` for scripting.
+is healthy. For inspection JSON, use `scitex-db inspect-db experiments.db --json`
+or `scitex-db --json inspect-db experiments.db`. The output is a list of table
+schemas, row counts and up to five sample rows per table; BLOB samples are
+size placeholders. `--quiet` does not suppress JSON. Non-finite sample numbers
+produce an error instead of invalid JSON. See the
+[CLI reference](src/scitex_db/_skills/scitex-db/10_cli-reference.md#scitex-db-inspect-db).
+JSON serialization for `check-health` remains unimplemented.
 
 ## Installation
 
