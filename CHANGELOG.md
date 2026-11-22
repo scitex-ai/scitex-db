@@ -9,6 +9,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Refuse invalid CSV import `if_exists` policies before CSV reads or transaction
+  entry, preserving pending caller work on invalid-policy refusal.
+
 - Open the CSV reader before entering the import transaction so missing, empty
   and directory sources preserve pending caller work; close the reader on exit.
 
