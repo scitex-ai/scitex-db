@@ -30,6 +30,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Documentation
 
+- Qualify read-only worker guidance: WAL readers can create sidecars in writable
+  directories while main-database content remains read-only.
+
 - Qualify cutover quiescence and retirement guidance: equal row counts and a
   completion marker do not prove writers stopped; document bounded observation
   evidence, marker-stage refusal and per-path retirement verification.

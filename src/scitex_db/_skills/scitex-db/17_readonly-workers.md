@@ -16,7 +16,9 @@ The public wrapper does not expose a `check_same_thread=False` switch.
 The following complete script reads a synthetic table named `signal` with
 `sample INTEGER PRIMARY KEY` and `value REAL`, containing samples 0 through 63.
 Save it as `readonly_workers.py` and run `python readonly_workers.py signal.db`.
-It opens existing storage read-only and performs no writes. The main guard and
+It reads existing storage through read-only connections. In WAL mode, SQLite
+can still create `-wal` and `-shm` sidecars in a writable directory: read-only
+database content does not mean zero filesystem writes. The main guard and
 explicit spawn context keep process startup portable. Each task creates its own
 connection; a worker may execute multiple tasks.
 The example sets native math-library thread counts to one before importing
@@ -70,7 +72,8 @@ if __name__ == "__main__":
 Create or migrate tables before starting readers. Writable SQLite3 connections
 configure WAL on supported storage; read-only opens leave the journal mode alone.
 Select storage whose SQLite locking semantics are supported. Do not infer safe
-multi-host/NFS access from a local worker test.
+multi-host/NFS access from a local worker test. Read-only-directory and immutable
+URI operation are not qualified by this guide.
 
 The SQL above selects indexed sample rows. `load_array`/`load_arrays` still load
 and decode each selected array BLOB completely; choose row/chunk boundaries to
