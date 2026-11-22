@@ -41,6 +41,20 @@ Failures log and return `(None, None)`. It performs no automatic `VACUUM` or
 table rebuild. Ordinary ROWID tables are the verified scope; virtual tables,
 concurrent/WAL behavior and large-database performance remain unqualified.
 
+## Copy with VACUUM INTO
+
+On an open SQLite3 instance, `vacuum(into=destination)` copies the database to
+that destination. The filename is bound as a SQL value, including apostrophes;
+do not add SQL quotes yourself. This is a separate instance method from the
+standalone path helpers above. Like ordinary `vacuum()`, it commits any pending
+transaction before running, so use it at an intentional transaction boundary.
+It returns `None`; SQLite errors are wrapped as `ValueError`.
+
+Native controls in `tests/scitex_db/_sqlite3/_SQLite3Mixins/test__MaintenanceMixin.py` verify
+literal destinations, rows, an index and `user_version`; the existing
+`test__SQLite3.py` covers ordinary vacuum/optimize. This does not qualify repair,
+concurrent/WAL or NFS behavior, or large-database performance.
+
 ## Inspect and health reports
 
 `inspect(db_path, table_names=None, sample_size=5, verbose=True, ...)` returns
