@@ -7,6 +7,12 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Bind SQLite `vacuum(into=...)` destinations as SQL values so filenames with
+  apostrophes copy successfully while retaining the existing transaction boundary.
+
+
 ### Documentation
 
 - Qualify cutover quiescence and retirement guidance: equal row counts and a
