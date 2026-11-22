@@ -7,6 +7,10 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Documentation
+
+- Qualify SQLite query classification as keyword routing: PRAGMA assignments can mutate while read-classified, and trigger bodies can be split into classification fragments. Runtime access controls and parser behavior are unchanged.
+
 ### Fixed
 
 - Preserve the configured SQLite connection timeout in writable modes instead
