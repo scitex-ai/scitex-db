@@ -54,7 +54,7 @@ availability does not qualify an existing-file health scan or PostgreSQL server.
 * [01_installation](01_installation.md) — pip install + extras + verify
 * [11_quick-start](11_quick-start.md) — disposable verified SQLite example
 * [03_python-api](03_python-api.md) — Public symbols
-* [04_cli-reference](04_cli-reference.md) — `scitex-db` console entry
+* [10_cli-reference](10_cli-reference.md) — canonical CLI contracts and limits
 
 ### Deep-dive
 
@@ -63,6 +63,6 @@ availability does not qualify an existing-file health scan or PostgreSQL server.
 * [14_numpy-blob](14_numpy-blob.md) — Storing ndarrays with compression
 * [15_maintenance](15_maintenance.md) — `check_health`, `delete_duplicates`, `inspect`
 * [02_quick-start](02_quick-start.md), [12_python-api](12_python-api.md) — historical redirects
-* [10_cli-reference](10_cli-reference.md) — historical CLI notes
+* [04_cli-reference](04_cli-reference.md) — historical CLI redirect
 
 * [17_readonly-workers](17_readonly-workers.md) — Worker-local read-only connections and thread limits
