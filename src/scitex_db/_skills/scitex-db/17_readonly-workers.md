@@ -84,3 +84,20 @@ Behavioral controls: `tests/scitex_db/_sqlite3/test__SQLite3.py` executes this
 specific script on an owned fixture, checks row values and child-process use,
 and verifies native cross-thread refusal. Other guides and arbitrary code
 fences are not executed by those controls.
+
+## Optional temporary copies
+
+`SQLite3(path, use_temp=True, mode=...)` copies the source to an exclusively
+allocated temporary filename. Copies from different directories with the same
+basename have separate paths and contents; closing one owner removes only its
+copy. Copy-source failures remove the newly allocated file before propagating
+the error. The original source path and the selected mode/timeout are retained
+by the connection wrapper. A legacy `temp_<basename>` file is not reused.
+
+This is a filesystem `shutil.copy2`, not SQLite's backup API or a consistent
+snapshot of a live database. Live writers, WAL/SHM copying, multi-process copy
+coordination, network storage and snapshot consistency remain unqualified.
+The default `use_temp=False` worker example above is unchanged. Source owner:
+`_SQLite3Mixins/_ConnectionMixin.py::_create_temp_copy`; native identity,
+source-failure, original-file preservation and close controls:
+`tests/scitex_db/_sqlite3/_SQLite3Mixins/test__ConnectionMixin_temp.py`.

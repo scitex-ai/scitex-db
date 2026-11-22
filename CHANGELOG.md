@@ -7,6 +7,10 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Allocate SQLite temporary copies exclusively so same-basename sources cannot overwrite each other or share close-time cleanup. Remove allocated files on copy-source failure; this does not establish live-database snapshot consistency.
+
 ### Documentation
 
 - Qualify SQLite query classification as keyword routing: PRAGMA assignments can mutate while read-classified, and trigger bodies can be split into classification fragments. Runtime access controls and parser behavior are unchanged.
