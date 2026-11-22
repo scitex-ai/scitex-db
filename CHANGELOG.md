@@ -35,6 +35,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Add the leaf-owned STX-DB002 warning for direct store-related environment
+  lookups passed to Path, with explicit syntax and false-positive limits.
+
 - Honor provided per-row compression flags with raw array dtype/shape fallback
   hints, retaining the existing no-flag and empty-frame paths.
 

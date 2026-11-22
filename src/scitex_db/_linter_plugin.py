@@ -1,4 +1,4 @@
-"""Linter plugin for scitex-db: DB-specific rules (DB001).
+"""Linter plugin for scitex-db: DB-specific rules (DB001/DB002).
 
 Registered via entry point 'scitex_dev.linter.plugins' so scitex-linter
 discovers this rule automatically when scitex-db is installed.
@@ -8,6 +8,22 @@ AST detection, no attempt to see through wrapper functions.
 """
 
 import ast
+
+from ._linter_env_path import _StoreEnvironmentPathChecker
+
+
+def _store_path_rule(Rule):
+    return Rule(
+        id="STX-DB002",
+        severity="warning",
+        category="io",
+        message="Store-related environment lookup passed directly to Path.",
+        suggestion=(
+            "Use scitex_db.store.resolve_store(env=...) and branch on dialect "
+            "before opening a database. Review genuine filesystem-path variables; "
+            "this syntactic warning does not determine the environment value."
+        ),
+    )
 
 
 def _load_scitex_dev():
@@ -135,8 +151,8 @@ def get_plugin():
     )
 
     return {
-        "rules": [DB001],
+        "rules": [DB001, _store_path_rule(Rule)],
         "call_rules": {},
         "axes_hints": {},
-        "checkers": [_SQLite3ConstructionChecker],
+        "checkers": [_SQLite3ConstructionChecker, _StoreEnvironmentPathChecker],
     }

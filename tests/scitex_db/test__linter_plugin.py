@@ -46,14 +46,7 @@ _RULE_ID = re.compile(r"\bSTX-DB\d+\b")
 # written reason. Itemised deliberately: a blanket "ignore undefined ids" flag
 # would also hide the STX-DB001 drift this gate exists to catch.
 # Delete an entry the moment its rule lands -- a stale exemption is a dead gate.
-_PROPOSED_NOT_YET_IMPLEMENTED = {
-    "STX-DB002": (
-        "Open proposal in docs/portable-store-seam-surface.md: flag "
-        "Path(<env lookup>) for *_DB|*_URL|*_DSN|*_STORE* names, closing the "
-        "bypass that no type can reach. Specified for the portable-store "
-        "seam; not yet built."
-    ),
-}
+_PROPOSED_NOT_YET_IMPLEMENTED = {}
 
 
 def _ids(issues):
@@ -95,7 +88,7 @@ def test_get_plugin_shape_expected_rule_ids():
     # Act
     rule_ids = {r.id for r in get_plugin()["rules"]}
     # Assert
-    assert "STX-DB001" in rule_ids
+    assert rule_ids == {"STX-DB001", "STX-DB002"}
 
 
 def test_get_plugin_shape_checkers_include_sqlite3_construction_checker():
