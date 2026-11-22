@@ -41,7 +41,11 @@ Wraps `scitex_db.inspect()`. JSON is a list of tables with `table_name`,
 `columns`, `row_count`, `is_approximate` and `sample_data`. Sample values retain
 SQLite integers, finite reals, strings and nulls. The default is up to five
 sample rows per table. BLOB samples are strings such as `<BLOB 3 bytes>`, not
-raw bytes or decoded scientific arrays. Repeated `--tables` flags select
+raw bytes or decoded scientific arrays. Counts below 100,000 are exact JSON
+integers (`is_approximate=false`). At the 100,000-row probe cap, `row_count`
+is the inclusive lower-bound string `">=100,000"` (`is_approximate=true`),
+including when the table has exactly 100,000 rows. Native boundary/CLI controls
+live in `tests/scitex_db/test__inspect_count_boundary.py`. Repeated `--tables` flags select
 and order the tables. `--quiet` suppresses human output, not JSON output.
 Non-finite numbers such as infinity cannot be encoded as standard JSON:
 the command exits nonzero, writes the error to stderr and leaves stdout empty.
