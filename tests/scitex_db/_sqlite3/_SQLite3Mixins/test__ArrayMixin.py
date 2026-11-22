@@ -656,3 +656,128 @@ def test_all_null_dictionary_absence_is_per_column(tmp_path, table_kind, compres
     actual = _invoke_default(path, frame, "get_array_dict", **options)
     # Assert
     assert actual["signal"] is None
+
+
+
+def _raw_hint_frame(path, dtype, shape, table_kind, empty=False, null=False):
+    expected = np.full(shape, 7, dtype=np.dtype(dtype))
+    _stored_frame(path, expected, False, table_kind)
+    with SQLite3(str(path)) as db:
+        if empty:
+            db.execute("DELETE FROM arrays")
+        elif null:
+            db.execute("UPDATE arrays SET data = NULL")
+    with SQLite3(str(path), mode="ro") as db:
+        frame = db.get_rows("arrays", columns=["data"], return_as="dataframe")
+    return frame, expected
+
+
+def _read_fallback_hint(path, frame, reader, dtype, shape, explicit=True):
+    options = {"columns": ["data"]} if explicit else {}
+    with SQLite3(str(path), mode="ro") as db:
+        if reader == "binary_to_array":
+            return db.binary_to_array(frame["data"].iloc[0], dtype=dtype, shape=shape)
+        if reader == "get_array_dict":
+            return db.get_array_dict(frame, dtype=dtype, shape=shape, **options)["data"][0]
+        return db.decode_array_columns(frame, dtype=dtype, shape=shape, **options)["data"].iloc[0]
+
+
+def _fallback_expected(path, expected, reader):
+    if reader == "get_array_dict":
+        return expected.astype(expected.dtype.newbyteorder("="))
+    if reader == "decode_array_columns" and expected.shape == ():
+        with SQLite3(str(path), mode="ro") as db:
+            frame = db.get_rows("arrays", return_as="dataframe")
+            decoded = db.decode_array_columns(frame, columns=["data"])
+        return decoded["data"].iloc[0]
+    return expected
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("reader", ["binary_to_array", "get_array_dict", "decode_array_columns"])
+@pytest.mark.parametrize("dtype", ["float32", "int16", ">i4"])
+@pytest.mark.parametrize("shape", [(), (0,), (2, 3)])
+def test_fallback_hint_preserves_native_payload(tmp_path, table_kind, reader, dtype, shape):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame, expected = _raw_hint_frame(path, dtype, shape, table_kind)
+    target = _fallback_expected(path, expected, reader)
+    # Act
+    actual = _read_fallback_hint(path, frame, reader, np.dtype(dtype), shape)
+    # Assert
+    assert (actual.shape, actual.dtype, actual.tobytes()) == (target.shape, target.dtype, target.tobytes())
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("reader", ["get_array_dict", "decode_array_columns"])
+def test_scalar_hint_default_selection_decodes_value(tmp_path, table_kind, reader):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame, expected = _raw_hint_frame(path, "float32", (), table_kind)
+    target = _fallback_expected(path, expected, reader)
+    # Act
+    actual = _read_fallback_hint(path, frame, reader, expected.dtype, (), explicit=False)
+    # Assert
+    assert (actual.shape, actual.dtype, actual.tobytes()) == (target.shape, target.dtype, target.tobytes())
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+def test_scalar_hint_empty_dictionary_has_absence_result(tmp_path, table_kind):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame, expected = _raw_hint_frame(path, "float32", (), table_kind, empty=True)
+    # Act
+    actual = _invoke_default(path, frame, "get_array_dict", dtype=expected.dtype, shape=())
+    # Assert
+    assert actual["data"] is None
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+def test_scalar_hint_empty_decoder_preserves_frame(tmp_path, table_kind):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame, expected = _raw_hint_frame(path, "float32", (), table_kind, empty=True)
+    before = frame.copy(deep=True)
+    # Act
+    actual = _invoke_default(path, frame, "decode_array_columns", dtype=expected.dtype, shape=())
+    # Assert
+    assert actual.equals(before)
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+def test_scalar_hint_null_dictionary_has_absence_result(tmp_path, table_kind):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame, expected = _raw_hint_frame(path, "float32", (), table_kind, null=True)
+    # Act
+    actual = _invoke_default(path, frame, "get_array_dict", dtype=expected.dtype, shape=())
+    # Assert
+    assert actual["data"] is None
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("dtype,shape", [(None, ()), ("float32", None), (None, None)])
+def test_fallback_hint_missing_component_preserves_binary(tmp_path, table_kind, dtype, shape):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame, _ = _raw_hint_frame(path, "float32", (), table_kind)
+    blob = frame["data"].iloc[0]
+    # Act
+    with SQLite3(str(path), mode="ro") as db:
+        actual = db.binary_to_array(blob, dtype=dtype, shape=shape)
+    # Assert
+    assert actual is blob
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("dtype", ["float32", "int16", ">i4"])
+def test_scalar_hint_metadata_control_preserves_dtype(tmp_path, table_kind, dtype):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    expected = np.full((), 7, dtype=np.dtype(dtype))
+    frame = _stored_frame(path, expected, False, table_kind)
+    target = expected
+    # Act
+    actual = _read_helper(path, frame, "decode_array_columns")
+    # Assert
+    assert (actual.shape, actual.dtype, actual.tobytes()) == (target.shape, target.dtype, target.tobytes())

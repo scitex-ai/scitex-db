@@ -49,6 +49,16 @@ with SQLite3("arrays.db", compress_by_default=True) as db:
     null_frame = frame.copy()
     null_frame["data"] = None
     assert db.get_array_dict(null_frame)["data"] is None
+
+    scalar = np.array(7, dtype=np.int16)
+    scalar_frame = frame[["data"]].iloc[:1].copy()
+    scalar_frame["data"] = [scalar.tobytes()]
+    binary_scalar = db.binary_to_array(scalar.tobytes(), dtype=scalar.dtype, shape=())
+    assert binary_scalar.shape == () and binary_scalar.item() == 7
+    stacked_scalar = db.get_array_dict(scalar_frame, dtype=scalar.dtype, shape=())["data"]
+    assert stacked_scalar.shape == (1,) and stacked_scalar[0] == 7
+    decoded_scalar = db.decode_array_columns(scalar_frame.copy(), dtype=scalar.dtype, shape=())
+    assert decoded_scalar["data"].iloc[0].shape == () and decoded_scalar["data"].iloc[0].item() == 7
 ```
 
 Run the example in a new directory: it creates synthetic `arrays.db`.
@@ -107,6 +117,19 @@ validates metadata presence, not metadata values. Controls:
 `test_dictionary_scalar_selection_rejects_previous_array_reuse` in the array
 reader test file named below. The in-place decoder's selection behavior is
 unchanged.
+
+For raw DataFrame payloads without companion metadata, supply both `dtype` and
+`shape` hints. The scalar example uses a one-column copy and raw int16 bytes;
+`shape=()` reconstructs a zero-dimensional scalar, while the dictionary stacks
+it into a leading row dimension `(1,)`. `None` means a missing hint; the empty
+tuple is a supplied shape. `binary_to_array` also supports these hints. Existing
+NumPy stacking conversion still applies to the dictionary. The in-place
+decoder retains scalar ndarray cells and their dtype, matching its existing
+metadata-backed scalar path. Native controls:
+`test_fallback_hint_preserves_native_payload` and
+`test_scalar_hint_default_selection_decodes_value` in the array reader test
+file below, with empty/NULL frame and missing-component controls alongside.
+This does not add fallback-hint handling to the main `load_array` reader.
 
 Both honor each row's compression flag: integer `1`, text `"1"` and `True`
 mean compressed, matching the main reader. A missing flag means raw bytes.

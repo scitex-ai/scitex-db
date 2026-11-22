@@ -9,6 +9,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Honor explicit scalar `shape=()` fallback hints in binary and DataFrame array
+  helpers by checking hint presence instead of truthiness.
+
 - Return `None` for all-NULL payload columns in array dictionaries, matching
   the main reader's absence result while retaining populated neighboring arrays.
 
