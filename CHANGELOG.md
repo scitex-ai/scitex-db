@@ -9,6 +9,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Return `None` for all-NULL payload columns in array dictionaries, matching
+  the main reader's absence result while retaining populated neighboring arrays.
+
 - Reject array-dictionary selections without dtype/shape metadata or usable hints
   instead of reusing a preceding column's arrays or raising an unbound-local error.
 
