@@ -1,75 +1,105 @@
 ---
 description: |
   [TOPIC] Python API
-  [DETAILS] Public callables — SQLite3, PostgreSQL backends, delete_duplicates, inspect.
+  [DETAILS] Public exports, backend differences and SQLite maintenance return values.
 tags: [scitex-db-python-api]
 ---
 
 # Python API
 
-```python
-import scitex_db
-```
+Import the standalone package with `import scitex_db`. Public attributes are
+loaded lazily; PostgreSQL support requires the optional PostgreSQL dependencies
+and can resolve to `None` when they are absent.
 
 ## Top-level exports (`__all__`)
 
 | Symbol | Purpose |
 |---|---|
-| `SQLite3` | SQLite backend class (composed from mixins) |
-| `PostgreSQL` | PostgreSQL backend class (composed from mixins) |
-| `delete_duplicates` | Generic deduplication helper |
-| `delete_sqlite3_duplicates` | SQLite-specific dedup |
-| `inspect` | Schema/row-count introspection function |
-| `__version__` | Package version string |
+| `SQLite3` | SQLite backend class |
+| `PostgreSQL` | Optional PostgreSQL backend class |
+| `delete_duplicates` | Deprecated alias forwarding SQLite path arguments |
+| `delete_sqlite3_duplicates` | SQLite duplicate preview or explicit apply |
+| `inspect` | Return a list of SQLite table dictionaries |
+| `check_health` | SQLite health report; existing-file provider limitation below |
+| `batch_health_check` | Mapping of database paths to health reports |
+| `register_post_save_hook` | Register a callback for successful writes |
+| `register_post_load_hook` | Register a callback for successful reads |
+| `__version__` | Installed distribution version string |
+
+The export list and lazy targets are owned by `src/scitex_db/__init__.py`.
+Export presence does not establish a working PostgreSQL service or a completed
+health scan.
 
 ## Backend classes
 
-`SQLite3` and `PostgreSQL` draw on the same mixin *namespace*, but their
-surfaces are **not** interchangeable: they spell the same operations
-differently, and each leaves part of the base surface unimplemented.
-Write against one of them, not against "the API".
+`SQLite3` and `PostgreSQL` share a mixin namespace, but their surfaces are
+not interchangeable. SQLite uses `get_table_names`, `insert_many`, `get_rows`,
+`get_row_count` and `execute`; PostgreSQL uses `get_tables`, `insert`, `select`,
+`count` and `execute_query`. Each leaves part of the base surface unimplemented.
+See [13_mixins.md](13_mixins.md) and
+[16_sqlite-to-postgres.md](16_sqlite-to-postgres.md) before porting code.
+
+Use a context manager for each connection; see
+[02_quick-start.md](02_quick-start.md) for backend examples and
+[17_readonly-workers.md](17_readonly-workers.md) for worker-local connections.
+For arrays, `load_array` requires a column name and returns a leading row
+dimension; [14_numpy-blob.md](14_numpy-blob.md) gives a checked save/load example.
+
+## SQLite maintenance helpers
+
+These standalone helpers take a database file path, not a backend connection
+or a PostgreSQL URL. `inspect(path, verbose=False)` returns a list of records
+with `table_name`, `columns`, `row_count`, `is_approximate` and `sample_data`.
+With the default `verbose=True`, it also logs a human-readable summary.
+
+`delete_sqlite3_duplicates(path, table_name, ...)` previews read-only by default
+and returns `(total_rows, duplicate_rows)`. Writing requires explicit
+`dry_run=False`; failures log and return `(None, None)`. The deprecated
+`delete_duplicates` alias emits `DeprecationWarning` and forwards the same
+arguments. It is not a backend-agnostic deduplication API.
+
+This complete example creates only a disposable native SQLite fixture and
+checks the default preview without applying deletions:
 
 ```python
-db = scitex_db.SQLite3("trials.db")
+import sqlite3
+from contextlib import closing
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
-# Schema
-db.create_table("trials", {"id": "INTEGER PRIMARY KEY", "rt_ms": "REAL"})
-db.drop_table("trials")
-db.get_table_names()
+from scitex_db import delete_sqlite3_duplicates, inspect
 
-# Rows
-db.insert_many("trials", [{"rt_ms": 342.0}])
-db.get_rows("trials", where="rt_ms > 300")     # DataFrame by default
-db.get_row_count("trials")
-db.execute("SELECT ...", parameters=())
-
-# numpy blobs -- addressed by (table, column), not by key
-db.save_array("eeg", arr, column="data")
-db.load_array("eeg", column="data")
-
-# Transactions
-with db.transaction():
-    db.insert_many("trials", [{"rt_ms": 410.0}])
+with TemporaryDirectory() as directory:
+    path = Path(directory) / "trials.db"
+    with closing(sqlite3.connect(path)) as connection:
+        connection.execute("CREATE TABLE trials (id INTEGER PRIMARY KEY, rt_ms REAL)")
+        connection.executemany("INSERT INTO trials (rt_ms) VALUES (?)", [(342.0,), (342.0,), (410.0,)])
+        connection.commit()
+    before = path.read_bytes()
+    records = inspect(str(path), verbose=False)
+    assert records[0]["table_name"] == "trials"
+    assert records[0]["row_count"] == 3
+    assert delete_sqlite3_duplicates(str(path), "trials", columns=["rt_ms"]) == (3, 1)
+    assert path.read_bytes() == before
 ```
 
-The PostgreSQL spellings differ: `get_tables`, `insert`, `select`,
-`count`, `execute_query`. See
-[16_sqlite-to-postgres.md](16_sqlite-to-postgres.md) for the mapping and
-for what a port actually costs.
+The owning implementations are `_inspect.py::inspect` and
+`_sqlite3/_delete_duplicates.py::delete_sqlite3_duplicates`. Behavioral controls
+in `tests/scitex_db/test__inspect.py` check result records and counts;
+`tests/scitex_db/_sqlite3/test__delete_duplicates.py` checks default preview
+preservation and explicit apply. See [15_maintenance.md](15_maintenance.md)
+for capped counts, BLOB samples, apply side effects and failure handling.
 
-See [13_mixins.md](13_mixins.md) for the full per-mixin breakdown.
+`check_health` and `batch_health_check` are exported, but existing-file scans
+currently depend on umbrella `scitex` imports in loadability helpers. Core-only
+installation does not establish completed health or repair support. Missing-file
+reports can return early without a status or score; the maintenance guide
+describes that separate verified scope.
 
-## Maintenance helpers
+## Observer registration
 
-```python
-from scitex_db import delete_duplicates, delete_sqlite3_duplicates, inspect
-
-inspect("experiment.db")                                # print schema
-delete_sqlite3_duplicates("experiment.db", "trials")    # in-place
-```
-
-## See also
-
-- [13_mixins.md](13_mixins.md) — capability groups
-- [14_numpy-blob.md](14_numpy-blob.md) — ndarray storage format
-- [15_maintenance.md](15_maintenance.md) — health/dedupe/inspect deep-dive
+`register_post_save_hook(callback)` and `register_post_load_hook(callback)`
+register callbacks with `(db_path, query, parameters)` and
+`(db_path, query, result)` respectively. Read results are live cursors; callbacks
+must not consume them. The registry is owned by `_observers/__init__.py`, with
+controls in `tests/scitex_db/_observers/test___init__.py`.

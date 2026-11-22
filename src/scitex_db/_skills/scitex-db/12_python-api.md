@@ -1,40 +1,18 @@
 ---
 description: |
-  [TOPIC] Python Api
-  [DETAILS] See file body for details.
+  [TOPIC] Python API (historical entry)
+  [DETAILS] Redirect to the current public exports and backend-specific API guide.
 tags: [scitex-db-python-api, scitex-db]
 ---
 
+# Python API (historical entry)
 
-# Python API
+Use [03_python-api.md](03_python-api.md) for the current public exports,
+backend differences and checked SQLite maintenance example. This historical
+entry remains available for existing skill links.
 
-Everything re-exported from top-level `scitex_db`.
-
-## Classes
-
-| Name        | Purpose                                                    |
-|-------------|------------------------------------------------------------|
-| `SQLite3`   | SQLite3 wrapper with numpy BLOB + compression + mixins     |
-| `PostgreSQL`| PostgreSQL wrapper with the same mixin-derived API surface |
-
-Both implement context-manager (`__enter__`/`__exit__`) and share the
-method set documented in [03_mixins.md](03_mixins.md).
-
-## Functions
-
-| Name                        | Purpose                                            |
-|-----------------------------|----------------------------------------------------|
-| `check_health(path_or_url)` | Validate one database (integrity + schema smoke)   |
-| `batch_health_check(paths)` | Validate many databases in one call                |
-| `delete_duplicates(db, …)`  | Backend-agnostic duplicate removal                 |
-| `delete_sqlite3_duplicates` | SQLite3-specific, uses ROWID tricks                |
-| `inspect(path_or_conn)`     | Return schema as a structured dict                 |
-
-Both `check_health` and `batch_health_check` appear in `__all__`.
-
-## Sub-packages (advanced)
-
-* `scitex_db._BaseMixins` — abstract mixin protocols
-* `scitex_db._sqlite3._SQLite3Mixins`, `scitex_db._postgresql._PostgreSQLMixins` — concrete implementations
-
-Prefer the public classes; mixin modules are private.
+SQLite and PostgreSQL do not expose interchangeable method sets. Maintenance
+helpers accept SQLite file paths: inspection returns a list of table records,
+and deduplication previews by default. See
+[15_maintenance.md](15_maintenance.md) for explicit apply behavior and the
+current health-provider limitation.
