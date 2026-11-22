@@ -64,6 +64,24 @@ storage behavior rather than replacing only the class name. PostgreSQL
 support also requires its optional driver; the lazy public export can be
 `None` when an `ImportError` prevents loading it (`scitex_db.__getattr__`).
 
+## SQLite query classification limits
+
+`_SQLite3Mixins/_QueryMixin.py::_is_write_query` routes the wrapper's
+writable check and observer dispatch using keywords. It is not a complete
+SQLite parser or a guarantee that a read-classified query has no side effects.
+In particular, all `PRAGMA` queries are read-classified: a writable connection
+can execute `PRAGMA user_version = 7`, change that value and emit a post-load
+notification. Native read-only connections and `query_only` remain separate
+SQLite controls; the classifier alone is not an authorization boundary.
+
+`_split_statements` ignores semicolons inside recognized quotes/comments and
+parentheses, but does not track trigger `BEGIN ... END` blocks. It can return
+trigger fragments. The existing
+`test_a_semicolon_inside_a_trigger_body_does_not_split_the_statement` checks
+only that `_script_is_write` returns `True`, not that splitting is absent.
+The complete script is still passed to SQLite for execution. Comprehensive
+SQL classification and trigger-aware parsing remain unresolved gaps.
+
 ## Evidence and coverage limits
 
 The SQLite tests in `tests/scitex_db/_sqlite3/test__SQLite3.py` exercise
