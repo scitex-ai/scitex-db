@@ -1,4 +1,4 @@
-"""Measure current whole-array BLOB reads against resident NumPy windows.
+"""Benchmark current whole-array BLOB reads against resident NumPy windows.
 
 Creates synthetic fixtures only. See docs/array-read-benchmark.md for scope,
 metric definitions and the distinction from chunked/out-of-core storage.
@@ -45,11 +45,24 @@ def _window_digest(reader, starts, width):
     return digest.hexdigest()
 
 
-def _peak_rss_bytes():
-    if resource is None or sys.platform not in ("linux", "darwin"):
-        return None
-    scale = 1 if sys.platform == "darwin" else 1024
-    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * scale
+def _rss_metrics():
+    raw = None
+    if resource is not None and sys.platform in ("linux", "darwin"):
+        scale = 1 if sys.platform == "darwin" else 1024
+        raw = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * scale
+    peak, metric = None, "unavailable"
+    if sys.platform == "linux":
+        try:
+            lines = Path("/proc/self/status").read_text().splitlines()
+        except OSError:
+            lines = []
+        for line in lines:
+            fields = line.split()
+            if len(fields) == 3 and fields[0] == "VmHWM:" and fields[2] == "kB":
+                peak, metric = int(fields[1]) * 1024, "linux_proc_status_VmHWM"
+    elif sys.platform == "darwin" and raw is not None:
+        peak, metric = raw, "darwin_ru_maxrss"
+    return {"peak_rss_bytes": peak, "peak_rss_metric": metric, "ru_maxrss_bytes": raw}
 
 
 def _prepare(output, config):
@@ -63,6 +76,7 @@ def _prepare(output, config):
         window_starts=starts,
         dtype=str(data.dtype),
         compression_level=6,
+        worker_math_threads=1,
         data_sha256=hashlib.sha256(data.tobytes(order="C")).hexdigest(),
         expected_digest=_window_digest(lambda: data, starts, config["window_samples"]),
     )
@@ -113,11 +127,11 @@ def _worker(output, mode):
     result.update(
         mode=mode,
         pid=os.getpid(),
-        peak_rss_bytes=_peak_rss_bytes(),
         access_pattern=(
             "resident_slice" if mode == "memory" else "whole_blob_then_slice"
         ),
     )
+    result.update(_rss_metrics())
     _write_json(output / (mode + ".json"), result)
 
 
@@ -135,7 +149,17 @@ def _run(output, config):
             "--worker",
             mode,
         ]
-        result = subprocess.run(command, capture_output=True, timeout=120)
+        environment = dict(os.environ)
+        for name in (
+            "OPENBLAS_NUM_THREADS",
+            "OMP_NUM_THREADS",
+            "MKL_NUM_THREADS",
+            "NUMEXPR_NUM_THREADS",
+        ):
+            environment[name] = str(config["worker_math_threads"])
+        result = subprocess.run(
+            command, capture_output=True, timeout=120, env=environment
+        )
         (output / (mode + ".stdout.log")).write_bytes(result.stdout)
         (output / (mode + ".stderr.log")).write_bytes(result.stderr)
         result.check_returncode()
@@ -162,7 +186,7 @@ def _run(output, config):
         "scope": {
             "data": "Synthetic independent normal float32 samples; not physiological recordings.",
             "timing": "Window access plus checksum; excludes fixture creation, connection open and initial NumPy load.",
-            "rss": "Whole fresh worker lifetime including imports and initial load; not an allocation delta. Null when unavailable.",
+            "rss": "OS-reported worker high-water including imports and initial load; not an allocation delta. Linux uses approximate proc VmHWM; raw ru_maxrss retained across exec as diagnostic. Null when unavailable.",
             "cache": "No cache eviction; fixture creation may populate the OS cache. Fixed memory/plain/compressed order.",
             "throughput": "Processed window duration; overlapping/repeated samples count repeatedly, not unique recording duration.",
             "limitations": "Current whole-BLOB baseline only; no chunked storage, out-of-RAM proof, DataLoader, or cross-host generalization.",

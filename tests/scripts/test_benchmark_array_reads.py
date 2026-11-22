@@ -3,6 +3,7 @@
 from contextlib import closing
 import hashlib
 import json
+import os
 from pathlib import Path
 import sqlite3
 import subprocess
@@ -11,7 +12,19 @@ import sys
 import numpy as np
 import pytest
 
-SCRIPT = Path(__file__).resolve().parents[2] / "examples/02_array_read_benchmark.py"
+SCRIPT = Path(__file__).resolve().parents[2] / "scripts/benchmark_array_reads.py"
+THREAD_ENV = {
+    **os.environ,
+    **{
+        name: "1"
+        for name in (
+            "OPENBLAS_NUM_THREADS",
+            "OMP_NUM_THREADS",
+            "MKL_NUM_THREADS",
+            "NUMEXPR_NUM_THREADS",
+        )
+    },
+}
 SMALL = [
     "--samples",
     "512",
@@ -28,7 +41,7 @@ SMALL = [
 ]
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def measured_run(tmp_path_factory):
     root = tmp_path_factory.mktemp("array-read-benchmark")
     output = root / "result"
@@ -37,6 +50,7 @@ def measured_run(tmp_path_factory):
         cwd=root,
         capture_output=True,
         timeout=30,
+        env=THREAD_ENV,
     )
     (root / "stdout.log").write_bytes(process.stdout)
     (root / "stderr.log").write_bytes(process.stderr)
@@ -144,6 +158,7 @@ def test_invalid_dimensions_refuse_before_creating_output(tmp_path, invalid):
         [sys.executable, "-I", str(SCRIPT), "--output", str(output), *SMALL, *invalid],
         capture_output=True,
         timeout=30,
+        env=THREAD_ENV,
     )
     # Assert
     assert (process.returncode, output.exists()) == (2, False)
@@ -160,6 +175,7 @@ def test_existing_output_refusal_preserves_owned_sentinel(tmp_path):
         [sys.executable, "-I", str(SCRIPT), "--output", str(output), *SMALL],
         capture_output=True,
         timeout=30,
+        env=THREAD_ENV,
     )
     # Assert
     assert (
@@ -167,3 +183,18 @@ def test_existing_output_refusal_preserves_owned_sentinel(tmp_path):
         sentinel.read_bytes(),
         sorted(p.name for p in output.iterdir()),
     ) == (2, b"keep", ["sentinel"])
+
+
+def test_worker_memory_metrics_explicitly_identify_the_source(measured_run):
+    # Arrange
+    report, _ = measured_run
+    # Act
+    metrics = [
+        (row["peak_rss_metric"], row["peak_rss_bytes"]) for row in report["results"]
+    ]
+    # Assert
+    assert all(
+        name in ("linux_proc_status_VmHWM", "darwin_ru_maxrss", "unavailable")
+        and (value is None or value > 0)
+        for name, value in metrics
+    )

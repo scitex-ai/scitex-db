@@ -170,7 +170,7 @@ Every subcommand supports `-h/--help`, `--json`, and the safety pair
 
 </details>
 
-## Array-read measurements
+## Array read measurements
 
 For a reproducible resident NumPy / plain SQLite / compressed SQLite baseline,
 see the [array-read benchmark](docs/array-read-benchmark.md). It measures the
