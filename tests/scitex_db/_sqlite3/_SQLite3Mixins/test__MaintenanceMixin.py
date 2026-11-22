@@ -12,7 +12,8 @@ from scitex_db import SQLite3
     "filename",
     ["copy.db", "two words.db", "O'Brien.db", "copy 'quote'.db", "semi';--.db"],
 )
-def test_vacuum_into_copies_to_the_literal_filename(tmp_path, filename):
+@pytest.mark.parametrize("as_path", [False, True])
+def test_vacuum_into_copies_to_the_literal_filename(tmp_path, filename, as_path):
     # Arrange
     source = tmp_path / "source.db"
     destination = tmp_path / filename
@@ -26,7 +27,7 @@ def test_vacuum_into_copies_to_the_literal_filename(tmp_path, filename):
     expected_rows = [(1, "alpha"), (2, "beta")]
     # Act
     with SQLite3(str(source), mode="rw") as db:
-        db.vacuum(into=str(destination))
+        db.vacuum(into=destination if as_path else str(destination))
         source_rows = db.execute("SELECT * FROM readings ORDER BY id").fetchall()
     with closing(sqlite3.connect(destination.as_uri() + "?mode=ro", uri=True)) as conn:
         observed = {

@@ -57,7 +57,7 @@ class _MaintenanceMixin:
         if self.conn is not None and self.conn.in_transaction:
             self.conn.commit()
         if into:
-            self.cursor.execute("VACUUM INTO ?", (into,))
+            self.cursor.execute("VACUUM INTO ?", (str(into),))
         else:
             self.cursor.execute("VACUUM")
 

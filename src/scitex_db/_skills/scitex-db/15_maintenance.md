@@ -44,7 +44,8 @@ concurrent/WAL behavior and large-database performance remain unqualified.
 ## Copy with VACUUM INTO
 
 On an open SQLite3 instance, `vacuum(into=destination)` copies the database to
-that destination. The filename is bound as a SQL value, including apostrophes;
+that destination. The filename is converted to text and bound as a SQL value, including
+apostrophes;
 do not add SQL quotes yourself. This is a separate instance method from the
 standalone path helpers above. Like ordinary `vacuum()`, it commits any pending
 transaction before running, so use it at an intentional transaction boundary.
