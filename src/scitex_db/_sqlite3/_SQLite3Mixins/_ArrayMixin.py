@@ -473,7 +473,8 @@ class _ArrayMixin:
         Returns
         -------
         dict
-            Dictionary mapping column names to stacked arrays
+            Dictionary mapping column names to stacked arrays. Columns with
+            no rows map to None, matching load_arrays.
         """
 
         result = {}
@@ -507,7 +508,7 @@ class _ArrayMixin:
                     self.binary_to_array(x, dtype=dtype, shape=shape)
                     for x in df[col]
                 ]
-            result[col] = np.stack(arrays)
+            result[col] = np.stack(arrays) if arrays else None
 
         return result
 
@@ -575,6 +576,8 @@ class _ArrayMixin:
 
         for col in columns:
             if f"{col}_dtype" in df.columns and f"{col}_shape" in df.columns:
+                if len(df.index) == 0:
+                    continue
                 df[col] = df.apply(
                     lambda row: self.binary_to_array(
                         row[col],

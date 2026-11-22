@@ -409,3 +409,105 @@ def test_default_discovery_retains_dtype_shape_hint_path(tmp_path, reader, table
     result = _invoke_default(path, raw_frame, reader, dtype=np.dtype("float32"), shape=shape)
     # Assert
     assert np.array_equal(_default_value(result, reader, "signal"), expected)
+
+
+def _empty_array_frame(path, table_kind, names):
+    _discovery_frame(path, table_kind, names, compress=True)
+    with SQLite3(str(path)) as db:
+        db.execute("DELETE FROM arrays")
+    with SQLite3(str(path), mode="ro") as db:
+        return db.get_rows("arrays", order_by="id", return_as="dataframe")
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("names", [("signal", "other"), ("signal_dtype", "other_is_compressed")])
+@pytest.mark.parametrize("selection", ["default", "explicit"])
+def test_empty_array_dict_matches_main_reader_absence(tmp_path, table_kind, names, selection):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame = _empty_array_frame(path, table_kind, names)
+    options = {} if selection == "default" else {"columns": list(names)}
+    # Act
+    actual = _invoke_default(path, frame, "get_array_dict", **options)
+    # Assert
+    assert actual == {name: None for name in names}
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("names", [("signal", "other"), ("signal_dtype", "other_is_compressed")])
+@pytest.mark.parametrize("selection", ["default", "explicit"])
+def test_empty_array_decoder_preserves_schema_and_dtypes(tmp_path, table_kind, names, selection):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame = _empty_array_frame(path, table_kind, names)
+    before = frame.copy(deep=True)
+    options = {} if selection == "default" else {"columns": list(names)}
+    # Act
+    actual = _invoke_default(path, frame, "decode_array_columns", **options)
+    # Assert
+    assert actual.equals(before)
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("names", [("signal", "other"), ("signal_dtype", "other_is_compressed")])
+@pytest.mark.parametrize("selection", ["default", "explicit"])
+def test_empty_array_decoder_retains_input_identity(tmp_path, table_kind, names, selection):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame = _empty_array_frame(path, table_kind, names)
+    options = {} if selection == "default" else {"columns": list(names)}
+    # Act
+    actual = _invoke_default(path, frame, "decode_array_columns", **options)
+    # Assert
+    assert actual is frame
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("names", [("signal", "other"), ("signal_dtype", "other_is_compressed")])
+def test_main_reader_empty_array_policy_is_none(tmp_path, table_kind, names):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    _empty_array_frame(path, table_kind, names)
+    # Act
+    with SQLite3(str(path), mode="ro") as db:
+        actual = db.load_arrays("arrays", columns=list(names), verbose=False)
+    # Assert
+    assert actual == {name: None for name in names}
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("shape", [(2048,), (1024, 2)])
+def test_empty_hint_array_dict_has_no_fabricated_array(tmp_path, table_kind, shape):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame = _empty_array_frame(path, table_kind, ("signal", "other"))[["signal"]].copy()
+    # Act
+    actual = _invoke_default(path, frame, "get_array_dict", dtype=np.dtype("float32"), shape=shape)
+    # Assert
+    assert actual == {"signal": None}
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("shape", [(2048,), (1024, 2)])
+def test_empty_hint_decoder_preserves_frame(tmp_path, table_kind, shape):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame = _empty_array_frame(path, table_kind, ("signal", "other"))[["signal"]].copy()
+    before = frame.copy(deep=True)
+    # Act
+    actual = _invoke_default(path, frame, "decode_array_columns", dtype=np.dtype("float32"), shape=shape)
+    # Assert
+    assert actual.equals(before)
+
+
+@pytest.mark.parametrize("reader", ["get_array_dict", "decode_array_columns"])
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+def test_present_zero_length_array_is_not_absence(tmp_path, reader, table_kind):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    expected = np.empty((0, 3), dtype=np.float32)
+    frame = _stored_frame(path, expected, False, table_kind)
+    # Act
+    actual = _read_helper(path, frame, reader)
+    # Assert
+    assert (actual.shape, actual.dtype) == (expected.shape, expected.dtype)

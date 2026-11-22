@@ -40,6 +40,11 @@ with SQLite3("arrays.db", compress_by_default=True) as db:
     np.testing.assert_array_equal(stacked[1], arr + 1)
     np.testing.assert_array_equal(decoded["data"].iloc[0], arr)
     np.testing.assert_array_equal(decoded["data"].iloc[1], arr + 1)
+
+    empty_frame = frame.iloc[:0].copy()
+    original_empty = empty_frame.copy(deep=True)
+    assert db.get_array_dict(empty_frame) == {"data": None}
+    assert db.decode_array_columns(empty_frame).equals(original_empty)
 ```
 
 Run the example in a new directory: it creates synthetic `arrays.db`.
@@ -73,6 +78,12 @@ names ending in metadata suffixes still qualify when they have companions.
 Explicit-column and nondefault dtype/shape-hint calls retain their existing
 selection paths. `get_array_dict` returns stacked arrays; `decode_array_columns`
 replaces cells in the supplied DataFrame, so the example passes a copy.
+For zero-row DataFrames, `get_array_dict` maps selected array columns to
+`None`, matching the main reader's absence result instead of inventing an
+array dtype or shape. `decode_array_columns` returns the same empty frame
+without changing its schema or dtypes. A stored row containing a zero-length
+NumPy array remains a present array with its original shape and dtype.
+
 Both honor each row's compression flag: integer `1`, text `"1"` and `True`
 mean compressed, matching the main reader. A missing flag means raw bytes.
 

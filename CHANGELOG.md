@@ -9,6 +9,10 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Handle zero-row DataFrames in array helpers: the dictionary maps recognized
+  columns to `None`, matching `load_arrays`, and the in-place decoder preserves
+  the empty frame without a Pandas assignment error. Present zero-length
+  NumPy arrays retain their shape and dtype.
 - Infer default DataFrame array columns from dtype/shape companions rather
   than suffix filtering. Scalar/hash fields are excluded and actual payloads
   with metadata-like names remain discoverable; explicit columns and hint-based
