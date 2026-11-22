@@ -11,6 +11,7 @@ __DIR__ = os.path.dirname(__FILE__)
 
 import sqlite3
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import scitex_logging as slogging
@@ -30,9 +31,11 @@ class OptimizedInspector:
 
     @contextmanager
     def connection(self):
-        """Context manager for database connection reuse."""
+        """Reuse a read-only connection to an existing SQLite file."""
         if self._conn is None:
-            self._conn = sqlite3.connect(self.db_path)
+            self._conn = sqlite3.connect(
+                Path(self.db_path).absolute().as_uri() + "?mode=ro", uri=True
+            )
             self._conn.row_factory = (
                 sqlite3.Row
             )  # Enable column access by name
