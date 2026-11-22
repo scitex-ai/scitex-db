@@ -133,7 +133,12 @@ def execute_ddl(
 
     Blank and whitespace-only entries are not submitted and are not
     counted; a splitter that produced them was not describing work.
+
+    ``run`` must be bool. Refuse other types before collecting statements
+    or opening a cursor; a string such as ``"False"`` must not run DDL.
     """
+    if not isinstance(run, bool):
+        raise TypeError(f"run must be a bool, got {run!r}")
     usable = _usable(statements)
     submitted = len(usable)
 
