@@ -41,6 +41,15 @@ Failures log and return `(None, None)`. It performs no automatic `VACUUM` or
 table rebuild. Ordinary ROWID tables are the verified scope; virtual tables,
 concurrent/WAL behavior and large-database performance remain unqualified.
 
+## Backup destination lifetime
+
+`SQLite3.backup(path, pages=-1, progress=None)` closes its destination connection
+on success and on callback failure. Errors are wrapped as `ValueError`; a failed
+backup may leave a destination file and is not a completed copy. Native controls
+in `_sqlite3/_SQLite3Mixins/test__MaintenanceMixin.py` cover success and two
+callback exception types, plus continued source readability. This does not
+qualify concurrent backups, network storage or recovery from corruption.
+
 ## Copy with VACUUM INTO
 
 On an open SQLite3 instance, `vacuum(into=destination)` copies the database to

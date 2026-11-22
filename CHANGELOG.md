@@ -9,6 +9,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Close SQLite backup destination connections even when a progress callback
+  raises, preserving the existing callback and wrapped-error behavior.
+
 - Bind SQLite `vacuum(into=...)` destinations as SQL values so filenames with
   apostrophes copy successfully while retaining the existing transaction boundary.
 
