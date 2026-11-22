@@ -95,15 +95,20 @@ def should_run_ddl(observed: int | None, required: int) -> bool:
     already at or ahead of the client needs nothing; re-running DDL
     there cannot add anything and only serialises every connection
     behind a catalogue lock.
+
+    ``required`` must be an integer (not bool), including when the
+    observed version is unknown. Invalid input must not authorize DDL.
     """
-    if observed is None:
-        return True
-    if not isinstance(observed, int) or isinstance(observed, bool):
+    if observed is not None and (
+        not isinstance(observed, int) or isinstance(observed, bool)
+    ):
         raise TypeError(
             f"observed must be an int or None, got {observed!r}"
         )
     if not isinstance(required, int) or isinstance(required, bool):
         raise TypeError(f"required must be an int, got {required!r}")
+    if observed is None:
+        return True
     return observed < required
 
 
