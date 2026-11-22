@@ -9,6 +9,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Align SQLite backup progress annotations with the existing two-integer public
+  callback and three-integer native adapter, without changing invocation behavior.
+
 - Close SQLite backup destination connections even when a progress callback
   raises, preserving the existing callback and wrapped-error behavior.
 
