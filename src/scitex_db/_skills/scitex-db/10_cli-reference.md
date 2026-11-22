@@ -70,6 +70,26 @@ scitex-db check-health <db_path> [<db_path> ...] [--fix] [--quiet] [--dry-run] [
 * `--json` — accepted by the current callback, but health-result JSON
   serialization remains unimplemented; this is not the inspection JSON path
 
+When the `scitex` loadability provider cannot be found, the CLI exits with
+code 1, empty stdout and a named missing-provider error on stderr before any
+SQLite scan or repair. Core installs do not supply this provider. The presence
+check does not import or validate its implementation. `--fix` without `--yes`
+still refuses with code 2 before this preflight; `--fix --dry-run` never
+repairs. Neither health JSON nor provider functionality is implemented by
+this guard.
+
+Owning source: `scitex_db.__main__.check_health`. Actual controls in
+`tests/scitex_db/test___main__.py` cover ordinary/quiet/JSON/global-JSON,
+confirmed-fix/dry-run, multiple paths, consent priority and a real exclusive
+SQLite lock. A competing native reader must first confirm `database is locked`.
+Byte snapshots are taken outside the owning transaction: opening and closing
+another file handle inside it can release process-scoped SQLite locks. The
+CLI child remains bounded to five seconds, shorter than the unchanged native
+scan's ten-second connection timeout. This does not claim every legacy lock
+error waits for that timeout. Database bytes and seeded rows remain unchanged. These controls qualify the
+missing-provider path only; provider-present health/loadability/repair
+behavior remains unverified.
+
 ### scitex-db list-python-apis
 
 ```
