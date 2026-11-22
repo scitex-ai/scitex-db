@@ -466,7 +466,8 @@ class _ArrayMixin:
         columns : list of str, optional
             Columns to decode. If None, decodes all array columns
         dtype : np.dtype, optional
-            Fallback dtype if metadata missing
+            Fallback dtype if metadata missing. A supplied column compression
+            flag is honored with fallback dtype/shape hints.
         shape : tuple, optional
             Fallback shape if metadata missing. Use () for a scalar payload;
             None means no shape hint.
@@ -513,10 +514,19 @@ class _ArrayMixin:
                     for _, row in df.iterrows()
                 ]
             elif dtype is not None and shape is not None:
-                arrays = [
-                    self.binary_to_array(x, dtype=dtype, shape=shape)
-                    for x in df[col]
-                ]
+                if f"{col}_is_compressed" in df.columns:
+                    arrays = [
+                        self.binary_to_array(
+                            value, dtype=dtype, shape=shape,
+                            compressed=flag in [1, "1", True],
+                        )
+                        for value, flag in zip(df[col], df[f"{col}_is_compressed"])
+                    ]
+                else:
+                    arrays = [
+                        self.binary_to_array(x, dtype=dtype, shape=shape)
+                        for x in df[col]
+                    ]
             else:
                 raise ValueError(
                     f"Array column {col!r} requires dtype/shape metadata "
@@ -615,7 +625,15 @@ class _ArrayMixin:
                     axis=1,
                 )
             elif dtype is not None and shape is not None:
-                if isinstance(shape, tuple) and not shape and len(df.index) > 0:
+                if f"{col}_is_compressed" in df.columns and len(df.index) > 0:
+                    df[col] = df.apply(
+                        lambda row: self.binary_to_array(
+                            row[col], dtype=dtype, shape=shape,
+                            compressed=row.get(f"{col}_is_compressed") in [1, "1", True],
+                        ),
+                        axis=1,
+                    )
+                elif isinstance(shape, tuple) and not shape and len(df.index) > 0:
                     # Row-wise apply keeps scalar ndarray cells and their dtype.
                     df[col] = df.apply(
                         lambda row: self.binary_to_array(
