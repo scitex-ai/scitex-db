@@ -26,10 +26,20 @@ Failures are logged and return `(None, None)`; a missing file is not created
 by preview. The legacy `delete_duplicates` alias emits `DeprecationWarning`
 and forwards the same path arguments. Use `table_name=`, not `table=`.
 
-Apply mode (`dry_run=False`) still rebuilds the table and can discard its
-constraints, indexes and triggers, and replace an existing `<table>_temp`.
-Schema-preserving application remains unresolved and is not demonstrated here.
-Read-only preview does not qualify apply mode or concurrent/WAL behavior.
+Apply mode (`dry_run=False`) opens an existing file for writing and deletes
+rows in a single `BEGIN IMMEDIATE` transaction, retaining the smallest native
+ROWID in each selected group. It preserves the table definition, constraints,
+indexes, triggers, AUTOINCREMENT sequence and unrelated `<table>_temp` data.
+Foreign-key enforcement is enabled: normal DELETE triggers and foreign-key
+actions (including cascading child deletes) run. SQL failures roll back the
+transaction. Counts describe direct target-table deletes, excluding additional
+trigger/cascade effects. Preview counts do not guarantee apply will succeed.
+
+Apply refuses missing files, invalid/empty column-name selections, targets
+without a native ROWID and tables shadowing all three native ROWID aliases.
+Failures log and return `(None, None)`. It performs no automatic `VACUUM` or
+table rebuild. Ordinary ROWID tables are the verified scope; virtual tables,
+concurrent/WAL behavior and large-database performance remain unqualified.
 
 ## Inspect and health reports
 
@@ -63,11 +73,11 @@ input returns an empty dictionary, and repeated paths retain one mapping entry.
 This does not complete existing-file scans: the provider, completed health
 checks and repair behavior remain unqualified.
 
-## Disposable preview example
+## Disposable preview and apply example
 
 This example creates and removes only its own temporary fixture. It verifies
 the default preview, inspection shape and missing-file health early return;
-it does not run repairs or apply deduplication.
+then applies deduplication only to that owned fixture. It does not run repairs.
 
 ```python
 import json
@@ -99,13 +109,21 @@ with TemporaryDirectory() as directory:
     assert len(tables) == 1 and tables[0]["table_name"] == "measurements"
     assert tables[0]["row_count"] == 3 and len(tables[0]["sample_data"]) == 1
     assert path.read_bytes() == original
+    applied = delete_sqlite3_duplicates(
+        str(path), table_name="measurements", columns=["name", "value"], dry_run=False
+    )
+    assert applied == (3, 1)
+    with closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)) as connection:
+        assert connection.execute("SELECT id FROM measurements ORDER BY id").fetchall() == [(1,), (3,)]
+        assert connection.execute("PRAGMA table_info(measurements)").fetchone()[5] == 1
+        assert connection.execute("SELECT marker FROM measurements_temp").fetchall() == [("preserve me",)]
     missing = Path(directory) / "missing.db"
     report = check_health(str(missing), verbose=False, fix_issues=False)
     assert report["exists"] is False and report["issues"] and not missing.exists()
     assert not {"status", "health_score", "ok", "fixed"}.intersection(report)
     batch = batch_health_check([str(missing)], verbose=False, fix_issues=False)
     assert batch == {str(missing): report} and not missing.exists()
-    print(json.dumps({"preview": preview, "tables": len(tables), "missing": report["exists"]}))
+    print(json.dumps({"preview": preview, "applied": applied, "tables": len(tables), "missing": report["exists"]}))
 ```
 
 Source: `_sqlite3/_delete_duplicates.py`, `_delete_duplicates.py`, `_inspect.py`
@@ -113,5 +131,6 @@ and `_check_health.py`. Behavioral controls:
 `tests/scitex_db/_sqlite3/test__delete_duplicates_preview.py` and the existing
 `tests/scitex_db/test__inspect.py` and
 `tests/scitex_db/test__check_health_batch.py` and
-`tests/scitex_db/test__inspect_readonly.py`. The example's installed execution is a
+`tests/scitex_db/test__inspect_readonly.py` and
+`tests/scitex_db/_sqlite3/test__delete_duplicates_apply.py`. The example's installed execution is a
 separate content check; static validation alone does not accept these claims.
