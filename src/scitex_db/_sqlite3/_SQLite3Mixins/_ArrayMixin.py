@@ -477,7 +477,12 @@ class _ArrayMixin:
         """
 
         result = {}
-        if columns is None:
+        if columns is None and dtype is None and shape is None:
+            columns = [
+                col for col in df.columns
+                if f"{col}_dtype" in df.columns and f"{col}_shape" in df.columns
+            ]
+        elif columns is None:
             columns = [
                 col
                 for col in df.columns
@@ -552,7 +557,12 @@ class _ArrayMixin:
     #     return df
 
     def decode_array_columns(self, df, columns=None, dtype=None, shape=None):
-        if columns is None:
+        if columns is None and dtype is None and shape is None:
+            columns = [
+                col for col in df.columns
+                if f"{col}_dtype" in df.columns and f"{col}_shape" in df.columns
+            ]
+        elif columns is None:
             columns = [
                 col
                 for col in df.columns

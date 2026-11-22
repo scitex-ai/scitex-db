@@ -9,6 +9,10 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Infer default DataFrame array columns from dtype/shape companions rather
+  than suffix filtering. Scalar/hash fields are excluded and actual payloads
+  with metadata-like names remain discoverable; explicit columns and hint-based
+  decoding retain their existing paths.
 - Forward each row's compression flag in `get_array_dict` and normalize
   integer/text flags in `decode_array_columns`, matching the main array reader.
   Numeric DataFrames from `get_rows` can decode raw and compressed payloads
