@@ -35,6 +35,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Validate the required DDL version even when the observed store version is
+  unknown, preventing invalid inputs from authorizing schema changes.
+
 - Add the leaf-owned STX-DB002 warning for direct store-related environment
   lookups passed to Path, with explicit syntax and false-positive limits.
 

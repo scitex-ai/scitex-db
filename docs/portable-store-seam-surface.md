@@ -67,8 +67,9 @@ a SQL script nor supplies automatic transaction atomicity.
 
 `should_run_ddl(observed, required)` returns true for an unknown (`None`)
 observed version; otherwise it checks `observed < required`, not inequality.
-At/ahead-of-required versions do not need DDL. The unknown branch returns before
-validating `required`; callers must still supply the intended integer contract.
+At/ahead-of-required versions do not need DDL. `required` must be an integer,
+excluding booleans, even when `observed` is unknown; invalid required versions
+raise before a DDL decision. Non-null observed versions are also validated.
 A counter or version decision does not prove that a consuming application uses
 this precondition on every connection path.
 
