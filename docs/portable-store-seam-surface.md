@@ -1,254 +1,198 @@
-# The portable-store seam: receiving surface
+# Portable-store seam: current surface and open requirements
 
-Status: proposed by scitex-db, 2026-08-02. Open for scitex-cards to
-implement against.
+The five modules in `scitex_db.store` exist. This document began as a receiving
+proposal on 2026-08-02; it now distinguishes current implementations from
+remaining proposal requirements. Do not reimplement the five modules on the
+assumption that they are missing.
 
-## Why this document exists before the code
+This seam provides guards, not connections, a query wrapper or interchangeable
+`SQLite3`/`PostgreSQL` classes. Connections and transaction completion belong to
+the caller. Adoption by the canonical scitex-cards store remains an operator
+decision; this document does not authorize a migration or claim adoption.
+Historical Cards incident counts, fleet versions and lock measurements from the
+proposal have not been revalidated by the current source/SQLite checks.
 
-scitex-cards has offered working implementations of five guards learned
-during its 2026-08-01 SQLite → PostgreSQL migration. Accepting code
-before agreeing where it lands is how a donated module ends up
-refactored into something its author no longer recognises. This file
-fixes the boundary first; the implementations then drop into named
-slots.
+## Dependency and import boundary
 
-## Non-goals, stated first
+The five store modules import standard-library modules and each other. They do
+not import a PostgreSQL driver: callers supply DB-API connections. PostgreSQL
+class extras elsewhere in the distribution are a separate concern.
+`scitex_db.__init__` uses lazy exports, so importing `scitex_db.store` need not
+load the existing scientific/CLI surface. This describes import behavior, not a
+promise that normal installation omits the distribution's declared NumPy,
+Pandas or logging dependencies. It does not establish a cold-import time budget.
 
-**This is not a query wrapper.** It does not wrap `connect`, `execute`,
-`cursor`, or rows. Every package that would use it already has working
-data access; a wrapper would add a dependency and remove nothing.
+Owners: `src/scitex_db/store/{__init__,_url,_ddl,_tx,_backend,_portable_sql}.py`
+and `src/scitex_db/__init__.py`.
 
-**It does not replace `SQLite3` / `PostgreSQL`.** Those two classes are
-not interchangeable (see `13_mixins.md`) and this seam does not try to
-make them so. It sits below them, and neither imports the other.
+## Location selection: `_url.py`
 
-**It is not for the canonical store's connection path.** scitex-cards
-keeps its own dependency-light adapter, for a documented reason and a
-measured incident. Nothing here asks it to change that.
+`parse_store_url(value: str) -> StoreLocation` accepts nonempty bare paths,
+`sqlite://`/`sqlite3://`, and `postgresql://`/`postgres://`. Unknown multi-letter
+URL schemes raise `UnknownStoreScheme`; empty and non-string values raise.
+A one-letter scheme is treated as a drive/path spelling. SQLite URLs remove
+the scheme and coerce the remainder to a path; this is not a general SQLite
+URI/query-option parser. PostgreSQL DSNs remain verbatim strings: parsing does
+not connect, authenticate, validate a server or establish database existence.
 
-## The dependency boundary — the load-bearing constraint
+`StoreLocation` is a frozen dataclass with `dialect`, `path=None`, `dsn=None`.
+Its constructor validates the dialect and the presence/mutual exclusion of the
+selected field. PostgreSQL carries `path=None`; SQLite carries `dsn=None`.
+These checks do not establish full runtime field typing or DSN validity.
 
-```
-scitex_db.store   →  stdlib only
-                     (sqlite3, urllib.parse, dataclasses, pathlib, re)
-scitex_db.store   →  psycopg / psycopg2 ONLY behind an extra, imported
-                     lazily inside the function that needs it
-```
+`resolve_store(*, env, default=None)` reads the caller-named environment
+variable. Unset/blank values use an explicit default or raise; the selected
+value goes through `parse_store_url`. It does not load YAML, `.env`, or a
+package-wide configuration precedence chain. A caller that bypasses this
+resolver and passes a raw DSN to `Path` remains outside its protection.
 
-No numpy. No pandas. No scitex-core. No click.
+Controls: `tests/scitex_db/store/test__url.py`, including real SQLite files
+showing the unguarded DSN/path hazard and actual environment selection.
 
-This is the entire reason the seam can be adopted. Measured 2026-08-02:
-every package that considered `scitex_db` and declined recorded weight
-as the reason —
+## DDL accounting: `_ddl.py`
 
-    scitex-clew/_connect.py:6
-      "scitex-db (which pulls numpy + pandas + scitex-core) ...
-       Instead this module MIRRORS scitex-db's proven [tuning]"
+The current frozen `DDLResult` has three nonnegative integer counters:
+`submitted=0`, `executed=0`, `skipped=0`. Booleans are rejected and the
+constructor enforces `executed + skipped == submitted`. The original proposal
+specified a tuple of skipped statements; that is not the implemented field.
+Per-statement skip reasons remain a proposal difference, not an available API.
 
-A guard nobody can afford to import is a guard nobody has. If a change
-to this module would add a dependency, the change is wrong, not the
-constraint.
+`execute_ddl(conn, statements, *, run=True)` filters out non-string and blank
+entries, then executes each remaining string through one cursor. `submitted`
+counts these usable inputs, including deliberate skips. With `run=False`, no
+cursor is opened and every usable input is counted as skipped. With `run=True`,
+SQL errors propagate; no partial-success result is returned. The caller owns
+commit/rollback and recovery from partial effects. This helper neither splits
+a SQL script nor supplies automatic transaction atomicity.
 
-## Module layout
+`should_run_ddl(observed, required)` returns true for an unknown (`None`)
+observed version; otherwise it checks `observed < required`, not inequality.
+At/ahead-of-required versions do not need DDL. The unknown branch returns before
+validating `required`; callers must still supply the intended integer contract.
+A counter or version decision does not prove that a consuming application uses
+this precondition on every connection path.
 
-```
-src/scitex_db/store/
-    __init__.py        # the public names, and nothing else
-    _url.py            # 1. read the config value; DSN vs path
-    _ddl.py            # 2. statement-by-statement DDL with a count
-    _tx.py             # 3. per-dialect write-transaction begin
-    _backend.py        # 4. which engine is live
-    _portable_sql.py   # 5. spellings that survive both dialects
-```
+Controls: `tests/scitex_db/store/test__ddl.py` checks actual SQLite schema and
+counts, deliberate no-op behavior, errors and version decisions.
 
-`scitex_db.store` must be importable without importing `scitex_db`'s
-existing surface. Package `__init__` stays lazy (PEP 562) as it is
-today.
+## Write-transaction start: `_tx.py`
 
-## Answer shapes
+The actual signature is `begin_write(conn, *, lock_key: int, dialect: str) -> None`.
+It is not a context manager. Both keywords are required; booleans/non-integer
+lock keys and unknown dialects are refused. SQLite executes `BEGIN IMMEDIATE`.
+The PostgreSQL branch issues `SELECT pg_advisory_xact_lock(%s)` with the key on
+a cursor; it does not issue a separate `BEGIN`. Driver transaction/autocommit
+configuration therefore matters. The function does not commit, roll back or
+release a lock on a caller's behalf.
 
-Per the constitution: one dataclass per question, every signal its own
-named field, every signal three-valued, a validator on the dataclass so
-a malformed answer fails where it is built.
+The original proposal required a context manager and an explicit PostgreSQL
+transaction start. Those differences remain open; documenting the current
+function does not qualify it as meeting that proposed lifecycle. An advisory
+lock is cooperative: writers that do not acquire the same key are not excluded
+by this mechanism. Serializable isolation is not a substitute for proving the
+intended blocking contract.
 
-### 1. `resolve_store(...)` / `parse_store_url(value) -> StoreLocation`
+`tests/scitex_db/store/test__tx.py` uses two native SQLite connections to observe
+write refusal while held and success after commit. Its PostgreSQL-shaped fake
+records statements/parameters only. It does not observe a PostgreSQL server
+lock, blocking, release or autocommit lifetime. The proposed native test must
+still observe the chosen lock from another connection while held and after
+transaction completion; a successful function return is insufficient.
 
-```python
-@dataclass(frozen=True)
-class StoreLocation:
-    dialect: str                 # "sqlite" | "postgresql"
-    path: Path | None            # sqlite only; None for postgresql
-    dsn: str | None              # postgresql only; None for sqlite
-```
+## Backend reporting: `_backend.py`
 
-Validator: exactly one of `path` / `dsn` is set, and it matches
-`dialect`. A value carrying a URL scheme must NEVER reach `Path()` —
-`Path("postgresql://host/db")` silently becomes the relative path
-`postgresql:/host/db`, which SQLite will then create, serve empty, and
-report healthy. Raise on an unrecognised scheme; do not fall back to
-"probably a path".
+`describe_backend(source, *, config_source=None) -> BackendReport` accepts a
+location or a connection. A location reports the selected dialect with unknown
+server version. A connection is probed with `SELECT sqlite_version()` and then
+`SHOW server_version`; unidentifiable connections report unknown fields.
+`config_source` is a caller-supplied note, not an inferred configuration tier.
 
-**Where the refusal lives.** Asked by scitex-cards, 2026-08-02, and a
-fair question against the first draft: it said "before any `Path()`
-coercion" without saying whose job that is. It is not the caller's.
+Failed probes attempt rollback and cursors are closed. Rollback may discard
+pending caller work; use a suitable diagnostic connection, not an assumed
+side-effect-free probe in an active transaction. No PostgreSQL server behavior
+is established by the recording fake. The report validator refuses unknown
+dialect strings and a known server version with an unknown dialect.
 
-1. **`parse_store_url` is total.** Every input either becomes a
-   validated `StoreLocation` or raises. It never returns `None`, never
-   "probably a path", never a bare string. There is no branch where the
-   caller is handed something and asked to decide — and that branch is
-   where both silent successes lived.
+Controls: `tests/scitex_db/store/test__backend.py` uses real SQLite plus
+PostgreSQL-shaped/unknown objects; fake rollback coverage is not native server
+qualification.
 
-2. **A postgres location carries `path=None`,** validator-enforced. A
-   caller who ignores `dialect` and reaches for `.path` gets
-   `Path(None)` → `TypeError`: loud, at the call site, on the first run.
-   Not an empty file at a mangled relative path serving zero rows.
+## SQL spellings: `_portable_sql.py`
 
-3. **The seam owns READING the config value, not only parsing it** —
-   `resolve_store(env=..., default=...) -> StoreLocation`. Both
-   incidents happened *before* any parse: the raw string went from the
-   environment straight into `Path()`. A parser that only refuses what
-   is handed to it cannot refuse what was never handed to it. The intent
-   is that no code in a consuming package ever holds the raw value.
+`null_safe_eq(column, *, dialect)` returns a dialect-specific comparison with a
+`?` placeholder. `column` is interpolated as supplied: this is not an identifier
+quoting or untrusted-input API. `to_paramstyle(sql, *, dialect)` keeps SQLite
+text unchanged. Its PostgreSQL branch changes placeholders outside single
+quotes to `%s`, preserves question marks in single-quoted strings, handles
+doubled single quotes and doubles percent signs, including inside literals.
+It is a small scanner, not a complete SQL lexer or query builder; comments,
+double-quoted identifiers and dollar-quoted bodies are not separately parsed.
+Do not infer safe rewriting for every SQL grammar from its selected cases.
 
-**What no type can do** is reach a caller who never calls it.
-`Path(os.environ["SCITEX_CARDS_DB"])`, written by someone who has not
-heard of this module, is invisible to all three points above. That is a
-linter rule, not a library feature: `STX-DB002`, flagging `Path(<env
-lookup>)` for variable names matching `*_DB|*_URL|*_DSN|*_STORE*`, in
-the existing plugin beside `STX-DB001` (entry point
-`scitex_dev.linter.plugins`).
+The module exports its null-safe/version and SQLite-only upsert constants.
+`tests/scitex_db/store/test__portable_sql.py` exercises native SQLite results
+and the running SQLite version, plus generated PostgreSQL strings. A version
+constant or generated SQL string does not certify execution on older SQLite
+or a PostgreSQL server.
 
-State its limits as plainly as DB001 states its own: plain AST, no
-seeing through wrappers, fires on the literal shape. It will miss an
-indirection and will occasionally fire on a genuine path variable. Both
-are acceptable — a false positive costs one line of thought; the false
-negative cost two incidents in a single day.
+## Disposable SQLite example
 
-The type refuses; the rule catches the bypass. Neither alone closes the
-class, and building to the type alone should not feel as though it did.
-
-### 2. `execute_ddl(conn, statements) -> DDLResult`
-
-```python
-@dataclass(frozen=True)
-class DDLResult:
-    executed: int                # statements that actually ran
-    submitted: int               # statements handed in
-    skipped: tuple[str, ...]     # must be empty on success
-```
-
-The count is the product. "The guards are installed" and "the install
-call did not raise" are different claims, and only the count
-distinguishes them. A construct that cannot be ported raises, naming
-it — never silently skipped. Validator: `executed <= submitted`, and
-`skipped` non-empty implies `executed < submitted`.
-
-### 3. `begin_write(conn, *, lock_key) -> contextmanager`
-
-SQLite: `BEGIN IMMEDIATE`. PostgreSQL: `BEGIN` +
-`pg_advisory_xact_lock(lock_key)`.
-
-`lock_key` is keyword-only with no default: PostgreSQL needs one and
-SQLite does not, so a default would let a caller who never thought about
-it get a lock scope chosen by the library.
-
-`SERIALIZABLE` is not an accepted implementation. It aborts the loser
-where these block it — same code, different concurrency contract,
-visible only under load.
-
-**Its test must observe the lock from a third connection.** "Run two
-concurrent writers and check the result" is too weak: a `begin_write`
-that does nothing at all passes it whenever the two writers happen not
-to collide, which under light load is most of the time. So the test
-asserts the lock is *visible while held* and *gone after commit* —
-
-```sql
-SELECT pid, objid, granted FROM pg_locks WHERE locktype = 'advisory';
-```
-
-— one row while the context manager is open, zero rows after it exits.
-For SQLite, the equivalent is a second connection whose write attempt
-fails with `SQLITE_BUSY` while the first holds `BEGIN IMMEDIATE`.
-
-This is not belt-and-braces. Without it, guard 3 is a gate that cannot
-fail, inside the module written to prevent gates that cannot fail.
-
-The requirement came from a real reading: scitex-cards sampled
-`pg_locks` 216 times at 200ms across four writes and saw zero granted
-rows. Zero waiters answered the contention question; zero *granted* rows
-is the shape that would also appear if the lock were never taken at all.
-Their data cannot distinguish the two — and did not need to, because
-either way the hold is bounded: missing four holds at 200ms sampling
-puts it under about 100ms at 95% confidence, which cannot explain a
-13-25s lag. But a library whose lock might silently not be taken is
-exactly what this test exists to rule out.
-
-### 4. `describe_backend(conn_or_location) -> BackendReport`
+This explicitly reviewed fixture creates and removes only its own database.
+It checks location/DDL/backend results, caller-owned transaction completion and
+observable write refusal from another native connection. It makes no network
+connection and performs no existing-file migration or health/repair operation.
 
 ```python
-@dataclass(frozen=True)
-class BackendReport:
-    dialect: str | None          # None == unknown, never guessed
-    server_version: str | None
-    config_source: str | None    # which env var / tier selected it
+import sqlite3
+from contextlib import closing
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+from scitex_db.store import begin_write, describe_backend, execute_ddl, parse_store_url
+
+with TemporaryDirectory() as directory:
+    path = Path(directory) / "store.db"
+    location = parse_store_url(str(path))
+    assert location.dialect == "sqlite" and location.path == path and location.dsn is None
+    with closing(sqlite3.connect(path)) as first, closing(sqlite3.connect(path, timeout=0)) as other:
+        result = execute_ddl(first, ["CREATE TABLE records (id INTEGER PRIMARY KEY)", " "])
+        assert (result.submitted, result.executed, result.skipped) == (1, 1, 0)
+        skipped = execute_ddl(first, ["CREATE TABLE skipped (id INTEGER)"], run=False)
+        assert (skipped.submitted, skipped.executed, skipped.skipped) == (1, 0, 1)
+        assert first.execute("SELECT name FROM sqlite_master WHERE name='skipped'").fetchall() == []
+        first.commit()
+        report = describe_backend(first, config_source="owned example")
+        assert report.dialect == "sqlite" and report.server_version == sqlite3.sqlite_version
+        assert report.config_source == "owned example"
+        assert begin_write(first, lock_key=17, dialect="sqlite") is None
+        try:
+            other.execute("INSERT INTO records VALUES (1)")
+        except sqlite3.OperationalError as error:
+            assert "locked" in str(error).lower()
+        else:
+            raise AssertionError("the second writer was not refused")
+        first.rollback()
+        other.execute("INSERT INTO records VALUES (2)")
+        other.commit()
+        assert first.execute("SELECT id FROM records").fetchall() == [(2,)]
+assert not path.exists()
 ```
 
-Three-valued on purpose. A doctor that asserts the literal string
-"SQLite" reports the wrong engine on every PostgreSQL deployment while
-passing — the failure this field exists to prevent.
+## Unimplemented linter requirement and adoption
 
-### 5. `portable_sql` — spellings, not a query builder
+The registered `scitex_dev.linter.plugins` provider is
+`scitex_db._linter_plugin:get_plugin`. It currently defines `STX-DB001` for
+literal `SQLite3(...)` construction, with plain AST limits. `STX-DB002` remains
+an open proposal to flag literal `Path(<environment lookup>)` shapes for
+`*_DB|*_URL|*_DSN|*_STORE*` names. Do not treat it as an installed bypass guard.
+It must state false-positive/indirection limits if implemented.
+`tests/scitex_db/test__linter_plugin.py` checks actual rule IDs, declared entry
+points and the explicit still-unimplemented proposal. No exemption is added by
+this documentation change.
 
-**Corrected 2026-08-03, and the correction is load-bearing.** This
-section originally said "constants and small helpers ... ships with the
-minimum SQLite version it supports as a module constant". That framing
-assumes one correct literal plus a version gate. It is wrong. Measured
-by scitex-cards on their deployment
-(`src/scitex_cards/_sql_null_safe.py`):
-
-```
-backend                col IS ?      col IS NOT DISTINCT FROM ?
-SQLite 3.37.2          WORKS         SYNTAX ERROR (needs >= 3.39)
-PostgreSQL             SYNTAX ERROR  WORKS
-```
-
-**There is no single spelling that works on both.** `IS` does not parse
-on PostgreSQL either, so no constant — gated or not — expresses this.
-The spelling must be chosen where the dialect is known, which makes
-`describe_backend` (§4) a *dependency* of this module rather than a
-sibling.
-
-The version constant still ships, and a test still asserts against it
-rather than against the developer's SQLite — the spread between host
-(3.37.2) and container (3.45.1) is exactly what hid the outage — but it
-selects a spelling, it does not certify one.
-
-That mismatch cost a **36-hour silent delivery outage**: every enqueue
-raised and a fail-soft `except` swallowed it. Work performed, evidence
-lost.
-
-Paramstyle is the other half, and the naive rewrite is worse than none:
-a `?` **inside a string literal** is not a placeholder, so
-`sql.replace("?", "%s")` silently corrupts card and message bodies
-containing question marks; and a literal `%` must be doubled or a
-`LIKE '%foo%'` pattern becomes a format specifier and raises. One
-correctness hazard and one crash hazard from the same one-liner.
-
-## What scitex-db owes in return
-
-- Review of the PR against this surface, not against taste.
-- A test per guard that can be shown to FAIL — for each one, the red
-  output goes in the PR body. A guard whose test has never been red is
-  not yet known to be a guard.
-- Where a guard's effect is observable from outside the process (a lock,
-  a file, an executed statement), the test observes the EFFECT, not the
-  return value. A function that returns the right answer without doing
-  the thing passes every test written against its return value.
-- No renames after merge without an alias.
-
-## Open question for the operator
-
-Whether `scitex-cards` then adopts it for its canonical store is
-explicitly NOT decided here, and this document takes no position. The
-dependency-light decision has a documented reason and a measured
-incident behind it.
+Future changes must retain effect-based checks and negative controls for the
+guards they advertise; do not rename merged public names without an alias.
+Neither current tests nor this document decide canonical-store adoption.
+Import-only, fake, native SQLite, native PostgreSQL and consuming-host evidence
+must remain separate. Static Markdown/build success does not establish runtime
+behavior, minimum-platform support, generated/served content or adoption.
