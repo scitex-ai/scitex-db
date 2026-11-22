@@ -114,6 +114,7 @@ class OptimizedInspector:
         table_names: List[str],
         sample_size: int = 5,
         skip_count: bool = False,
+        skip_blob_content: bool = False,
     ) -> Dict[str, Dict]:
         """Get statistics for multiple tables efficiently.
 
@@ -121,6 +122,7 @@ class OptimizedInspector:
             table_names: List of table names to inspect
             sample_size: Number of sample rows to retrieve
             skip_count: If True, skip the COUNT(*) query for performance
+            skip_blob_content: Project BLOB sizes in SQLite instead of fetching bytes
 
         Returns:
             Dict mapping table_name to statistics dictionary
@@ -131,9 +133,22 @@ class OptimizedInspector:
             for table_name in table_names:
                 table_stats = {}
 
-                # Get sample data
+                # A zero-row descriptor also includes generated/visible view columns.
+                sample_columns = "*"
+                if skip_blob_content:
+                    cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")
+                    names = [description[0] for description in cursor.description]
+                    projections = []
+                    for name in names:
+                        column = '"' + name.replace('"', '""') + '"'
+                        projections.append(
+                            f"CASE WHEN typeof({column}) = 'blob' "
+                            f"THEN '<BLOB ' || length({column}) || ' bytes>' "
+                            f"ELSE {column} END AS {column}"
+                        )
+                    sample_columns = ", ".join(projections)
                 cursor.execute(
-                    f"SELECT * FROM {table_name} LIMIT {sample_size}"
+                    f"SELECT {sample_columns} FROM {table_name} LIMIT {sample_size}"
                 )
                 table_stats["columns"] = [
                     desc[0] for desc in cursor.description
@@ -183,7 +198,7 @@ class OptimizedInspector:
             table_names: Tables to inspect (None for all)
             sample_size: Number of sample rows
             skip_count: Skip row counting for performance
-            skip_blob_content: Don't load BLOB content
+            skip_blob_content: Project BLOB size labels in SQLite; False fetches bytes
             verbose: Print results
 
         Returns:
@@ -195,7 +210,7 @@ class OptimizedInspector:
         # Batch operations for efficiency
         table_info = self.get_table_info_batch(table_names)
         table_stats = self.get_table_stats_batch(
-            table_names, sample_size, skip_count
+            table_names, sample_size, skip_count, skip_blob_content=skip_blob_content
         )
 
         results = []
