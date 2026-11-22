@@ -53,6 +53,11 @@ and mixed storage types retain their existing result semantics. Index metadata i
 not included. Large-table counts can be approximate; see the `is_approximate`
 field rather than assuming every `row_count` is an integer.
 
+Table names are literal SQLite identifiers, including spaces, reserved words,
+quotes, Unicode and dots within a name. Pass the native name without adding SQL
+quotes; SQL fragments and schema-qualified expressions are not accepted as
+selection syntax. Default discovery also handles these table names.
+
 Inspection opens an existing file through a SQLite read-only URI. The reusable
 `OptimizedInspector.connection()` cursor rejects SQL writes. Removing the file
 before lazy open or after close makes the next open fail without recreating it.
@@ -142,5 +147,6 @@ and `_check_health.py`. Behavioral controls:
 `tests/scitex_db/test__check_health_batch.py` and
 `tests/scitex_db/test__inspect_readonly.py` and
 `tests/scitex_db/_sqlite3/test__delete_duplicates_apply.py` and
-`tests/scitex_db/test__inspect_blob_projection.py`. The example's installed execution is a
+`tests/scitex_db/test__inspect_blob_projection.py` and
+`tests/scitex_db/test__inspect_identifiers.py`. The example's installed execution is a
 separate content check; static validation alone does not accept these claims.
