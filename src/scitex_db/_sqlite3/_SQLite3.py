@@ -175,7 +175,7 @@ class SQLite3(
         called ``close()``, and ``close()`` issues an explicit
         ``conn.rollback()`` -- so with the default ``autocommit=False`` a block
         that wrote and then ended normally threw the work away. Measured
-        2026-07-31:
+        2026-07-31::
 
             with SQLite3(p) as db:
                 db.execute("INSERT INTO t VALUES (1)")
