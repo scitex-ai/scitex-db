@@ -9,6 +9,10 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Documentation
 
+- Qualify cutover quiescence and retirement guidance: equal row counts and a
+  completion marker do not prove writers stopped; document bounded observation
+  evidence, marker-stage refusal and per-path retirement verification.
+
 - Update the portable-store proposal to current location/DDL/transaction/report
   contracts while retaining unmet lifecycle, native PostgreSQL and linter requirements.
 

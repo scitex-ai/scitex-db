@@ -1,8 +1,11 @@
 # SQLite → PostgreSQL cutover runbook
 
-For moving a scitex-cards store from SQLite to PostgreSQL. Written from two
-real runs (2026-07-30 and 2026-07-31), so every warning below is something that
-actually happened rather than something imagined.
+For moving a scitex-cards store from SQLite to PostgreSQL. The incident
+accounts below describe runs on 2026-07-30 and 2026-07-31; they are historical
+context, not verification of the current Cards client, schema or deployment.
+Recheck those application-owned contracts before using the operational steps.
+The observation and provenance notes describe the current scitex-db source;
+this document does not establish native PostgreSQL or live cutover acceptance.
 
 **A cutover is not a copy.** A verified copy proves the destination matches the
 source at a moment. A cutover additionally makes the destination *the* store and
@@ -67,9 +70,32 @@ environment it was taken in.
 A declaration and a fact are different things. Daemons write independently of
 whether agents are stopped.
 
-Take a full per-table row count **before and after** the copy and require zero
-drift. On 2026-07-30 that was 17,353 = 17,353 across the copy, which is what
-made the run trustworthy. It costs one query per table.
+Keep the writer-stop mechanism in force throughout the copy and verification.
+Take per-table counts before and after as an additional drift check. Equal
+counts do not prove quiescence: updates can change content without changing a
+count, and an insert and delete can cancel each other. The historical
+17,353 = 17,353 count comparison describes that run, not a writer fence.
+
+The private observer `scitex_db._migrate._observe.observe_source` requires an
+explicit `seconds=` window and `interval=` sampling period. It returns
+`QuiescenceEvidence`: a positive `writes_seen` reports an observed writer; zero
+means only **no writer observed in that window**; `unobservable_reason` means
+the source could not be watched. None of these replaces stopping writers.
+
+`migrate(..., quiescence_evidence=...)` requires the keyword, accepts explicit
+`None`, and does not call the observer itself. Pass the observation separately
+from the required `Quiescence` declaration. A positive writer observation
+refuses completion at the marker stage; rows may already have been copied.
+`None` and unobservable evidence are not proof of quiet, and the API does not
+reject them merely because observation is missing. The cutover operator must
+check the evidence and retain the writer-stop requirement.
+
+These contracts are owned by `_migrate/_observe.py::QuiescenceEvidence`,
+`_migrate/_run.py::migrate` and `_migrate/_copy.py::finalize` under
+`src/scitex_db/`. Their controls are
+`tests/scitex_db/_migrate/test__observe.py`, `test__run.py` and
+`test__copy_quiescence_refusal.py` in that test directory; they exercise native
+SQLite observation and marker behavior, not a PostgreSQL cutover.
 
 Two traps found the hard way:
 
@@ -119,8 +145,11 @@ The marker carries, by construction rather than by anyone writing a report:
 - the source identity and the completion timestamp
 - **`store_identity`** — the store's own UUID, so a reader can ask *which* store
   this is, not merely whether it is complete
-- **`quiescence`** — the mechanism and *who stated it*, because it is the one
-  claim the migration cannot verify for itself
+- **`quiescence`** — the declared mechanism and *who stated it*, alongside
+  `observed`: explicit null when no evidence was supplied, or the observation's
+  window, sampling period, sample count, writes, signals and unobservable
+  reason. The declaration and observation are separate facts; a completion
+  marker alone does not prove writers were stopped
 - per-table row counts at copy time
 - excluded tables **with reasons**
 - **the transformation manifest**, with original bytes as hex
@@ -324,7 +353,10 @@ That is luck, not design. The same condition destroyed this board three times
 previously (2170 rows → 18, 2136 → 21, 2138 → 1), because "reconcile" deletes
 rows absent from whichever store is treated as the source.
 
-The retire-before-switch step is what makes it impossible rather than lucky.
+Retire before switching, then prove every relevant read and write path refuses
+the retired source. The ordering alone cannot prevent two live stores: the
+separate DM write path described in §5 bypassed the retirement check. A marker
+or a passing check on one path does not fence the others.
 
 ---
 
@@ -336,14 +368,17 @@ The retire-before-switch step is what makes it impossible rather than lucky.
 [ ] every carried object EXECUTED against the destination and rolled back
 [ ] destination has a FRESH store_uuid; predecessor recorded in the marker
 [ ] destination database freshly created, old one kept for rollback
+[ ] writer-stop mechanism named, enforced and retained through verification
+[ ] source observation reviewed with explicit window/interval and its limits
+[ ] no observed writer; missing/unobservable evidence is not treated as quiet
 [ ] per-table counts taken BEFORE the copy, from the snapshot
-[ ] copy reports ok, marker written
-[ ] per-table counts AFTER: drift is zero
+[ ] copy reports ok, marker written; declaration and observation inspected
+[ ] per-table counts AFTER: zero count drift, not proof of zero writes
 [ ] independent verification by the other party, by id AND content
 [ ] all schema objects owned by the role the application connects as
 [ ] the DSN resolves from inside a CONTAINER, not only on the host
 [ ] the real CLIENT opens the destination — read, write, inbox, threads
-[ ] retirement guard proven to FIRE on the source
+[ ] retirement refusal proven on every relevant client read/write path
 [ ] source retired
 [ ] readers repointed
 [ ] restart complete, no process left on the old path
