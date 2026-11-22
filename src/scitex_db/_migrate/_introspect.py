@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Iterator, Sequence
 
 from ._ddl import Column
@@ -66,11 +67,14 @@ def connect_readonly(path: str) -> sqlite3.Connection:
     read-only URI turns an accidental write into an immediate error rather than
     a modification of the thing being copied.
 
+    ``path`` is a literal filename, not a prebuilt SQLite URI. URI delimiters
+    and percent escapes in filenames are encoded before adding read-only mode.
+
     ``row_factory`` is set to :class:`sqlite3.Row` so callers get name access,
     which is what :mod:`._verify` needs -- it compares by column name, and a
     positional tuple would silently reorder if the SELECT ever changed.
     """
-    conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    conn = sqlite3.connect(Path(path).absolute().as_uri() + "?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row
     return conn
 
