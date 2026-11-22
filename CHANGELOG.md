@@ -9,6 +9,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Documentation
 
+- Consolidate quick starts around a disposable verified SQLite example; correct
+  context-manager, maintenance-keyword, backend and health-provider guidance.
+
 - Correct migration observation imports, evidence/refusal boundaries, advisory
   locking and stored-schema-text guidance; state native PostgreSQL coverage limits.
 

@@ -32,15 +32,16 @@ health scan.
 
 ## Backend classes
 
-`SQLite3` and `PostgreSQL` share a mixin namespace, but their surfaces are
-not interchangeable. SQLite uses `get_table_names`, `insert_many`, `get_rows`,
-`get_row_count` and `execute`; PostgreSQL uses `get_tables`, `insert`, `select`,
-`count` and `execute_query`. Each leaves part of the base surface unimplemented.
+`SQLite3` and `PostgreSQL` compose backend-specific mixins; their surfaces
+are not interchangeable. Both expose `get_table_names`, `insert_many`,
+`get_rows`, `get_row_count` and `execute`. PostgreSQL additionally exposes
+`get_tables`, `insert`, `select`, `count` and `execute_query`. SQLite does not
+inherit the base mixin stubs; absent names are missing attributes.
 See [13_mixins.md](13_mixins.md) and
 [16_sqlite-to-postgres.md](16_sqlite-to-postgres.md) before porting code.
 
 Use a context manager for each connection; see
-[02_quick-start.md](02_quick-start.md) for backend examples and
+[11_quick-start.md](11_quick-start.md) for a disposable SQLite example and
 [17_readonly-workers.md](17_readonly-workers.md) for worker-local connections.
 For arrays, `load_array` requires a column name and returns a leading row
 dimension; [14_numpy-blob.md](14_numpy-blob.md) gives a checked save/load example.
