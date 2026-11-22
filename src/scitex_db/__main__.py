@@ -86,17 +86,29 @@ def main(ctx, as_json):
     default=False,
     help="Emit machine-readable JSON output.",
 )
-def inspect_db(db_path, tables, quiet, as_json):
+@click.pass_context
+def inspect_db(ctx, db_path, tables, quiet, as_json):
     """Inspect a database's structure (tables, schemas, row counts).
 
     \b
     Example:
         $ scitex-db inspect-db ./mydb.sqlite
-        $ scitex-db inspect-db ./mydb.sqlite --tables users orders
+        $ scitex-db inspect-db ./mydb.sqlite --tables users --tables orders
     """
     from ._inspect import inspect
 
-    inspect(db_path, table_names=list(tables) or None, verbose=not quiet)
+    as_json = as_json or ctx.find_root().obj.get("as_json", False)
+    results = inspect(
+        db_path, table_names=list(tables) or None, verbose=not (quiet or as_json)
+    )
+    if as_json:
+        try:
+            payload = json.dumps(results, indent=2, allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            raise click.ClickException(
+                f"Cannot encode inspection as standard JSON: {exc}"
+            ) from exc
+        click.echo(payload)
 
 
 @main.command("check-health")

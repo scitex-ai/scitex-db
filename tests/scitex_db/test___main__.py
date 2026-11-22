@@ -4,6 +4,7 @@ These controls record ignored files; successful commands do not qualify a
 configuration loader or its precedence. Update them when that feature lands.
 """
 
+import json
 import os
 import re
 import sqlite3
@@ -108,3 +109,114 @@ def test_cli_help_discloses_unimplemented_configuration(option, tmp_path):
     result = subprocess.run(command, cwd=tmp_path, capture_output=True, text=True, timeout=60)
     # Assert
     assert result.returncode == 0 and "not implemented" in result.stdout
+
+
+@pytest.fixture
+def inspection_case(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    database = tmp_path / "inspection.db"
+    with closing(sqlite3.connect(database)) as connection:
+        connection.executescript(
+            "CREATE TABLE records(id INTEGER PRIMARY KEY, label TEXT NOT NULL,"
+            "value REAL, optional TEXT, payload BLOB);"
+            "CREATE TABLE empty(id INTEGER PRIMARY KEY);"
+        )
+        connection.execute(
+            "INSERT INTO records VALUES(1, ?, 1.25, NULL, ?)",
+            ("日本語", b"\x00\xff\x10"),
+        )
+        connection.commit()
+    environment = dict(os.environ, HOME=str(home), SCITEX_LOGGING_LEVEL="INFO")
+    yield database, environment
+
+
+def _run_inspection(case, before, after):
+    database, environment = case
+    original = database.read_bytes()
+    result = subprocess.run(
+        [sys.executable, "-m", "scitex_db", *before, "inspect-db", str(database), *after],
+        cwd=database.parent,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    return result, database.read_bytes() == original
+
+
+@pytest.mark.parametrize(
+    "before,after", [([], ["--json"]), (["--json"], []), (["--json"], ["--json"])]
+)
+@pytest.mark.parametrize("quiet", [[], ["--quiet"]])
+def test_inspect_json_preserves_schema_values_and_bytes(inspection_case, before, after, quiet):
+    # Arrange
+    expected = [{
+        "table_name": "records",
+        "columns": [
+            {"cid": 0, "name": "id", "type": "INTEGER", "notnull": False, "default": None, "pk": True},
+            {"cid": 1, "name": "label", "type": "TEXT", "notnull": True, "default": None, "pk": False},
+            {"cid": 2, "name": "value", "type": "REAL", "notnull": False, "default": None, "pk": False},
+            {"cid": 3, "name": "optional", "type": "TEXT", "notnull": False, "default": None, "pk": False},
+            {"cid": 4, "name": "payload", "type": "BLOB", "notnull": False, "default": None, "pk": False},
+        ],
+        "row_count": 1,
+        "is_approximate": False,
+        "sample_data": [{"id": 1, "label": "日本語", "value": 1.25, "optional": None, "payload": "<BLOB 3 bytes>"}],
+    }]
+    # Act
+    result, unchanged = _run_inspection(inspection_case, before, after + quiet + ["--tables", "records"])
+    # Assert
+    assert (result.returncode, json.loads(result.stdout), "Table:" in result.stderr, unchanged) == (0, expected, False, True)
+
+
+@pytest.mark.parametrize(
+    "options,expected",
+    [([], [("empty", 0), ("records", 1)]),
+     (["--tables", "records"], [("records", 1)]),
+     (["--tables", "records", "--tables", "empty"], [("records", 1), ("empty", 0)])],
+)
+def test_inspect_json_selects_tables_in_requested_order(inspection_case, options, expected):
+    # Arrange
+    arguments = ["--json", *options]
+    # Act
+    result, unchanged = _run_inspection(inspection_case, [], arguments)
+    observed = [(row["table_name"], row["row_count"]) for row in json.loads(result.stdout)]
+    # Assert
+    assert (result.returncode, observed, unchanged) == (0, expected, True)
+
+
+@pytest.mark.parametrize("value", [float("inf"), float("-inf")])
+def test_inspect_json_refuses_nonfinite_values(inspection_case, value):
+    # Arrange
+    database, _ = inspection_case
+    with closing(sqlite3.connect(database)) as connection:
+        connection.execute("UPDATE records SET value = ?", (value,))
+        connection.commit()
+    # Act
+    result, unchanged = _run_inspection(inspection_case, [], ["--json", "--tables", "records"])
+    # Assert
+    assert (result.returncode, result.stdout, "standard JSON" in result.stderr, unchanged) == (1, "", True, True)
+
+
+@pytest.mark.parametrize("quiet,visible", [([], True), (["--quiet"], False)])
+def test_inspect_human_output_keeps_quiet_contract(inspection_case, quiet, visible):
+    # Arrange
+    arguments = ["--tables", "records", *quiet]
+    # Act
+    result, unchanged = _run_inspection(inspection_case, [], arguments)
+    # Assert
+    assert (result.returncode, "Table: records" in result.stdout + result.stderr, unchanged) == (0, visible, True)
+
+
+def test_inspect_json_retains_default_sample_limit(inspection_case):
+    # Arrange
+    database, _ = inspection_case
+    with closing(sqlite3.connect(database)) as connection:
+        connection.executemany("INSERT INTO records(id, label) VALUES(?, 'extra')", [(n,) for n in range(2, 9)])
+        connection.commit()
+    # Act
+    result, unchanged = _run_inspection(inspection_case, [], ["--json", "--tables", "records"])
+    row = json.loads(result.stdout)[0]
+    # Assert
+    assert (result.returncode, row["row_count"], [sample["id"] for sample in row["sample_data"]], unchanged) == (0, 8, [1, 2, 3, 4, 5], True)
