@@ -475,6 +475,12 @@ class _ArrayMixin:
         dict
             Dictionary mapping column names to stacked arrays. Columns with
             no rows map to None, matching load_arrays.
+
+        Raises
+        ------
+        ValueError
+            A selected column lacks dtype/shape metadata and usable fallback
+            dtype and shape hints.
         """
 
         result = {}
@@ -508,6 +514,11 @@ class _ArrayMixin:
                     self.binary_to_array(x, dtype=dtype, shape=shape)
                     for x in df[col]
                 ]
+            else:
+                raise ValueError(
+                    f"Array column {col!r} requires dtype/shape metadata "
+                    "or both dtype and shape hints"
+                )
             result[col] = np.stack(arrays) if arrays else None
 
         return result
