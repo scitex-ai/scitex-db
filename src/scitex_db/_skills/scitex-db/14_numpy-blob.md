@@ -34,8 +34,8 @@ with SQLite3("arrays.db", compress_by_default=True) as db:
     np.testing.assert_array_equal(updated[0], arr + 1)
 
     frame = db.get_rows("m", order_by="id")
-    stacked = db.get_array_dict(frame, columns=["data"])["data"]
-    decoded = db.decode_array_columns(frame.copy(), columns=["data"])
+    stacked = db.get_array_dict(frame)["data"]
+    decoded = db.decode_array_columns(frame.copy())
     np.testing.assert_array_equal(stacked[0], arr)
     np.testing.assert_array_equal(stacked[1], arr + 1)
     np.testing.assert_array_equal(decoded["data"].iloc[0], arr)
@@ -66,18 +66,22 @@ Shape strings are parsed as Python literals by both `load_arrays` and
 parser also serves `get_array_dict` and `decode_array_columns`. Existing
 literal tuple, list and integer shape forms remain accepted by the helper.
 
-For DataFrames returned by `get_rows`, select array columns explicitly as in
-the example. `get_array_dict` returns stacked arrays; `decode_array_columns`
+With `columns`, `dtype` and `shape` omitted, both DataFrame helpers infer
+payload columns from their dtype/shape companions, preserving DataFrame order.
+Scalar fields and hashes without their own companions are excluded; real array
+names ending in metadata suffixes still qualify when they have companions.
+Explicit-column and nondefault dtype/shape-hint calls retain their existing
+selection paths. `get_array_dict` returns stacked arrays; `decode_array_columns`
 replaces cells in the supplied DataFrame, so the example passes a copy.
 Both honor each row's compression flag: integer `1`, text `"1"` and `True`
 mean compressed, matching the main reader. A missing flag means raw bytes.
 
-The array reader tests below cover numeric payloads with explicit columns,
+The array reader tests below cover numeric payloads with explicit and inferred columns,
 including raw/compressed rows in the same DataFrame. Wrapper-created tables
 use BOOLEAN metadata; saving arrays to pre-existing native tables can add TEXT
 metadata. Both formats retain the existing dtype and stacking conversions.
-Default column inference, malformed/null records, PostgreSQL and large-scale
-behavior remain outside this selected coverage.
+Malformed/null metadata, generic BLOBs, PostgreSQL and large-scale behavior
+remain outside this selected coverage.
 
 ## Large arrays
 

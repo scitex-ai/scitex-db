@@ -311,3 +311,101 @@ def test_stored_frame_mixed_compression_decodes_each_row(tmp_path, reader, dtype
             actual = np.stack(decoded["data"].tolist())
     # Assert
     assert np.array_equal(actual, expected)
+
+
+def _discovery_frame(path, table_kind, names, compress=False):
+    schema = {"id": "INTEGER PRIMARY KEY", "label": "TEXT", "score": "REAL"}
+    schema.update({name: "BLOB" for name in names})
+    if table_kind == "native":
+        with closing(sqlite3.connect(path)) as connection:
+            definition = ", ".join(f"{name} {kind}" for name, kind in schema.items())
+            connection.execute(f"CREATE TABLE arrays ({definition})")
+            connection.commit()
+    else:
+        with SQLite3(str(path)) as db:
+            db.create_table("arrays", schema)
+    expected = {
+        names[0]: np.arange(2048, dtype=np.float32).reshape(1024, 2),
+        names[1]: np.arange(12, dtype=np.int16),
+    }
+    with SQLite3(str(path)) as db:
+        db.save_arrays("arrays", expected, additional_columns={"id": 1, "label": "trial", "score": 1.25}, compress=compress, verbose=False)
+    with SQLite3(str(path), mode="ro") as db:
+        frame = db.get_rows("arrays", order_by="id", return_as="dataframe")
+    return frame, expected
+
+
+def _invoke_default(path, frame, reader, **hints):
+    with SQLite3(str(path), mode="ro") as db:
+        if reader == "get_array_dict":
+            return db.get_array_dict(frame, **hints)
+        return db.decode_array_columns(frame, **hints)
+
+
+def _default_value(result, reader, name):
+    if reader == "get_array_dict":
+        return result[name][0]
+    return result[name].iloc[0]
+
+
+@pytest.mark.parametrize("reader", ["get_array_dict", "decode_array_columns"])
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("compress", [False, True])
+@pytest.mark.parametrize("names", [("signal", "other"), ("signal_dtype", "other_shape"), ("signal_hash", "other_is_compressed")])
+def test_default_discovery_decodes_metadata_backed_arrays(tmp_path, reader, table_kind, compress, names):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame, expected = _discovery_frame(path, table_kind, names, compress)
+    # Act
+    actual = _invoke_default(path, frame, reader)
+    # Assert
+    assert all(np.array_equal(_default_value(actual, reader, name), value) for name, value in expected.items())
+
+
+@pytest.mark.parametrize("reader", ["get_array_dict", "decode_array_columns"])
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("compress", [False, True])
+@pytest.mark.parametrize("names", [("signal", "other"), ("signal_dtype", "other_shape"), ("signal_hash", "other_is_compressed")])
+def test_default_discovery_preserves_result_column_contract(tmp_path, reader, table_kind, compress, names):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame, _ = _discovery_frame(path, table_kind, names, compress)
+    expected_names = list(names) if reader == "get_array_dict" else list(frame.columns)
+    # Act
+    actual = _invoke_default(path, frame, reader)
+    # Assert
+    assert list(actual) == expected_names
+
+
+@pytest.mark.parametrize("reader", ["get_array_dict", "decode_array_columns"])
+@pytest.mark.parametrize("empty", [False, True])
+def test_default_discovery_without_arrays_preserves_scalar_frame(tmp_path, reader, empty):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    with closing(sqlite3.connect(path)) as connection:
+        connection.execute("CREATE TABLE scalars (id INTEGER PRIMARY KEY, label TEXT)")
+        if not empty:
+            connection.executemany("INSERT INTO scalars VALUES (?, ?)", [(1, "first"), (2, "second")])
+        connection.commit()
+    with SQLite3(str(path), mode="ro") as db:
+        frame = db.get_rows("scalars", order_by="id", return_as="dataframe")
+    before = frame.copy(deep=True)
+    # Act
+    actual = _invoke_default(path, frame, reader)
+    # Assert
+    assert actual == {} if reader == "get_array_dict" else actual.equals(before)
+
+
+@pytest.mark.parametrize("reader", ["get_array_dict", "decode_array_columns"])
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("shape", [(2048,), (1024, 2)])
+def test_default_discovery_retains_dtype_shape_hint_path(tmp_path, reader, table_kind, shape):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame, values = _discovery_frame(path, table_kind, ("signal", "other"))
+    raw_frame = frame[["signal"]].copy()
+    expected = values["signal"].reshape(shape)
+    # Act
+    result = _invoke_default(path, raw_frame, reader, dtype=np.dtype("float32"), shape=shape)
+    # Assert
+    assert np.array_equal(_default_value(result, reader, "signal"), expected)
