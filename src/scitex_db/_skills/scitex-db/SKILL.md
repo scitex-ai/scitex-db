@@ -56,7 +56,7 @@ rule and empirical verification table.
 ### Mandatory
 
 * [01_installation](01_installation.md) — pip install + extras + verify
-* [02_quick-start](02_quick-start.md) — SQLite3 + PostgreSQL minimal examples
+* [11_quick-start](11_quick-start.md) — disposable verified SQLite example
 * [03_python-api](03_python-api.md) — Public symbols
 * [04_cli-reference](04_cli-reference.md) — `scitex-db` console entry
 
@@ -66,7 +66,7 @@ rule and empirical verification table.
 * [16_sqlite-to-postgres](16_sqlite-to-postgres.md) — Porting to PostgreSQL: the failures that do not raise
 * [14_numpy-blob](14_numpy-blob.md) — Storing ndarrays with compression
 * [15_maintenance](15_maintenance.md) — `check_health`, `delete_duplicates`, `inspect`
-* [11_quick-start](11_quick-start.md), [12_python-api](12_python-api.md) — historical leaves
+* [02_quick-start](02_quick-start.md), [12_python-api](12_python-api.md) — historical redirects
 * [10_cli-reference](10_cli-reference.md) — historical CLI notes
 
 * [17_readonly-workers](17_readonly-workers.md) — Worker-local read-only connections and thread limits
