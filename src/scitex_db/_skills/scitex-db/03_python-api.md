@@ -46,6 +46,21 @@ Use a context manager for each connection; see
 For arrays, `load_array` requires a column name and returns a leading row
 dimension; [14_numpy-blob.md](14_numpy-blob.md) gives a checked save/load example.
 
+## Observer dispatch limits
+
+`register_post_save_hook` and `register_post_load_hook` append process-local,
+synchronous callbacks. Successful SQLite `execute`/`executemany` calls dispatch
+once according to the wrapper's SQL classification. Scripts classified as
+writes dispatch once; scripts classified as reads emit no post-load event.
+Direct driver calls are not automatically observed.
+With default `autocommit=False`, an `execute` event can precede a later rollback;
+notifications are not commit or durable-audit receipts. Post-load callbacks
+receive the caller's live cursor and must not consume its rows to observe it.
+Callback `Exception`s are caught and logged; `BaseException` propagates after
+SQL may already have executed. Callbacks are not sandboxed. Comprehensive
+cross-backend observation remains unqualified. Owning controls:
+`tests/scitex_db/_observers/test___init__.py` and SQLite `_QueryMixin.py`.
+
 ## CSV import preconditions
 
 `SQLite3.load_from_csv(..., batch_size=10000, chunk_size=100000)` requires
