@@ -96,10 +96,18 @@ uv pip install "scitex-db[all]"
 
 ### Configuration
 
-Defaults work out of the box. To override, drop a `config.yaml` next to
-your script, or point `SCITEX_DB_CONFIG` at one — see
-[`.env.example`](./.env.example) for the full env-var list and
-resolution order.
+The current CLI takes database paths and options explicitly on the command
+line. YAML configuration and automatic `.env` loading are **not implemented**:
+`./config.yaml`, `SCITEX_DB_CONFIG` and `~/.scitex/db/config.yaml` do not select
+CLI defaults. Pass options such as `--tables` directly; malformed files at
+these locations are ignored, so a successful command does not validate them.
+
+Portable project/user configuration under `.scitex/db` remains an intended
+contract awaiting implementation; there is no supported file precedence yet.
+See the [CLI skill](src/scitex_db/_skills/scitex-db/04_cli-reference.md#configuration-limit)
+and [`.env.example`](./.env.example). Python callers pass constructor/function
+arguments explicitly; `store.resolve_store(env=...)` separately reads the
+caller-named environment variable, not a package-wide YAML configuration.
 
 ## Architecture
 

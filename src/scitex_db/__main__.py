@@ -59,12 +59,11 @@ def main(ctx, as_json):
     """Database utilities — SQLite/Postgres inspection and health checks.
 
     \b
-    Configuration precedence (highest -> lowest):
-      1. Explicit CLI flags
-      2. ./config.yaml (project-local)
-      3. $SCITEX_DB_CONFIG (path to a YAML file)
-      4. ~/.scitex/db/config.yaml (user-wide)
-      5. Built-in defaults
+    Configuration files are not implemented. Pass paths and options explicitly.
+    ./config.yaml, SCITEX_DB_CONFIG, ~/.scitex/db/config.yaml and automatic
+    .env loading do not configure these commands. Malformed files are ignored;
+    successful commands do not validate them. Portable .scitex/db configuration
+    remains an intended contract; no file precedence is supported yet.
     """
     ctx.ensure_object(dict)
     ctx.obj["as_json"] = as_json
