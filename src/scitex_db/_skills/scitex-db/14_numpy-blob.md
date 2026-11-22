@@ -59,6 +59,16 @@ with SQLite3("arrays.db", compress_by_default=True) as db:
     assert stacked_scalar.shape == (1,) and stacked_scalar[0] == 7
     decoded_scalar = db.decode_array_columns(scalar_frame.copy(), dtype=scalar.dtype, shape=())
     assert decoded_scalar["data"].iloc[0].shape == () and decoded_scalar["data"].iloc[0].item() == 7
+
+    db.create_table("nullable", {"id": "INTEGER PRIMARY KEY", "data": "BLOB"})
+    db.save_array("nullable", arr, additional_columns={"id": 1}, compress=False, verbose=False)
+    db.execute("INSERT INTO nullable (id, data) VALUES (?, ?)", (2, None))
+    mixed = db.load_array("nullable", "data", verbose=False)
+    np.testing.assert_array_equal(mixed[0], arr)
+    assert np.isnan(mixed[1]).all()
+    mixed_frame = db.get_rows("nullable", order_by="id")
+    mixed_decoded = db.decode_array_columns(mixed_frame.copy())
+    assert mixed_decoded["data"].iloc[1] is None
 ```
 
 Run the example in a new directory: it creates synthetic `arrays.db`.
@@ -105,8 +115,31 @@ column still stacks normally. The example checks an all-None DataFrame copy;
 native SQLite NULL controls and owning-reader comparisons live in
 `test_all_null_dictionary_columns_match_absence_policy` and
 `test_main_reader_all_null_columns_return_none` in the array reader test file
-below. This does not establish behavior for a mixture of valid and NULL
-payloads within the same column.
+below. Mixed valid/NULL rows have separate behavior described next.
+
+## Mixed floating arrays and NULL rows
+
+For the controlled non-scalar floating records in the example, `load_arrays`
+(and its single-column wrapper `load_array`) fills a NULL payload row with a
+NaN array using the first present array's shape and dtype before stacking.
+The existing NumPy stacking conversion still applies, including byte order.
+When every selected payload is NULL, the column result remains `None`.
+
+`decode_array_columns` retains `None` in missing cells and decodes present
+cells. Handle this difference when switching from a stacked result.
+`get_array_dict` currently raises `ValueError` while stacking these mixed
+non-scalar records; alignment with main-reader NULL filling remains an
+unresolved bug. Cross-reader NULL and integer-promotion policy remains open.
+
+Owning `_ArrayMixin` methods are covered by
+`test_mixed_null_floating_main_reader_fills_nan` and
+`test_mixed_null_decoder_retains_none_cell`, with adjacent dtype/shape,
+present-value and main-file byte checks in the array reader test file below.
+Main: float32, float64, big-endian float32; decoder: float32. Both schemas,
+first/middle/last NULL rows and raw/compressed present records are covered.
+Main-file byte checks do not establish WAL/sidecar or concurrency guarantees.
+
+## DataFrame selection and raw hints
 
 For `get_array_dict`, each explicitly selected column must have both dtype and
 shape companion columns, or the call must provide usable `dtype` and `shape`
@@ -131,15 +164,17 @@ metadata-backed scalar path. Native controls:
 file below, with empty/NULL frame and missing-component controls alongside.
 This does not add fallback-hint handling to the main `load_array` reader.
 
-Both honor each row's compression flag: integer `1`, text `"1"` and `True`
+For DataFrame decoding with dtype/shape companion metadata, both helpers honor
+each row's compression flag: integer `1`, text `"1"` and `True`
 mean compressed, matching the main reader. A missing flag means raw bytes.
 
 The array reader tests below cover numeric payloads with explicit and inferred columns,
 including raw/compressed rows in the same DataFrame. Wrapper-created tables
 use BOOLEAN metadata; saving arrays to pre-existing native tables can add TEXT
 metadata. Both formats retain the existing dtype and stacking conversions.
-Malformed metadata on present payloads, mixed valid/NULL rows, generic BLOBs,
-PostgreSQL and large-scale behavior remain outside this selected coverage.
+Dictionary alignment for mixed valid/NULL rows, non-floating NULL policies,
+malformed metadata on present payloads, generic BLOBs, PostgreSQL and large-scale
+behavior remain outside this selected result.
 
 ## Large arrays
 

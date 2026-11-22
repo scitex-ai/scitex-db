@@ -781,3 +781,97 @@ def test_scalar_hint_metadata_control_preserves_dtype(tmp_path, table_kind, dtyp
     actual = _read_helper(path, frame, "decode_array_columns")
     # Assert
     assert (actual.shape, actual.dtype, actual.tobytes()) == (target.shape, target.dtype, target.tobytes())
+
+
+
+def _mixed_null_frame(path, table_kind, dtype, missing_id, compress):
+    _frame_table(path, table_kind)
+    arrays = [np.full((512, 4), row_id, dtype=np.dtype(dtype)) for row_id in (1, 2, 3)]
+    with SQLite3(str(path)) as db:
+        for row_id, array in enumerate(arrays, 1):
+            db.save_array("arrays", array, additional_columns={"id": row_id}, compress=compress, verbose=False)
+        db.execute("UPDATE arrays SET data = NULL, data_dtype = NULL, data_shape = NULL, data_is_compressed = NULL, data_hash = NULL WHERE id = ?", (missing_id,))
+    with SQLite3(str(path), mode="ro") as db:
+        frame = db.get_rows("arrays", order_by="id", return_as="dataframe")
+    expected = [array.copy() for array in arrays]
+    expected[missing_id - 1][...] = np.nan
+    return frame, np.stack(expected), arrays
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("dtype", ["float32", "float64", ">f4"])
+@pytest.mark.parametrize("missing_id", [1, 2, 3])
+@pytest.mark.parametrize("compress", [False, True])
+def test_mixed_null_floating_main_reader_fills_nan(tmp_path, table_kind, dtype, missing_id, compress):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    _, expected, _ = _mixed_null_frame(path, table_kind, dtype, missing_id, compress)
+    # Act
+    with SQLite3(str(path), mode="ro") as db:
+        actual = db.load_arrays("arrays", columns=["data"], verbose=False)["data"]
+    # Assert
+    assert np.array_equal(actual, expected, equal_nan=True)
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("dtype", ["float32", "float64", ">f4"])
+@pytest.mark.parametrize("missing_id", [1, 2, 3])
+@pytest.mark.parametrize("compress", [False, True])
+def test_mixed_null_floating_main_reader_retains_shape_dtype(tmp_path, table_kind, dtype, missing_id, compress):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    _, expected, _ = _mixed_null_frame(path, table_kind, dtype, missing_id, compress)
+    # Act
+    with SQLite3(str(path), mode="ro") as db:
+        actual = db.load_arrays("arrays", columns=["data"], verbose=False)["data"]
+    # Assert
+    assert (actual.shape, actual.dtype) == (expected.shape, expected.dtype)
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("missing_id", [1, 2, 3])
+@pytest.mark.parametrize("compress", [False, True])
+def test_mixed_null_decoder_retains_none_cell(tmp_path, table_kind, missing_id, compress):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame, _, _ = _mixed_null_frame(path, table_kind, "float32", missing_id, compress)
+    # Act
+    with SQLite3(str(path), mode="ro") as db:
+        actual = db.decode_array_columns(frame)
+    # Assert
+    assert actual["data"].iloc[missing_id - 1] is None
+
+
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("missing_id", [1, 2, 3])
+@pytest.mark.parametrize("compress", [False, True])
+def test_mixed_null_decoder_preserves_present_values(tmp_path, table_kind, missing_id, compress):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame, _, expected = _mixed_null_frame(path, table_kind, "float32", missing_id, compress)
+    # Act
+    with SQLite3(str(path), mode="ro") as db:
+        actual = db.decode_array_columns(frame)
+    # Assert
+    assert all(np.array_equal(actual["data"].iloc[index], expected[index]) for index in range(3) if index != missing_id - 1)
+
+
+def _read_mixed_null_result(path, frame, reader):
+    with SQLite3(str(path), mode="ro") as db:
+        if reader == "load_arrays":
+            return db.load_arrays("arrays", columns=["data"], verbose=False)
+        return db.decode_array_columns(frame)
+
+
+@pytest.mark.parametrize("reader", ["load_arrays", "decode_array_columns"])
+@pytest.mark.parametrize("table_kind", ["wrapper", "native"])
+@pytest.mark.parametrize("compress", [False, True])
+def test_mixed_null_reader_preserves_main_database_bytes(tmp_path, reader, table_kind, compress):
+    # Arrange
+    path = tmp_path / "arrays.db"
+    frame, _, _ = _mixed_null_frame(path, table_kind, "float32", 2, compress)
+    before = path.read_bytes()
+    # Act
+    _read_mixed_null_result(path, frame, reader)
+    # Assert
+    assert path.read_bytes() == before
