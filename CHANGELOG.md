@@ -9,6 +9,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Documentation
 
+- Replace invalid README database/repair examples with a disposable verified
+  SQLite quick start,accurate backend composition and command-specific CLI scope.
+
 - Correct installation dependencies,PostgreSQL driver and standalone namespace
   guidance; distinguish installed profile checks from umbrella/native adoption.
 
