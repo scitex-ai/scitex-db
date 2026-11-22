@@ -205,7 +205,9 @@ class _BlobMixin:
         key : str, optional
             Specific key to load. If None, loads all.
         ids : int, list of int, or "all", default "all"
-            Row IDs to load. "all" loads all rows
+            Row IDs to load. "all" loads all rows. An explicit ``id`` column
+            takes precedence; otherwise uses SQLite ``rowid``. Storage rowids
+            can change when rows are replaced; use keys for stable identity.
         where : str, optional
             SQL WHERE clause
 
@@ -215,23 +217,21 @@ class _BlobMixin:
         """
         self.ensure_connection()
 
-        # Handle ids parameter
+        # Standard save_blob tables use SQLite rowid; retain explicit id schemas.
+        id_params = ()
         if ids != "all":
-            if isinstance(ids, int):
-                id_where = f"id = {ids}"
-            else:
-                id_list = ",".join(map(str, ids))
-                id_where = f"id IN ({id_list})"
-
-            if where:
-                where = f"({where}) AND ({id_where})"
-            else:
-                where = id_where
+            columns = self.get_column_info(table_name)
+            id_column = "id" if any(c["name"].lower() == "id" for c in columns) else "rowid"
+            selected_ids = [ids] if isinstance(ids, int) else list(ids)
+            placeholders = ",".join("?" for _ in selected_ids)
+            id_where = f"{id_column} IN ({placeholders})" if selected_ids else "0"
+            id_params = tuple(selected_ids)
+            where = f"({where}) AND ({id_where})" if where else id_where
 
         if key:
             # Load specific key
             query = f"SELECT data, compressed, data_type FROM {table_name} WHERE key = ?"
-            params = (key,)
+            params = (key,) + id_params
 
             if where:
                 query += f" AND {where}"
@@ -265,7 +265,7 @@ class _BlobMixin:
 
             results = {}
             for key, data_bytes, is_compressed, data_type in self.execute(
-                query
+                query, id_params
             ):
                 if is_compressed:
                     data_bytes = zlib.decompress(data_bytes)
