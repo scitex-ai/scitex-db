@@ -31,7 +31,7 @@ def _inspector_error(inspector, statement=None):
             with inspector.connection() as cursor:
                 cursor.execute(statement)
     except sqlite3.OperationalError as error:
-        return error.sqlite_errorcode & 255
+        return str(error)
     return None
 
 
@@ -43,7 +43,7 @@ def test_inspector_connection_rejects_native_writes(inspection_database, stateme
     with OptimizedInspector(str(inspection_database)) as inspector:
         code = _inspector_error(inspector, statement)
     # Assert
-    assert (code, inspection_database.read_bytes()) == (sqlite3.SQLITE_READONLY, before)
+    assert (code, inspection_database.read_bytes()) == ("attempt to write a readonly database", before)
 
 
 def test_inspector_does_not_recreate_removed_database(inspection_database):
@@ -54,7 +54,7 @@ def test_inspector_does_not_recreate_removed_database(inspection_database):
     with inspector:
         code = _inspector_error(inspector)
     # Assert
-    assert (code, inspection_database.exists()) == (sqlite3.SQLITE_CANTOPEN, False)
+    assert (code, inspection_database.exists()) == ("unable to open database file", False)
 
 
 def test_inspector_reopen_does_not_create_database(inspection_database):
@@ -67,7 +67,7 @@ def test_inspector_reopen_does_not_create_database(inspection_database):
     with inspector:
         code = _inspector_error(inspector)
     # Assert
-    assert (code, inspection_database.exists()) == (sqlite3.SQLITE_CANTOPEN, False)
+    assert (code, inspection_database.exists()) == ("unable to open database file", False)
 
 
 def test_public_inspect_preserves_metadata_and_bytes(inspection_database):
