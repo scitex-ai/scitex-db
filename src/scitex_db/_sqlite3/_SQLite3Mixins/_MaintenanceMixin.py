@@ -31,13 +31,13 @@ class _MaintenanceMixin:
         self,
         backup_path: str,
         pages: int = -1,
-        progress: Optional[Callable[[sqlite3.Connection, int, int], None]] = None,
+        progress: Optional[Callable[[int, int], None]] = None,
     ) -> None:
         with self.maintenance_lock():
             try:
 
                 def _progress(
-                    status: sqlite3.Connection, remaining: int, total: int
+                    status: int, remaining: int, total: int
                 ) -> None:
                     if progress:
                         progress(total - remaining, total)
