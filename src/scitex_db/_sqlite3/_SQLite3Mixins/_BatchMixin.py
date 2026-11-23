@@ -65,6 +65,8 @@ class _BatchMixin:
                     if col in table_columns and col.isidentifier()
                 ]
             else:
+                if isinstance(rows, list) and not rows and table_columns:
+                    return
                 valid_columns = [
                     col
                     for col in rows[0].keys()
