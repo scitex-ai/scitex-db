@@ -46,6 +46,19 @@ Use a context manager for each connection; see
 For arrays, `load_array` requires a column name and returns a leading row
 dimension; [14_numpy-blob.md](14_numpy-blob.md) gives a checked save/load example.
 
+## SQLite row-query errors
+
+`SQLite3.get_rows(...)` preserves SQLite exception subclasses, original error
+arguments and native error metadata, as `execute(...)` does. Missing tables
+and incomplete SQL raise `sqlite3.OperationalError`, including when
+`return_as` is `"dataframe"`, `"list"` or `"dict"`. The former generic
+`sqlite3.Error("Query execution failed: ...")` wrapper is removed, so callers
+can catch the native subclass. Successful result formats are unchanged.
+Source owner: `_SQLite3Mixins/_RowMixin.py::get_rows`; native failure,
+continued-read and format controls:
+`tests/scitex_db/_sqlite3/_SQLite3Mixins/test__RowMixin_errors.py`.
+This does not establish PostgreSQL error parity or change SQL construction.
+
 ## SQLite lock waits
 
 `SQLite3(path, timeout=60.0)` preserves SQLite's configured busy-handler budget
