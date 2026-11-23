@@ -7,6 +7,10 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Return cleanly for empty SQLite batch input lists with default column selection
+  and an existing table schema, preserving transaction-entry and explicit-column policy.
+
 ### Documentation
 - Clarify SQLite input-row batch filtering, suppressed evaluation errors and
   transaction-entry commits of prior caller work; runtime behavior is unchanged.
