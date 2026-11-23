@@ -7,6 +7,10 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Tests
+
+- Scope temporary-copy cleanup assertions to native allocations owned by each case, while creating and preserving an unrelated neighboring file during copying. Avoid shared runner temporary-directory churn and give legacy-name witnesses unique per-test basenames. Runtime behavior and qualification guards are unchanged.
+
 ### Fixed
 
 - Preserve native SQLite exception classes, arguments and error metadata through `get_rows`, matching `execute`. Remove the generic `Query execution failed:` wrapper while retaining successful result formats.

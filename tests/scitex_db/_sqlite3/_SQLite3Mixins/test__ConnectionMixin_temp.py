@@ -3,7 +3,10 @@
 from contextlib import closing
 from pathlib import Path
 import sqlite3
+import sys
 import tempfile
+import threading
+import uuid
 
 import pytest
 
@@ -26,6 +29,38 @@ def _rows(path):
 @pytest.fixture
 def copy_directory():
     return Path(tempfile.gettempdir())
+
+
+_NEIGHBOR_BYTES = b"preserve unrelated neighboring activity"
+
+
+@pytest.fixture
+def copy_scope(copy_directory):
+    token = uuid.uuid4().hex
+    scope = {"paths": [], "neighbor": copy_directory / ("scitex-neighbor-" + token), "token": token}
+    active = True
+    thread = threading.get_ident()
+
+    def observe(event, args):
+        if active and event == "tempfile.mkstemp" and threading.get_ident() == thread:
+            path = Path(args[0])
+            if path.parent == copy_directory and path.name.startswith("scitex-db-"):
+                if not scope["paths"]:
+                    with scope["neighbor"].open("xb") as file:
+                        file.write(_NEIGHBOR_BYTES)
+                scope["paths"].append(path)
+
+    sys.addaudithook(observe)
+    try:
+        yield scope
+    finally:
+        active = False
+        scope["neighbor"].unlink(missing_ok=True)
+
+
+def _owned_files_left(scope):
+    candidates = [Path(str(path) + suffix) for path in scope["paths"] for suffix in ("", "-wal", "-shm", "-journal")]
+    return [str(path) for path in candidates if path.exists()]
 
 
 @pytest.fixture(params=["missing", "directory"])
@@ -59,17 +94,16 @@ def _owner():
 
 
 @pytest.mark.parametrize("filename", ["signal.db", "recording?.db", "日本語 signal.db"])
-def test_same_basename_copies_preserve_each_owners_rows_and_cleanup(tmp_path, copy_directory, filename):
+def test_same_basename_copies_preserve_each_owners_rows_and_cleanup(tmp_path, copy_directory, copy_scope, filename):
     # Arrange
     left, right = tmp_path / "left", tmp_path / "right"
     left.mkdir()
     right.mkdir()
-    first, second = left / (tmp_path.name + filename), right / (tmp_path.name + filename)
+    first, second = left / (copy_scope["token"] + filename), right / (copy_scope["token"] + filename)
     _seed(first, 42)
     _seed(second, 84)
     original = first.read_bytes(), second.read_bytes()
     owner1, owner2 = _owner(), _owner()
-    entries = set(copy_directory.iterdir())
     # Act
     try:
         copy1 = Path(owner1._create_temp_copy(str(first)))
@@ -81,14 +115,14 @@ def test_same_basename_copies_preserve_each_owners_rows_and_cleanup(tmp_path, co
         owner1.close()
         owner2.close()
     # Assert
-    assert (observed, other_survives, first.read_bytes(), second.read_bytes(), set(copy_directory.iterdir())) == (
-        (True, [(42,)], [(84,)]), True, *original, entries
+    assert (observed, other_survives, first.read_bytes(), second.read_bytes(), _owned_files_left(copy_scope), copy_scope["neighbor"].read_bytes()) == (
+        (True, [(42,)], [(84,)]), True, *original, [], _NEIGHBOR_BYTES
     )
 
 
-def test_temporary_copy_does_not_overwrite_or_remove_legacy_named_file(tmp_path, copy_directory):
+def test_temporary_copy_does_not_overwrite_or_remove_legacy_named_file(tmp_path, copy_directory, copy_scope):
     # Arrange
-    source = tmp_path / (tmp_path.name + "signal.db")
+    source = tmp_path / (copy_scope["token"] + "signal.db")
     _seed(source, 42)
     witness = copy_directory / ("temp_" + source.name)
     with witness.open("xb") as file:
@@ -104,28 +138,26 @@ def test_temporary_copy_does_not_overwrite_or_remove_legacy_named_file(tmp_path,
     finally:
         witness.unlink(missing_ok=True)
     # Assert
-    assert preserved == b"owned unrelated witness"
+    assert (preserved, _owned_files_left(copy_scope), copy_scope["neighbor"].read_bytes()) == (b"owned unrelated witness", [], _NEIGHBOR_BYTES)
 
 
-def test_copy_source_failure_leaves_no_allocated_file_or_owned_path(invalid_source, copy_directory):
+def test_copy_source_failure_leaves_no_allocated_file_or_owned_path(invalid_source, copy_directory, copy_scope):
     # Arrange
     owner = _owner()
-    entries = set(copy_directory.iterdir())
     # Act
     error = _copy_error(owner, invalid_source)
-    observed = isinstance(error, OSError), set(copy_directory.iterdir()), owner.temp_path
+    observed = isinstance(error, OSError), _owned_files_left(copy_scope), owner.temp_path, copy_scope["neighbor"].read_bytes()
     owner.close()
     # Assert
-    assert observed == (True, entries, None)
+    assert observed == (True, [], None, _NEIGHBOR_BYTES)
 
 
 @pytest.mark.parametrize("mode", ["rw", "rwc"])
-def test_writable_temporary_copy_preserves_original_and_cleans_its_file(tmp_path, copy_directory, mode):
+def test_writable_temporary_copy_preserves_original_and_cleans_its_file(tmp_path, copy_directory, copy_scope, mode):
     # Arrange
-    source = tmp_path / (tmp_path.name + "original.db")
+    source = tmp_path / (copy_scope["token"] + "original.db")
     _seed(source, 42)
     original = source.read_bytes()
-    entries = set(copy_directory.iterdir())
     # Act
     with SQLite3(str(source), use_temp=True, mode=mode) as db:
         temporary = Path(db.temp_path)
@@ -133,23 +165,22 @@ def test_writable_temporary_copy_preserves_original_and_cleans_its_file(tmp_path
         db.execute("INSERT INTO signal VALUES (84)")
         during = db.conn.execute("SELECT sample FROM signal ORDER BY sample").fetchall()
     # Assert
-    assert (temporary.exists(), source.read_bytes(), _rows(source), initial, during, set(copy_directory.iterdir())) == (
-        False, original, [(42,)], [(42,)], [(42,), (84,)], entries
+    assert (temporary.exists(), source.read_bytes(), _rows(source), initial, during, _owned_files_left(copy_scope), copy_scope["neighbor"].read_bytes()) == (
+        False, original, [(42,)], [(42,)], [(42,), (84,)], [], _NEIGHBOR_BYTES
     )
 
 
-def test_readonly_temporary_copy_refuses_writes_preserves_original_and_cleans_its_file(tmp_path, copy_directory):
+def test_readonly_temporary_copy_refuses_writes_preserves_original_and_cleans_its_file(tmp_path, copy_directory, copy_scope):
     # Arrange
-    source = tmp_path / (tmp_path.name + "original.db")
+    source = tmp_path / (copy_scope["token"] + "original.db")
     _seed(source, 42)
     original = source.read_bytes()
-    entries = set(copy_directory.iterdir())
     # Act
     with SQLite3(str(source), use_temp=True, mode="ro") as db:
         temporary = Path(db.temp_path)
         error = _readonly_error(db)
         during = db.execute("SELECT sample FROM signal").fetchall()
     # Assert
-    assert (isinstance(error, sqlite3.OperationalError), temporary.exists(), source.read_bytes(), _rows(source), during, set(copy_directory.iterdir())) == (
-        True, False, original, [(42,)], [(42,)], entries
+    assert (isinstance(error, sqlite3.OperationalError), temporary.exists(), source.read_bytes(), _rows(source), during, _owned_files_left(copy_scope), copy_scope["neighbor"].read_bytes()) == (
+        True, False, original, [(42,)], [(42,)], [], _NEIGHBOR_BYTES
     )
