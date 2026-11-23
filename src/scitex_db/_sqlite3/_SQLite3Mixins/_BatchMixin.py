@@ -24,6 +24,7 @@ Prerequisites:
     * Foreign key constraints must be enabled if using inherit_foreign
 """
 
+from numbers import Integral
 from typing import Any as _Any
 from typing import Dict, List, Optional
 from ..._BaseMixins._BaseBatchMixin import _BaseBatchMixin
@@ -32,6 +33,13 @@ import sqlite3
 import scitex_logging as slogging
 
 log = slogging.getLogger(__name__)
+
+
+def _validate_batch_size(batch_size):
+    if not isinstance(batch_size, Integral) or isinstance(batch_size, bool):
+        raise ValueError("batch_size must be a positive integer")
+    if batch_size <= 0:
+        raise ValueError("Batch size must be positive")
 
 
 class _BatchMixin:
@@ -168,6 +176,7 @@ class _BatchMixin:
         where: Optional[str] = None,
         columns: Optional[List[str]] = None,
     ) -> None:
+        _validate_batch_size(batch_size)
         with self.transaction():
             self._run_many(
                 sql_command="UPDATE",
@@ -194,6 +203,7 @@ class _BatchMixin:
         limitation is not fail-fast validation. Transaction entry may commit
         already pending connection work, even if no input rows are selected.
         """
+        _validate_batch_size(batch_size)
         with self.transaction():
             self._run_many(
                 sql_command="INSERT",
@@ -219,6 +229,7 @@ class _BatchMixin:
         limitation is not fail-fast validation. Transaction entry may commit
         already pending connection work, even if no input rows are selected.
         """
+        _validate_batch_size(batch_size)
         with self.transaction():
             self._run_many(
                 sql_command="REPLACE",

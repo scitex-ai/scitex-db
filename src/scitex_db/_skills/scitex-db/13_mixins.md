@@ -112,6 +112,23 @@ owners: SQLite `_BatchMixin._run_many` and `_TransactionMixin.begin/transaction`
 The existing class transaction and context-exit tests below cover their stated
 cases; they do not qualify every batch failure or nested transaction scenario.
 
+## SQLite batch-size preconditions
+
+`insert_many`, `replace_many` and `update_many` require a positive integer
+`batch_size`, including NumPy integer scalars. Booleans, floats, strings, `None`,
+zero and negative values raise `ValueError` before SQL or transaction entry.
+The error identifies the batch size; nonpositive, non-bool integers retain
+their previous message. Refusal preserves pending caller writes for rollback, input data,
+table rows, schema and indexes. This is a precondition guarantee only: valid
+calls retain the transaction-entry commits and other limits described above.
+Validation does not add UPDATE chunking or general failure atomicity.
+
+The owning `_SQLite3Mixins/_BatchMixin.py::_validate_batch_size` is called before
+each public batch method enters `transaction()`. The lower `_run_many` check
+remains; direct private calls do not gain the public precondition guarantee.
+Native refusal, pending-work and positive Python/NumPy controls live in
+`tests/scitex_db/_sqlite3/_SQLite3Mixins/test__BatchMixin_sizes.py`.
+
 ## Evidence and coverage limits
 
 The SQLite tests in `tests/scitex_db/_sqlite3/test__SQLite3.py` exercise

@@ -7,6 +7,10 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Validate public SQLite batch sizes before transaction entry, refusing non-integer
+  and boolean sizes and preserving pending writes on invalid-size refusal.
+
 ### Documentation
 - Clarify SQLite input-row batch filtering, suppressed evaluation errors and
   transaction-entry commits of prior caller work; runtime behavior is unchanged.
