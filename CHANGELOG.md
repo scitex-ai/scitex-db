@@ -7,6 +7,11 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Documentation
+- Clarify SQLite input-row batch filtering, suppressed evaluation errors and
+  transaction-entry commits of prior caller work; runtime behavior is unchanged.
+
+
 ### Fixed
 
 - Return without a batch write when a valid SQLite `insert_many`/`replace_many` filter excludes every supplied row, instead of indexing an empty filtered list. Existing transaction policy is unchanged.

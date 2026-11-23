@@ -65,6 +65,8 @@ This does not establish PostgreSQL error parity or change SQL construction.
 all nonempty input rows; no batch INSERT/REPLACE executes. This case preserves
 rows and schema in `ro` and `rwc`. Transaction-entry/commit policy is
 unchanged; this is not an atomicity or pending-work guarantee.
+See [13_mixins.md](13_mixins.md#sqlite-batch-filters-and-transaction-boundaries)
+for predicate and transaction limits.
 Owner: `_SQLite3Mixins/_BatchMixin.py::_run_many`; native controls:
 `tests/scitex_db/_sqlite3/_SQLite3Mixins/test__BatchMixin_filter.py`.
 
