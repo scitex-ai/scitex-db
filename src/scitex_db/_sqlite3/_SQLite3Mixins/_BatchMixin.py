@@ -127,6 +127,8 @@ class _BatchMixin:
                     except Exception as e:
                         log.warning(f"Where clause evaluation failed for row: {e}")
                 rows = filtered_rows
+                if not rows:
+                    return
             schema = self.get_table_schema(table_name)
             table_columns = set(schema["name"])
             valid_columns = [col for col in rows[0].keys()]
