@@ -82,6 +82,36 @@ only that `_script_is_write` returns `True`, not that splitting is absent.
 The complete script is still passed to SQLite for execution. Comprehensive
 SQL classification and trigger-aware parsing remain unresolved gaps.
 
+## SQLite batch filters and transaction boundaries
+
+SQLite `insert_many` and `replace_many` evaluate a nonempty `where` separately
+against each supplied dictionary, using a parameterized single-row SELECT.
+For `where="score > 10"`, only supplied rows whose score exceeds 10 proceed;
+the predicate does not select existing destination rows. `update_many` takes
+a different branch: its `where` is part of the destination UPDATE statement.
+These operations do not have interchangeable predicate semantics.
+
+Valid filters selecting no supplied rows return `None` without a batch
+INSERT/REPLACE. Existing native controls for selection, no-match and read-only
+refusal live in `test__BatchMixin_filter.py` under
+`tests/scitex_db/_sqlite3/_SQLite3Mixins/`.
+
+Known limitation: insert/replace filter evaluation catches `Exception`, logs a
+warning and excludes that input row. A malformed predicate can therefore return
+normally after excluding every row; missing dictionary fields can cause partial
+selection. This is an unresolved error-reporting gap, not fail-fast validation
+or a recommended way to validate input.
+
+All three public batch methods enter `transaction()` before `_run_many`.
+`_TransactionMixin.begin` commits an already pending connection transaction
+before issuing BEGIN. Thus even a no-match batch can commit earlier caller
+writes, which a subsequent rollback cannot undo. The wrapper commits on normal
+exit and rolls back its active transaction on `Exception`; this does not give
+nested savepoint semantics or a pending-work preservation guarantee. Source
+owners: SQLite `_BatchMixin._run_many` and `_TransactionMixin.begin/transaction`.
+The existing class transaction and context-exit tests below cover their stated
+cases; they do not qualify every batch failure or nested transaction scenario.
+
 ## Evidence and coverage limits
 
 The SQLite tests in `tests/scitex_db/_sqlite3/test__SQLite3.py` exercise

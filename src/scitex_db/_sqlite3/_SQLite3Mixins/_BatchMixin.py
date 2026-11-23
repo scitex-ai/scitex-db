@@ -8,7 +8,7 @@ THIS_FILE = "/home/ywatanabe/proj/scitex_repo/src/scitex/db/_SQLite3Mixins/_Batc
 """
 Functionality:
     * Provides batch database operations for SQLite3
-    * Handles batch inserts, updates, replacements with transaction safety
+    * Wraps batch inserts, updates and replacements in transaction()
     * Supports foreign key inheritance and where clause filtering
 
 Input:
@@ -16,7 +16,7 @@ Input:
     * Support for batch size control and conditional operations
 
 Output:
-    * None, but executes database operations with transaction safety
+    * None; transaction entry can commit already pending connection work
 
 Prerequisites:
     * SQLite3 database connection
@@ -187,6 +187,13 @@ class _BatchMixin:
         inherit_foreign: bool = True,
         where: Optional[str] = None,
     ) -> None:
+        """Filter supplied rows with ``where`` before writing selected rows.
+
+        The predicate uses each input dictionary, not existing table rows.
+        Evaluation errors currently log and exclude that row; this known
+        limitation is not fail-fast validation. Transaction entry may commit
+        already pending connection work, even if no input rows are selected.
+        """
         with self.transaction():
             self._run_many(
                 sql_command="INSERT",
@@ -205,6 +212,13 @@ class _BatchMixin:
         inherit_foreign: bool = True,
         where: Optional[str] = None,
     ) -> None:
+        """Filter supplied rows with ``where`` before writing selected rows.
+
+        The predicate uses each input dictionary, not existing table rows.
+        Evaluation errors currently log and exclude that row; this known
+        limitation is not fail-fast validation. Transaction entry may commit
+        already pending connection work, even if no input rows are selected.
+        """
         with self.transaction():
             self._run_many(
                 sql_command="REPLACE",
