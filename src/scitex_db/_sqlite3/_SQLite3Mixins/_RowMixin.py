@@ -101,8 +101,9 @@ class _RowMixin:
             else:
                 return pd.DataFrame(data, columns=column_names)
 
-        except sqlite3.Error as error:
-            raise sqlite3.Error(f"Query execution failed: {str(error)}")
+        except sqlite3.Error:
+            # Keep the original subclass, arguments and SQLite error metadata.
+            raise
 
     def get_row_count(self, table_name: str = None, where: str = None) -> int:
         if table_name is None:

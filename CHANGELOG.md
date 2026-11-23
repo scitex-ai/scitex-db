@@ -9,6 +9,10 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Preserve native SQLite exception classes, arguments and error metadata through `get_rows`, matching `execute`. Remove the generic `Query execution failed:` wrapper while retaining successful result formats.
+
+### Fixed
+
 - Allocate SQLite temporary copies exclusively so same-basename sources cannot overwrite each other or share close-time cleanup. Remove allocated files on copy-source failure; this does not establish live-database snapshot consistency.
 
 ### Documentation
