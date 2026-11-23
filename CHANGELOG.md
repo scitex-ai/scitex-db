@@ -9,6 +9,10 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Return without a batch write when a valid SQLite `insert_many`/`replace_many` filter excludes every supplied row, instead of indexing an empty filtered list. Existing transaction policy is unchanged.
+
+### Fixed
+
 - Preserve native SQLite exception classes, arguments and error metadata through `get_rows`, matching `execute`. Remove the generic `Query execution failed:` wrapper while retaining successful result formats.
 
 ### Fixed
