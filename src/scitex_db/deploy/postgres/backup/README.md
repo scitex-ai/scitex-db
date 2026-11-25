@@ -11,12 +11,29 @@ recovery chain together. (Standing card:
 
 ## What it is
 
-- `wal-sync-primary.sh` — ports compute-04's production `wal_sync.sh` verdict
-  rules (its header records the audits that paid for them): archiver health
-  first and it FAILS the unit; prune only files individually confirmed
-  offsite BY NAME; zero segments with archiving on is an emergency; staleness
-  and timeline gates because `failed=0` forever is what a disabled archiver
-  looks like.
+- `wal-sync-primary.sh` ports compute-04's production `wal_sync.sh` verdict
+  rules. Its header records the audits that paid for them. Archiver health is
+  checked first, and a failure fails the unit. Zero segments with archiving on
+  is an emergency. Staleness and timeline are gated, because `failed=0`
+  forever is also what a disabled archiver looks like.
+  Hardened after the 2026-11-24/25 outage:
+  - **Offsite is confirmed by content, not by name.** A file counts as
+    offsite only when the far side has the same size AND the same SHA-256.
+    Each file is hashed once per side (at most `SCITEX_PG_VERIFY_MAX` per
+    run), and the match is recorded in `$SCITEX_PG_STATE_DIR/verified.tsv`.
+    Files about to be pruned are hashed again on both sides just before
+    deletion.
+  - **No pruning on a bad run.** Any alert in a run means nothing is deleted
+    that run: archiver unhealthy, database unreachable, push failed, a
+    truncated segment, or a conflict.
+  - **The push never overwrites.** It uses `rsync --ignore-existing`. A far
+    side file that differs from the local one is a CONFLICT. The run alerts,
+    keeps both (the local copy is uploaded beside it as
+    `NAME.conflict-<sha12>`), and prunes neither.
+  - **A segment whose size is not 16 MiB is a truncated copy.** The run
+    alerts, does not push it, and does not prune it.
+  - **Every alert exits non-zero.** `--dry-run` measures and verifies but
+    changes nothing.
 - `scitex-pg-wal-sync.{service,timer}` — user units, every 15 minutes.
 - `wal-sync.env.<host>.example` — per-host values. Nothing is baked in; the
   script refuses to run without its declarations (`:?`).
@@ -32,6 +49,9 @@ recovery chain together. (Standing card:
 
 ## Verifying — checks that can fail
 
+    # load the env file the way systemd's EnvironmentFile= does (values are unquoted)
+    while IFS= read -r l; do case "$l" in ''|'#'*) ;; *) export "$l" ;; esac; done < ~/.scitex/pg/wal-sync.env
+    ~/.scitex/pg/bin/wal-sync-primary.sh --dry-run; echo rc=$?   # changes nothing
     systemctl --user start scitex-pg-wal-sync.service; echo rc=$?
     tail ~/.scitex/pg/logs/wal-sync.log
     ssh -i ~/.ssh/id_mesh scitex-nas-02 'ls pg-backups/nas-03/wal-archive | wc -l'
