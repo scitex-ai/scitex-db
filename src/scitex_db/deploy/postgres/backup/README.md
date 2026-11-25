@@ -34,6 +34,11 @@ recovery chain together. (Standing card:
     alerts, does not push it, and does not prune it.
   - **Every alert exits non-zero.** `--dry-run` measures and verifies but
     changes nothing.
+- `archiver_status.sh` is the `SCITEX_PG_ARCHIVER_STATUS` command on nas-03.
+  It prints the primary's archiver state as `key=value` lines through
+  `docker exec … psql`. When psql cannot connect, every value is empty, and
+  wal-sync reports that as the database being down. It ran untracked on
+  nas-03 from 2026-08-28 and is tracked here verbatim since 2026-11-25.
 - `scitex-pg-wal-sync.{service,timer}` — user units, every 15 minutes.
 - `wal-sync.env.<host>.example` — per-host values. Nothing is baked in; the
   script refuses to run without its declarations (`:?`).
