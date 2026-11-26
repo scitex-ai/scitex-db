@@ -11,6 +11,7 @@ __DIR__ = os.path.dirname(__FILE__)
 
 import sqlite3
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import scitex_logging as slogging
@@ -30,9 +31,11 @@ class OptimizedInspector:
 
     @contextmanager
     def connection(self):
-        """Context manager for database connection reuse."""
+        """Reuse a read-only connection to an existing SQLite file."""
         if self._conn is None:
-            self._conn = sqlite3.connect(self.db_path)
+            self._conn = sqlite3.connect(
+                Path(self.db_path).absolute().as_uri() + "?mode=ro", uri=True
+            )
             self._conn.row_factory = (
                 sqlite3.Row
             )  # Enable column access by name
@@ -76,16 +79,18 @@ class OptimizedInspector:
 
         with self.connection() as cursor:
             for table_name in table_names:
+                quoted_table = '"' + table_name.replace('"', '""') + '"'
                 # Get column info
-                cursor.execute(f"PRAGMA table_info({table_name})")
+                cursor.execute(f"PRAGMA table_info({quoted_table})")
                 columns = cursor.fetchall()
 
                 # Get primary key info more efficiently
                 cursor.execute(
-                    f"""
-                    SELECT name FROM pragma_table_info('{table_name}')
+                    """
+                    SELECT name FROM pragma_table_info(?)
                     WHERE pk > 0
-                """
+                """,
+                    (table_name,),
                 )
                 pk_columns = {row[0] for row in cursor.fetchall()}
 
@@ -111,6 +116,7 @@ class OptimizedInspector:
         table_names: List[str],
         sample_size: int = 5,
         skip_count: bool = False,
+        skip_blob_content: bool = False,
     ) -> Dict[str, Dict]:
         """Get statistics for multiple tables efficiently.
 
@@ -118,6 +124,7 @@ class OptimizedInspector:
             table_names: List of table names to inspect
             sample_size: Number of sample rows to retrieve
             skip_count: If True, skip the COUNT(*) query for performance
+            skip_blob_content: Project BLOB sizes in SQLite instead of fetching bytes
 
         Returns:
             Dict mapping table_name to statistics dictionary
@@ -126,11 +133,25 @@ class OptimizedInspector:
 
         with self.connection() as cursor:
             for table_name in table_names:
+                quoted_table = '"' + table_name.replace('"', '""') + '"'
                 table_stats = {}
 
-                # Get sample data
+                # A zero-row descriptor also includes generated/visible view columns.
+                sample_columns = "*"
+                if skip_blob_content:
+                    cursor.execute(f"SELECT * FROM {quoted_table} LIMIT 0")
+                    names = [description[0] for description in cursor.description]
+                    projections = []
+                    for name in names:
+                        column = '"' + name.replace('"', '""') + '"'
+                        projections.append(
+                            f"CASE WHEN typeof({column}) = 'blob' "
+                            f"THEN '<BLOB ' || length({column}) || ' bytes>' "
+                            f"ELSE {column} END AS {column}"
+                        )
+                    sample_columns = ", ".join(projections)
                 cursor.execute(
-                    f"SELECT * FROM {table_name} LIMIT {sample_size}"
+                    f"SELECT {sample_columns} FROM {quoted_table} LIMIT {sample_size}"
                 )
                 table_stats["columns"] = [
                     desc[0] for desc in cursor.description
@@ -143,7 +164,7 @@ class OptimizedInspector:
                     cursor.execute(
                         f"""
                         SELECT COUNT(*) FROM (
-                            SELECT 1 FROM {table_name} LIMIT 100000
+                            SELECT 1 FROM {quoted_table} LIMIT 100000
                         )
                     """
                     )
@@ -151,12 +172,12 @@ class OptimizedInspector:
 
                     if approx_count < 100000:
                         # Small table, get exact count
-                        cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+                        cursor.execute(f"SELECT COUNT(*) FROM {quoted_table}")
                         table_stats["row_count"] = cursor.fetchone()[0]
                         table_stats["is_approximate"] = False
                     else:
-                        # Large table, use approximate count
-                        table_stats["row_count"] = f">{approx_count:,}"
+                        # The capped probe proves an inclusive lower bound.
+                        table_stats["row_count"] = f">={approx_count:,}"
                         table_stats["is_approximate"] = True
                 else:
                     table_stats["row_count"] = "Not counted"
@@ -180,7 +201,7 @@ class OptimizedInspector:
             table_names: Tables to inspect (None for all)
             sample_size: Number of sample rows
             skip_count: Skip row counting for performance
-            skip_blob_content: Don't load BLOB content
+            skip_blob_content: Project BLOB size labels in SQLite; False fetches bytes
             verbose: Print results
 
         Returns:
@@ -192,7 +213,7 @@ class OptimizedInspector:
         # Batch operations for efficiency
         table_info = self.get_table_info_batch(table_names)
         table_stats = self.get_table_stats_batch(
-            table_names, sample_size, skip_count
+            table_names, sample_size, skip_count, skip_blob_content=skip_blob_content
         )
 
         results = []

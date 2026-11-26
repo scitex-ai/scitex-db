@@ -10,6 +10,7 @@ __DIR__ = os.path.dirname(__FILE__)
 # ----------------------------------------
 
 import sqlite3
+from contextlib import closing
 from typing import Any, Dict, List
 
 import pandas as pd
@@ -58,7 +59,7 @@ def check_health(
     results["stats"]["file_size_mb"] = os.path.getsize(db_path) / (1024 * 1024)
 
     try:
-        with sqlite3.connect(db_path, timeout=10.0) as conn:
+        with closing(sqlite3.connect(db_path, timeout=10.0)) as conn, conn:
             cursor = conn.cursor()
             results["accessible"] = True
 
@@ -370,14 +371,17 @@ def batch_health_check(
         )
 
     # Summary
-    healthy = sum(1 for r in results.values() if r["status"] == "HEALTHY")
-    issues = sum(1 for r in results.values() if r["status"] == "ISSUES_FOUND")
-    critical = sum(1 for r in results.values() if r["status"] == "CRITICAL")
+    healthy = sum(1 for r in results.values() if r.get("status") == "HEALTHY")
+    issues = sum(1 for r in results.values() if r.get("status") == "ISSUES_FOUND")
+    critical = sum(1 for r in results.values() if r.get("status") == "CRITICAL")
+
+    incomplete = sum(1 for r in results.values() if "status" not in r)
 
     log.info(f"\nBatch Health Check Summary:")
     log.info(f"  Healthy: {healthy}")
     log.info(f"  Issues: {issues}")
     log.info(f"  Critical: {critical}")
+    log.info(f"  Incomplete: {incomplete}")
 
     return results
 

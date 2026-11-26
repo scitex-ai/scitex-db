@@ -26,6 +26,8 @@ services:
       - ${SCITEX_PG_DATA:?path to the data directory, e.g. ~/.scitex/pg/cards18}:/var/lib/postgresql/data
       - ${SCITEX_PG_WAL_ARCHIVE:?path to the WAL archive dir}:/var/lib/postgresql/wal-archive
       - ${SCITEX_PG_PGPASS:?path to a .pgpass file}:/var/lib/postgresql/.pgpass
+      # The archive_command (archive-wal.sh beside this file), read-only.
+      - ${SCITEX_PG_ARCHIVE_SCRIPT:?path to archive-wal.sh, e.g. ~/.scitex/pg/bin/archive-wal.sh}:/usr/local/bin/scitex-pg-archive-wal:ro
     command:
       - -c
       - port=${SCITEX_PG_PORT:-55432}
@@ -40,7 +42,11 @@ services:
       - -c
       - archive_mode=on
       - -c
-      - archive_command=test ! -f /var/lib/postgresql/wal-archive/%f && cp -f %p /var/lib/postgresql/wal-archive/%f
+      # Copy to a temp name, fsync, publish with an atomic no-clobber link; an
+      # existing archived file is success only when byte-identical. Replaces
+      # `test ! -f DEST && cp`, which left a TRUNCATED segment under its real
+      # name when the disk filled (2026-11-24) and then failed every retry.
+      - archive_command=/usr/local/bin/scitex-pg-archive-wal %p %f /var/lib/postgresql/wal-archive
       - -c
       - archive_timeout=300
       - -c
@@ -62,6 +68,23 @@ services:
       - max_wal_senders=${SCITEX_PG_MAX_WAL_SENDERS:-20}
       - -c
       - max_replication_slots=${SCITEX_PG_MAX_REPLICATION_SLOTS:-20}
+      # Connection logging, REDUCED rather than removed (2026-11-25). 'all' wrote
+      # four lines per connection plus a disconnection line into the docker log,
+      # which grew to 129 GB and filled /volume1. 'authorization' keeps one line
+      # per connection with role, database and application (ADR-0013 tier 1:
+      # who connected, from where, when); disconnections are dropped. Both are
+      # reload-level settings; declared here they override postgresql.conf.
+      - -c
+      - log_connections=${SCITEX_PG_LOG_CONNECTIONS:-authorization}
+      - -c
+      - log_disconnections=${SCITEX_PG_LOG_DISCONNECTIONS:-off}
+    # The json-file driver keeps everything by default; unbounded, it filled the
+    # volume under this database (2026-11-24). 5 x 100 MB = 500 MB at most.
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
     healthcheck:
       # pg_isready exits 0 only when the server accepts connections — a check
       # that can actually fail, unlike `docker ps`.

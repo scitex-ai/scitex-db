@@ -201,4 +201,47 @@ def test_an_empty_result_is_constructible() -> None:
     assert result.submitted == 0
 
 
+@pytest.mark.parametrize("observed", [None, 0, 9])
+@pytest.mark.parametrize("required", [True, False, 7.0, "7", None, []])
+def test_required_version_type_for_unknown_and_known_stores(observed, required):
+    # Arrange
+    # Act
+    # Assert
+    with pytest.raises(TypeError, match="required must be an int"):
+        should_run_ddl(observed=observed, required=required)
+
+
+def test_invalid_required_cannot_create_schema(db: sqlite3.Connection) -> None:
+    # Arrange
+    refused = False
+    # Act
+    try:
+        execute_ddl(db, _SCHEMA, run=should_run_ddl(observed=None, required=True))
+    except TypeError:
+        refused = True
+    # Assert
+    assert (refused, _table_names(db)) == (True, set())
+
+
+@pytest.mark.parametrize("run", [None, 0, 1, "False", "True", [], [1], {}])
+def test_run_flag_type_is_validated(db: sqlite3.Connection, run) -> None:
+    # Arrange
+    # Act
+    # Assert
+    with pytest.raises(TypeError, match="run must be a bool"):
+        execute_ddl(db, _SCHEMA, run=run)
+
+
+def test_invalid_run_cannot_create_schema(db: sqlite3.Connection) -> None:
+    # Arrange
+    refused = False
+    # Act
+    try:
+        execute_ddl(db, _SCHEMA, run="False")
+    except TypeError:
+        refused = True
+    # Assert
+    assert (refused, _table_names(db)) == (True, set())
+
+
 # EOF

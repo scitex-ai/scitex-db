@@ -5,6 +5,7 @@
 
 THIS_FILE = "/home/ywatanabe/proj/scitex_repo/src/scitex/db/_SQLite3Mixins/_ImportExportMixin.py"
 
+from numbers import Integral
 from typing import List
 
 import pandas as pd
@@ -21,28 +22,49 @@ class _ImportExportMixin:
         batch_size: int = 10_000,
         chunk_size: int = 100_000,
     ) -> None:
-        with self.transaction():
-            try:
-                # Determine target table columns so we can drop CSV columns
-                # the table doesn't have (e.g. exporting an `id` PRIMARY KEY
-                # and importing into a table without that column).
-                target_cols = set(self.get_table_schema(table_name)["name"].tolist())
-                for chunk in pd.read_csv(csv_path, chunksize=chunk_size):
-                    extra = [c for c in chunk.columns if c not in target_cols]
-                    if extra:
-                        chunk = chunk.drop(columns=extra)
-                    chunk.to_sql(
-                        table_name,
-                        self.conn,
-                        if_exists=if_exists,
-                        index=False,
-                        chunksize=batch_size,
-                    )
-                    if_exists = "append"
-            except FileNotFoundError:
-                raise FileNotFoundError(f"CSV file not found: {csv_path}")
-            except Exception as err:
-                raise ValueError(f"Failed to import from CSV: {err}")
+        """Import CSV with positive, non-bool integer batch and chunk sizes.
+
+        Refuse invalid sizes or policies before transaction entry or CSV reads.
+        Open the CSV reader before entering the transaction; always close it.
+        """
+        for name, size in (("batch_size", batch_size), ("chunk_size", chunk_size)):
+            if not isinstance(size, Integral) or isinstance(size, bool) or size <= 0:
+                raise ValueError(
+                    f"Failed to import from CSV: {name} must be a positive integer"
+                )
+        if not isinstance(if_exists, str) or if_exists not in ("append", "replace", "fail"):
+            raise ValueError(
+                "Failed to import from CSV: if_exists must be 'append', 'replace' or 'fail'"
+            )
+        try:
+            chunks = pd.read_csv(csv_path, chunksize=chunk_size)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"CSV file not found: {csv_path}")
+        except Exception as err:
+            raise ValueError(f"Failed to import from CSV: {err}")
+        with chunks:
+            with self.transaction():
+                try:
+                    # Determine target table columns so we can drop CSV columns
+                    # the table doesn't have (e.g. exporting an `id` PRIMARY KEY
+                    # and importing into a table without that column).
+                    target_cols = set(self.get_table_schema(table_name)["name"].tolist())
+                    for chunk in chunks:
+                        extra = [c for c in chunk.columns if c not in target_cols]
+                        if extra:
+                            chunk = chunk.drop(columns=extra)
+                        chunk.to_sql(
+                            table_name,
+                            self.conn,
+                            if_exists=if_exists,
+                            index=False,
+                            chunksize=batch_size,
+                        )
+                        if_exists = "append"
+                except FileNotFoundError:
+                    raise FileNotFoundError(f"CSV file not found: {csv_path}")
+                except Exception as err:
+                    raise ValueError(f"Failed to import from CSV: {err}")
 
     def save_to_csv(
         self,
@@ -52,12 +74,22 @@ class _ImportExportMixin:
         where: str = None,
         batch_size: int = 10_000,
     ) -> None:
+        """Export CSV using a positive, non-bool integer batch size.
+
+        Invalid batch sizes raise ValueError before SQL or output changes.
+        """
         # When the caller passes ["*"] (or no value), select all columns by
         # leaving columns=None so get_rows emits SELECT * — passing ["*"]
         # would produce SELECT "*" and a CSV with a literal "*" header.
         if columns is None or columns == ["*"]:
             columns = None
         try:
+            if (
+                not isinstance(batch_size, Integral)
+                or isinstance(batch_size, bool)
+                or batch_size <= 0
+            ):
+                raise ValueError("batch_size must be a positive integer")
             df = self.get_rows(
                 columns=columns,
                 table_name=table_name,

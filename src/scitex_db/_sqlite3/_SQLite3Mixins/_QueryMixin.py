@@ -57,16 +57,10 @@ _WORD = re.compile(r"[A-Za-z_]+")
 
 
 def _blank_noise(sql: str) -> str:
-    """Replace comments and quoted text with spaces, preserving length.
+    """Replace recognized comments and quoted text with equal-length spaces.
 
-    A keyword search over raw SQL matches PROSE: a column named ``created_at``
-    contains ``CREATE``, and ``WHERE note LIKE '%dropped%'`` contains ``DROP``.
-    Blanking the parts that can hold arbitrary text leaves only syntax, which
-    the user does not control -- the same principle as anchoring a test on
-    something prose cannot produce.
-
-    Spaces rather than removal so offsets and token boundaries survive.
-    """
+    This regex supports the forms below for keyword classification. It is
+    not a SQLite tokenizer or a validator for arbitrary SQL."""
     return _COMMENT_OR_LITERAL.sub(lambda m: " " * len(m.group(0)), sql)
 
 
@@ -77,37 +71,18 @@ def _leading_keyword(sql: str) -> str:
 
 
 def _is_write_query(sql: str) -> bool:
-    """Whether ``sql`` mutates the database.
+    """Classify SQL for this wrapper's writable check and observer dispatch.
 
-    Single source of truth for the write/read split: it gates both the
-    read-only guard (``_check_writable``) and observer dispatch, so the two can
-    never disagree about what counts as a write.
+    Ordinary statements use a leading keyword; WITH uses the depth-based
+    helper below. Recognized comments and quoted text are blanked first, so
+    SELECT columns such as created_at and literals containing DROP do not
+    count as writes. Unknown leading keywords count as writes.
 
-    DECIDED BY THE LEADING KEYWORD, NOT BY SCANNING THE BODY. The previous
-    implementation asked ``any(keyword in sql.upper())``, which classifies
-    ordinary reads as writes because a column name is text too. Measured on the
-    live scitex-cards schema:
-
-        SELECT created_at FROM tasks                  -> matched CREATE
-        SELECT id, updated_at ... WHERE deleted_at    -> matched UPDATE, DELETE
-        SELECT * FROM t WHERE note LIKE '%dropped%'   -> matched DROP
-
-    That is not a rare edge: scitex-cards has 171 occurrences of
-    ``created_at``/``updated_at``/``deleted_at``, so a large fraction of their
-    reads were refused on a read-only connection -- and, because this same
-    function routes observer dispatch, a misclassified SELECT also fired
-    ``post_save`` observers announcing a write that never happened.
-
-    ``WITH`` is resolved rather than guessed: a CTE may precede either a SELECT
-    or an INSERT, so the first write keyword appearing at paren depth 0 decides
-    it. Blanked literals mean a CTE body containing the word INSERT cannot vote.
-
-    AN UNRECOGNISED LEADING KEYWORD COUNTS AS A WRITE. The two possible errors
-    are not symmetric: treating an unknown statement as a read would let it past
-    the read-only guard and fire the wrong observer, while treating it as a
-    write costs an unnecessary refusal on a read-only connection. Unknown
-    collapses toward the safe pole, and it collapses deliberately.
-    """
+    This is a routing heuristic, not proof of SQLite side effects or an
+    authorization boundary. Every PRAGMA is read-classified, including
+    assignments such as PRAGMA user_version = 7 that can change the database.
+    SQLite's native read-only connection and query_only policy remain separate
+    controls. Comprehensive SQL classification remains an unresolved gap."""
     keyword = _leading_keyword(sql)
     if keyword == "WITH":
         return _cte_leads_to_write(sql)
@@ -119,13 +94,12 @@ def _is_write_query(sql: str) -> bool:
 
 
 def _split_statements(script: str) -> list[str]:
-    """Split ``script`` on statement-terminating semicolons.
+    """Split SQL into classification fragments at depth-zero semicolons.
 
-    Only depth-0 semicolons outside literals terminate a statement, so a
-    semicolon inside a string or a trigger body does not split it -- which
-    matters here because trigger bodies are exactly where this store keeps its
-    ``BEGIN ... END`` guards.
-    """
+    Recognized quotes/comments and parentheses protect their semicolons.
+    BEGIN ... END trigger bodies are not tracked and can produce multiple
+    fragments. The result is not a sequence of complete SQLite statements;
+    it is used only by the script classification heuristic."""
     blanked = _blank_noise(script)
     statements, start, depth = [], 0, 0
     for index, char in enumerate(blanked):
@@ -141,23 +115,19 @@ def _split_statements(script: str) -> list[str]:
 
 
 def _script_is_write(script: str) -> bool:
-    """Whether ANY statement in a multi-statement script mutates the database.
+    """Whether any classification fragment is write-classified.
 
-    `executescript` takes a script, and the leading keyword only describes its
-    FIRST statement -- ``SELECT 1; DROP TABLE t;`` leads with a read. Asking
-    each statement separately is what keeps the leading-keyword fix from making
-    scripts less safe than the substring check it replaced.
-    """
+    This detects SELECT 1; DROP TABLE t even though the first fragment reads.
+    It inherits the classifier's limits: PRAGMA assignments remain read-
+    classified, and trigger fragments are not complete parsed statements."""
     return any(_is_write_query(statement) for statement in _split_statements(script))
 
 
 def _cte_leads_to_write(sql: str) -> bool:
-    """Whether a ``WITH`` statement ends in a write, by depth-0 keyword.
+    """Classify WITH by its first recognized depth-zero write word or SELECT.
 
-    ``WITH x AS (SELECT ...) INSERT INTO t ...`` writes; the same CTE followed
-    by ``SELECT`` does not. Only depth 0 is consulted, so a subquery cannot
-    decide the outer statement's kind.
-    """
+    Blanked quoted text and parenthesized CTE bodies do not vote. This is a
+    depth-based heuristic, not a complete parser for SQLite's WITH grammar."""
     blanked = _blank_noise(sql)
     depth = 0
     token = ""

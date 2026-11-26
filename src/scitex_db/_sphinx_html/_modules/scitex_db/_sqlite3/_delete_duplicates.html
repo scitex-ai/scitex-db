@@ -5,15 +5,16 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>scitex_db._sqlite3._delete_duplicates &mdash; SciTeX DB v0.1.12</title>
+  <title>scitex_db._sqlite3._delete_duplicates &mdash; SciTeX DB v0.2.3</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/sphinx_autodoc_typehints.css?v=057ac668" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=297ad043"></script>
+      <script src="../../../_static/documentation_options.js?v=a47416a6"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
@@ -68,6 +69,8 @@
 <li class="toctree-l2"><a class="reference internal" href="../../../api/scitex_db.html#scitex_db.delete_duplicates"><code class="docutils literal notranslate"><span class="pre">delete_duplicates()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../api/scitex_db.html#scitex_db.delete_sqlite3_duplicates"><code class="docutils literal notranslate"><span class="pre">delete_sqlite3_duplicates()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../api/scitex_db.html#scitex_db.inspect"><code class="docutils literal notranslate"><span class="pre">inspect()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/scitex_db.html#scitex_db.register_post_load_hook"><code class="docutils literal notranslate"><span class="pre">register_post_load_hook()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/scitex_db.html#scitex_db.register_post_save_hook"><code class="docutils literal notranslate"><span class="pre">register_post_save_hook()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -99,22 +102,27 @@
   <h1>Source code for scitex_db._sqlite3._delete_duplicates</h1><div class="highlight"><pre>
 <span></span><span class="ch">#!/usr/bin/env python3</span>
 <span class="c1"># -*- coding: utf-8 -*-</span>
-<span class="c1"># Timestamp: &quot;2025-07-16 14:00:04 (ywatanabe)&quot;</span>
+<span class="c1"># Timestamp: "2025-07-16 14:00:04 (ywatanabe)"</span>
 <span class="c1"># File: /ssh:sp:/home/ywatanabe/proj/scitex_repo/src/scitex/db/_sqlite3/_delete_duplicates.py</span>
 <span class="c1"># ----------------------------------------</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
 
 <span class="n">__FILE__</span> <span class="o">=</span> <span class="vm">__file__</span>
 <span class="n">__DIR__</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">__FILE__</span><span class="p">)</span>
 <span class="c1"># ----------------------------------------</span>
-<span class="c1"># Time-stamp: &quot;2024-11-11 14:16:58 (ywatanabe)&quot;</span>
+<span class="c1"># Time-stamp: "2024-11-11 14:16:58 (ywatanabe)"</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">sqlite3</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">scitex_logging</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">slogging</span>
 
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="n">log</span> <span class="o">=</span> <span class="n">slogging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="sd">"""</span>
 <span class="sd">Functionality:</span>
 <span class="sd">    - Deletes duplicate entries from an SQLite database table</span>
 <span class="sd">Input:</span>
@@ -123,11 +131,11 @@
 <span class="sd">    - Updated SQLite database with duplicates removed</span>
 <span class="sd">Prerequisites:</span>
 <span class="sd">    - sqlite3, pandas, tqdm, scitex</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_sort_db</span><span class="p">(</span><span class="n">cursor</span><span class="p">:</span> <span class="n">sqlite3</span><span class="o">.</span><span class="n">Cursor</span><span class="p">,</span> <span class="n">table_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">columns</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Sorts the database table based on the specified columns.</span>
 
 <span class="sd">    Parameters</span>
@@ -141,20 +149,20 @@
 
 <span class="sd">    Example</span>
 <span class="sd">    -------</span>
-<span class="sd">    &gt;&gt;&gt; conn = sqlite3.connect(&#39;example.db&#39;)</span>
+<span class="sd">    &gt;&gt;&gt; conn = sqlite3.connect('example.db')</span>
 <span class="sd">    &gt;&gt;&gt; cursor = conn.cursor()</span>
-<span class="sd">    &gt;&gt;&gt; _sort_db(cursor, &#39;my_table&#39;, [&#39;column1&#39;, &#39;column2&#39;])</span>
+<span class="sd">    &gt;&gt;&gt; _sort_db(cursor, 'my_table', ['column1', 'column2'])</span>
 <span class="sd">    &gt;&gt;&gt; conn.commit()</span>
 <span class="sd">    &gt;&gt;&gt; conn.close()</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">columns_str</span> <span class="o">=</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">columns</span><span class="p">)</span>
-    <span class="n">temp_table</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">_temp&quot;</span>
+<span class="sd">    """</span>
+    <span class="n">columns_str</span> <span class="o">=</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">columns</span><span class="p">)</span>
+    <span class="n">temp_table</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">_temp"</span>
 
     <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
-        <span class="sa">f</span><span class="s2">&quot;CREATE TABLE </span><span class="si">{</span><span class="n">temp_table</span><span class="si">}</span><span class="s2"> AS SELECT * FROM </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2"> ORDER BY </span><span class="si">{</span><span class="n">columns_str</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="sa">f</span><span class="s2">"CREATE TABLE </span><span class="si">{</span><span class="n">temp_table</span><span class="si">}</span><span class="s2"> AS SELECT * FROM </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2"> ORDER BY </span><span class="si">{</span><span class="n">columns_str</span><span class="si">}</span><span class="s2">"</span>
     <span class="p">)</span>
-    <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;DROP TABLE </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-    <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;ALTER TABLE </span><span class="si">{</span><span class="n">temp_table</span><span class="si">}</span><span class="s2"> RENAME TO </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">"DROP TABLE </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">"ALTER TABLE </span><span class="si">{</span><span class="n">temp_table</span><span class="si">}</span><span class="s2"> RENAME TO </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
 
 <span class="c1"># def _determine_columns(</span>
@@ -163,26 +171,26 @@
 <span class="c1">#     columns: Union[str, List[str]],</span>
 <span class="c1">#     include_blob: bool,</span>
 <span class="c1"># ) -&gt; List[str]:</span>
-<span class="c1">#     cursor.execute(f&quot;PRAGMA table_info({table_name})&quot;)</span>
+<span class="c1">#     cursor.execute(f"PRAGMA table_info({table_name})")</span>
 <span class="c1">#     table_info = cursor.fetchall()</span>
 <span class="c1">#     all_columns = [col[1] for col in table_info]</span>
 <span class="c1">#     column_types = {col[1]: col[2] for col in table_info}</span>
 
-<span class="c1">#     if columns == &quot;all&quot;:</span>
+<span class="c1">#     if columns == "all":</span>
 <span class="c1">#         columns = (</span>
 <span class="c1">#             all_columns</span>
 <span class="c1">#             if include_blob</span>
 <span class="c1">#             else [</span>
 <span class="c1">#                 col</span>
 <span class="c1">#                 for col in all_columns</span>
-<span class="c1">#                 if column_types[col].lower() != &quot;blob&quot;</span>
+<span class="c1">#                 if column_types[col].lower() != "blob"</span>
 <span class="c1">#             ]</span>
 <span class="c1">#         )</span>
 <span class="c1">#     elif isinstance(columns, str):</span>
 <span class="c1">#         columns = [columns]</span>
 
-<span class="c1">#     columns_str = &quot;, &quot;.join(columns)</span>
-<span class="c1">#     print(f&quot;Columns considered for duplicates: {columns_str}&quot;)</span>
+<span class="c1">#     columns_str = ", ".join(columns)</span>
+<span class="c1">#     print(f"Columns considered for duplicates: {columns_str}")</span>
 
 <span class="c1">#     return columns</span>
 
@@ -193,27 +201,27 @@
     <span class="n">columns</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]],</span>
     <span class="n">include_blob</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
-    <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;PRAGMA table_info(</span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+    <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">"PRAGMA table_info(</span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">)"</span><span class="p">)</span>
     <span class="n">table_info</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span>
     <span class="n">all_columns</span> <span class="o">=</span> <span class="p">[</span><span class="n">col</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">table_info</span><span class="p">]</span>
     <span class="n">column_types</span> <span class="o">=</span> <span class="p">{</span><span class="n">col</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span> <span class="n">col</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">table_info</span><span class="p">}</span>
     <span class="c1"># PRAGMA columns: (cid, name, type, notnull, dflt_value, pk).</span>
     <span class="n">pk_columns</span> <span class="o">=</span> <span class="p">{</span><span class="n">col</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">table_info</span> <span class="k">if</span> <span class="n">col</span><span class="p">[</span><span class="mi">5</span><span class="p">]}</span>
 
-    <span class="k">if</span> <span class="n">columns</span> <span class="o">==</span> <span class="s2">&quot;all&quot;</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">columns</span> <span class="o">==</span> <span class="s2">"all"</span><span class="p">:</span>
         <span class="c1"># Exclude PK columns — by definition unique, so they prevent any row</span>
-        <span class="c1"># from matching another and &#39;all&#39; would silently dedup nothing.</span>
+        <span class="c1"># from matching another and 'all' would silently dedup nothing.</span>
         <span class="n">columns</span> <span class="o">=</span> <span class="p">[</span><span class="n">col</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">all_columns</span> <span class="k">if</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">pk_columns</span><span class="p">]</span>
         <span class="c1"># Exclude blob columns unless caller opted in.</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">include_blob</span><span class="p">:</span>
-            <span class="n">columns</span> <span class="o">=</span> <span class="p">[</span><span class="n">col</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">columns</span> <span class="k">if</span> <span class="n">column_types</span><span class="p">[</span><span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">!=</span> <span class="s2">&quot;blob&quot;</span><span class="p">]</span>
+            <span class="n">columns</span> <span class="o">=</span> <span class="p">[</span><span class="n">col</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">columns</span> <span class="k">if</span> <span class="n">column_types</span><span class="p">[</span><span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">!=</span> <span class="s2">"blob"</span><span class="p">]</span>
         <span class="c1"># Exclude timestamp columns (e.g. created_at, updated_at).</span>
-        <span class="n">columns</span> <span class="o">=</span> <span class="p">[</span><span class="n">col</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">columns</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">col</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;_at&quot;</span><span class="p">)]</span>
+        <span class="n">columns</span> <span class="o">=</span> <span class="p">[</span><span class="n">col</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">columns</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">col</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">"_at"</span><span class="p">)]</span>
     <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">columns</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
         <span class="n">columns</span> <span class="o">=</span> <span class="p">[</span><span class="n">columns</span><span class="p">]</span>
 
-    <span class="n">columns_str</span> <span class="o">=</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">columns</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Columns considered for duplicates: </span><span class="si">{</span><span class="n">columns_str</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">columns_str</span> <span class="o">=</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">columns</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Columns considered for duplicates: </span><span class="si">{</span><span class="n">columns_str</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">columns</span>
 
@@ -221,20 +229,20 @@
 <span class="k">def</span><span class="w"> </span><span class="nf">_fetch_as_df</span><span class="p">(</span>
     <span class="n">cursor</span><span class="p">:</span> <span class="n">sqlite3</span><span class="o">.</span><span class="n">Cursor</span><span class="p">,</span> <span class="n">columns</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">table_name</span><span class="p">:</span> <span class="nb">str</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Fetching all database entries...&quot;</span><span class="p">)</span>
-    <span class="n">columns_str</span> <span class="o">=</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">columns</span><span class="p">)</span>
-    <span class="n">query</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;SELECT </span><span class="si">{</span><span class="n">columns_str</span><span class="si">}</span><span class="s2"> FROM </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Fetching all database entries..."</span><span class="p">)</span>
+    <span class="n">columns_str</span> <span class="o">=</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">columns</span><span class="p">)</span>
+    <span class="n">query</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"SELECT </span><span class="si">{</span><span class="n">columns_str</span><span class="si">}</span><span class="s2"> FROM </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">"</span>
     <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
     <span class="n">df_entries</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span>
     <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">df_entries</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="n">columns</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_find_duplicated</span><span class="p">(</span><span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
-    <span class="n">df_duplicated</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="o">.</span><span class="n">duplicated</span><span class="p">(</span><span class="n">keep</span><span class="o">=</span><span class="s2">&quot;first&quot;</span><span class="p">)]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">df_duplicated</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="o">.</span><span class="n">duplicated</span><span class="p">(</span><span class="n">keep</span><span class="o">=</span><span class="s2">"first"</span><span class="p">)]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
     <span class="n">duplication_rate</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">df_duplicated</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">df_duplicated</span><span class="p">))</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="si">{</span><span class="mi">100</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">duplication_rate</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">% of data was duplicated. Cleaning up...&quot;</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Original entries:</span><span class="se">\n</span><span class="si">{</span><span class="n">df</span><span class="o">.</span><span class="n">head</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Duplicated entries:</span><span class="se">\n</span><span class="si">{</span><span class="n">df_duplicated</span><span class="o">.</span><span class="n">head</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="se">\n</span><span class="si">{</span><span class="mi">100</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">duplication_rate</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">% of data was duplicated. Cleaning up..."</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Original entries:</span><span class="se">\n</span><span class="si">{</span><span class="n">df</span><span class="o">.</span><span class="n">head</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Duplicated entries:</span><span class="se">\n</span><span class="si">{</span><span class="n">df_duplicated</span><span class="o">.</span><span class="n">head</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">df_duplicated</span>
 
 
@@ -244,25 +252,29 @@
     <span class="n">table_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">dry_run</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bool</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if entry to delete is the one intended&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Check if entry to delete is the one intended"""</span>
     <span class="n">columns</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">duplicated_row</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
-    <span class="n">columns_str</span> <span class="o">=</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">columns</span><span class="p">)</span>
+    <span class="n">columns_str</span> <span class="o">=</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">columns</span><span class="p">)</span>
 
-    <span class="n">where_conditions</span> <span class="o">=</span> <span class="s2">&quot; AND &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2"> = ?&quot;</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">])</span>
-    <span class="n">select_query</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+    <span class="n">where_conditions</span> <span class="o">=</span> <span class="s2">" AND "</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2"> = ?"</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">])</span>
+    <span class="n">select_query</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"""</span>
 <span class="s2">        SELECT </span><span class="si">{</span><span class="n">columns_str</span><span class="si">}</span>
 <span class="s2">        FROM </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span>
 <span class="s2">        WHERE </span><span class="si">{</span><span class="n">where_conditions</span><span class="si">}</span>
-<span class="s2">    &quot;&quot;&quot;</span>
+<span class="s2">    """</span>
     <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">select_query</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">duplicated_row</span><span class="p">))</span>
     <span class="n">entries</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span>
 
     <span class="n">is_verified</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">entries</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">1</span>
 
     <span class="k">if</span> <span class="n">dry_run</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Expected duplicate entry: </span><span class="si">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">duplicated_row</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Found entries: </span><span class="si">{</span><span class="n">entries</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Verification </span><span class="si">{</span><span class="s1">&#39;succeeded&#39;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">is_verified</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;failed&#39;</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="c1"># PS-220 exception: --dry-run bodies are machine-readable data</span>
+        <span class="c1"># transport and stay on stdout (sys.stdout.write is not flagged).</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Expected duplicate entry: </span><span class="si">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">duplicated_row</span><span class="p">)</span><span class="si">}</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Found entries: </span><span class="si">{</span><span class="n">entries</span><span class="si">}</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"Verification </span><span class="si">{</span><span class="s1">'succeeded'</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">is_verified</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">'failed'</span><span class="si">}</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="p">)</span>
 
     <span class="k">return</span> <span class="n">select_query</span><span class="p">,</span> <span class="n">is_verified</span>
 
@@ -277,13 +289,14 @@
         <span class="n">cursor</span><span class="p">,</span> <span class="n">duplicated_row</span><span class="p">,</span> <span class="n">table_name</span><span class="p">,</span> <span class="n">dry_run</span>
     <span class="p">)</span>
     <span class="k">if</span> <span class="n">is_verified</span><span class="p">:</span>
-        <span class="c1"># Build DELETE directly: `select_query.replace(&quot;SELECT&quot;, &quot;DELETE&quot;)`</span>
+        <span class="c1"># Build DELETE directly: `select_query.replace("SELECT", "DELETE")`</span>
         <span class="c1"># produced `DELETE col1, col2 FROM ...` which is not valid SQLite.</span>
         <span class="n">columns</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">duplicated_row</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
-        <span class="n">where_conditions</span> <span class="o">=</span> <span class="s2">&quot; AND &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2"> = ?&quot;</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">])</span>
-        <span class="n">delete_query</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;DELETE FROM </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2"> WHERE </span><span class="si">{</span><span class="n">where_conditions</span><span class="si">}</span><span class="s2"> LIMIT 1&quot;</span>
+        <span class="n">where_conditions</span> <span class="o">=</span> <span class="s2">" AND "</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2"> = ?"</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">])</span>
+        <span class="n">delete_query</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"DELETE FROM </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2"> WHERE </span><span class="si">{</span><span class="n">where_conditions</span><span class="si">}</span><span class="s2"> LIMIT 1"</span>
         <span class="k">if</span> <span class="n">dry_run</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[DRY RUN] Would delete entry:</span><span class="se">\n</span><span class="si">{</span><span class="n">duplicated_row</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="c1"># PS-220 exception: --dry-run bodies stay on stdout.</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">"[DRY RUN] Would delete entry:</span><span class="se">\n</span><span class="si">{</span><span class="n">duplicated_row</span><span class="si">}</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">try</span><span class="p">:</span>
                 <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">delete_query</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">duplicated_row</span><span class="p">))</span>
@@ -291,14 +304,14 @@
                 <span class="c1"># Older SQLite builds compiled without ENABLE_UPDATE_DELETE_LIMIT</span>
                 <span class="c1"># — fall back to a rowid-based delete that hits one row only.</span>
                 <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;DELETE FROM </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2"> WHERE rowid = (&quot;</span>
-                    <span class="sa">f</span><span class="s2">&quot;SELECT rowid FROM </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2"> WHERE </span><span class="si">{</span><span class="n">where_conditions</span><span class="si">}</span><span class="s2"> &quot;</span>
-                    <span class="sa">f</span><span class="s2">&quot;LIMIT 1)&quot;</span><span class="p">,</span>
+                    <span class="sa">f</span><span class="s2">"DELETE FROM </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2"> WHERE rowid = ("</span>
+                    <span class="sa">f</span><span class="s2">"SELECT rowid FROM </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2"> WHERE </span><span class="si">{</span><span class="n">where_conditions</span><span class="si">}</span><span class="s2"> "</span>
+                    <span class="sa">f</span><span class="s2">"LIMIT 1)"</span><span class="p">,</span>
                     <span class="nb">tuple</span><span class="p">(</span><span class="n">duplicated_row</span><span class="p">),</span>
                 <span class="p">)</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Deleted entry:</span><span class="se">\n</span><span class="si">{</span><span class="n">duplicated_row</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Deleted entry:</span><span class="se">\n</span><span class="si">{</span><span class="n">duplicated_row</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Skipping entry (not found or already deleted):</span><span class="se">\n</span><span class="si">{</span><span class="n">duplicated_row</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Skipping entry (not found or already deleted):</span><span class="se">\n</span><span class="si">{</span><span class="n">duplicated_row</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
 
 <div class="viewcode-block" id="delete_sqlite3_duplicates">
@@ -306,87 +319,97 @@
 <span class="k">def</span><span class="w"> </span><span class="nf">delete_sqlite3_duplicates</span><span class="p">(</span>
     <span class="n">lpath_db</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">table_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-    <span class="n">columns</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="s2">&quot;all&quot;</span><span class="p">,</span>
+    <span class="n">columns</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="s2">"all"</span><span class="p">,</span>
     <span class="n">include_blob</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">chunk_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10_000</span><span class="p">,</span>
     <span class="n">dry_run</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">"""Return row and duplicate counts, previewing read-only by default.</span>
+
+<span class="sd">    Preview opens an existing SQLite file without rebuilding tables. Apply mode</span>
+<span class="sd">    deletes duplicate native ROWIDs in one transaction, preserving table schema.</span>
+<span class="sd">    Apply enables foreign keys and runs normal DELETE triggers/cascade actions.</span>
+<span class="sd">    Failures are logged and return ``(None, None)``.</span>
+<span class="sd">    """</span>
+    <span class="n">conn</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="k">try</span><span class="p">:</span>
-        <span class="n">conn</span> <span class="o">=</span> <span class="n">sqlite3</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">lpath_db</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">dry_run</span><span class="p">:</span>
+            <span class="n">conn</span> <span class="o">=</span> <span class="n">sqlite3</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+                <span class="n">Path</span><span class="p">(</span><span class="n">lpath_db</span><span class="p">)</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span><span class="o">.</span><span class="n">as_uri</span><span class="p">()</span> <span class="o">+</span> <span class="s2">"?mode=ro"</span><span class="p">,</span> <span class="n">uri</span><span class="o">=</span><span class="kc">True</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">conn</span> <span class="o">=</span> <span class="n">sqlite3</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+                <span class="n">Path</span><span class="p">(</span><span class="n">lpath_db</span><span class="p">)</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span><span class="o">.</span><span class="n">as_uri</span><span class="p">()</span> <span class="o">+</span> <span class="s2">"?mode=rw"</span><span class="p">,</span> <span class="n">uri</span><span class="o">=</span><span class="kc">True</span>
+            <span class="p">)</span>
+            <span class="n">conn</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">"PRAGMA foreign_keys=ON"</span><span class="p">)</span>
+            <span class="n">conn</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">"BEGIN IMMEDIATE"</span><span class="p">)</span>
         <span class="n">cursor</span> <span class="o">=</span> <span class="n">conn</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span>
 
-        <span class="c1"># Vacuum the database to free up space</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">dry_run</span><span class="p">:</span>
-            <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;VACUUM&quot;</span><span class="p">)</span>
-            <span class="n">conn</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
-
         <span class="n">columns</span> <span class="o">=</span> <span class="n">_determine_columns</span><span class="p">(</span><span class="n">cursor</span><span class="p">,</span> <span class="n">table_name</span><span class="p">,</span> <span class="n">columns</span><span class="p">,</span> <span class="n">include_blob</span><span class="p">)</span>
-        <span class="n">columns_str</span> <span class="o">=</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">columns</span><span class="p">)</span>
-
-        <span class="c1"># Drop temp table if exists from previous run</span>
-        <span class="n">temp_table</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">_temp&quot;</span>
-        <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;DROP TABLE IF EXISTS </span><span class="si">{</span><span class="n">temp_table</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-        <span class="c1"># Get all columns for creating temp table with same structure</span>
-        <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;PRAGMA table_info(</span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
-        <span class="n">all_cols_info</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span>
-        <span class="n">all_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">col</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">all_cols_info</span><span class="p">]</span>
-        <span class="n">all_cols_str</span> <span class="o">=</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">all_cols</span><span class="p">)</span>
-
-        <span class="c1"># Create temp table with same structure</span>
-        <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;CREATE TABLE </span><span class="si">{</span><span class="n">temp_table</span><span class="si">}</span><span class="s2"> AS SELECT </span><span class="si">{</span><span class="n">all_cols_str</span><span class="si">}</span><span class="s2"> FROM </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2"> LIMIT 0&quot;</span>
-        <span class="p">)</span>
-
-        <span class="c1"># Get total row count</span>
-        <span class="n">total_rows</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;SELECT COUNT(*) FROM </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total rows in table: </span><span class="si">{</span><span class="n">total_rows</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-        <span class="c1"># Insert unique rows based on specified columns</span>
-        <span class="n">insert_query</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
-<span class="s2">            INSERT INTO </span><span class="si">{</span><span class="n">temp_table</span><span class="si">}</span>
-<span class="s2">            SELECT </span><span class="si">{</span><span class="n">all_cols_str</span><span class="si">}</span>
-<span class="s2">            FROM (</span>
-<span class="s2">                SELECT *, ROW_NUMBER() OVER (PARTITION BY </span><span class="si">{</span><span class="n">columns_str</span><span class="si">}</span><span class="s2"> ORDER BY rowid) as rn</span>
-<span class="s2">                FROM </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span>
-<span class="s2">            )</span>
-<span class="s2">            WHERE rn = 1</span>
-<span class="s2">        &quot;&quot;&quot;</span>
+        <span class="n">columns_str</span> <span class="o">=</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">columns</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">dry_run</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[DRY RUN] Would execute deduplication based on: </span><span class="si">{</span><span class="n">columns_str</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">insert_query</span><span class="p">)</span>
-            <span class="n">conn</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+            <span class="n">total_rows</span><span class="p">,</span> <span class="n">total_unique</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+                <span class="s2">"SELECT COALESCE(SUM(group_size), 0), COUNT(*) "</span>
+                <span class="sa">f</span><span class="s2">"FROM (SELECT COUNT(*) AS group_size FROM </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2"> "</span>
+                <span class="sa">f</span><span class="s2">"GROUP BY </span><span class="si">{</span><span class="n">columns_str</span><span class="si">}</span><span class="s2">)"</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()</span>
+            <span class="n">total_duplicates</span> <span class="o">=</span> <span class="n">total_rows</span> <span class="o">-</span> <span class="n">total_unique</span>
+            <span class="c1"># PS-220 exception: --dry-run bodies stay on stdout.</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"[DRY RUN] Would execute deduplication based on: </span><span class="si">{</span><span class="n">columns_str</span><span class="si">}</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Total rows processed: </span><span class="si">{</span><span class="n">total_rows</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Total unique rows: </span><span class="si">{</span><span class="n">total_unique</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Total duplicates identified: </span><span class="si">{</span><span class="n">total_duplicates</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">total_rows</span><span class="p">,</span> <span class="n">total_duplicates</span>
 
-        <span class="c1"># Count unique rows</span>
-        <span class="n">total_unique</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;SELECT COUNT(*) FROM </span><span class="si">{</span><span class="n">temp_table</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()[</span>
-            <span class="mi">0</span>
-        <span class="p">]</span>
-        <span class="n">total_duplicates</span> <span class="o">=</span> <span class="n">total_rows</span> <span class="o">-</span> <span class="n">total_unique</span>
+        <span class="k">with</span> <span class="n">conn</span><span class="p">:</span>
+            <span class="n">table_sql</span> <span class="o">=</span> <span class="s1">'"'</span> <span class="o">+</span> <span class="n">table_name</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">'"'</span><span class="p">,</span> <span class="s1">'""'</span><span class="p">)</span> <span class="o">+</span> <span class="s1">'"'</span>
+            <span class="n">target</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+                <span class="s2">"SELECT type FROM sqlite_master WHERE name=? COLLATE NOCASE"</span><span class="p">,</span>
+                <span class="p">(</span><span class="n">table_name</span><span class="p">,),</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">target</span> <span class="ow">or</span> <span class="n">target</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">"table"</span> <span class="ow">or</span> <span class="n">table_name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"sqlite_"</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Apply requires an application table with a native ROWID"</span><span class="p">)</span>
+            <span class="n">table_info</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">"PRAGMA table_info(</span><span class="si">{</span><span class="n">table_sql</span><span class="si">}</span><span class="s2">)"</span><span class="p">)</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span>
+            <span class="n">ascii_case</span> <span class="o">=</span> <span class="nb">str</span><span class="o">.</span><span class="n">maketrans</span><span class="p">(</span><span class="s2">"ABCDEFGHIJKLMNOPQRSTUVWXYZ"</span><span class="p">,</span> <span class="s2">"abcdefghijklmnopqrstuvwxyz"</span><span class="p">)</span>
+            <span class="n">available</span> <span class="o">=</span> <span class="p">{</span><span class="n">column</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">translate</span><span class="p">(</span><span class="n">ascii_case</span><span class="p">):</span> <span class="n">column</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">table_info</span><span class="p">}</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">columns</span> <span class="ow">or</span> <span class="nb">any</span><span class="p">(</span><span class="n">column</span><span class="o">.</span><span class="n">translate</span><span class="p">(</span><span class="n">ascii_case</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">available</span> <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Deduplication columns must name existing table columns"</span><span class="p">)</span>
+            <span class="n">rowid_alias</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span>
+                <span class="p">(</span><span class="n">alias</span> <span class="k">for</span> <span class="n">alias</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"rowid"</span><span class="p">,</span> <span class="s2">"_rowid_"</span><span class="p">,</span> <span class="s2">"oid"</span><span class="p">)</span> <span class="k">if</span> <span class="n">alias</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">available</span><span class="p">),</span>
+                <span class="kc">None</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">rowid_alias</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Cannot safely address native ROWIDs: all aliases are shadowed"</span><span class="p">)</span>
+            <span class="c1"># A native lookup rejects WITHOUT ROWID tables before any deletion.</span>
+            <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SELECT </span><span class="si">{</span><span class="n">rowid_alias</span><span class="si">}</span><span class="s2"> FROM </span><span class="si">{</span><span class="n">table_sql</span><span class="si">}</span><span class="s2"> LIMIT 0"</span><span class="p">)</span>
+            <span class="n">group_columns</span> <span class="o">=</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                <span class="s1">'"'</span> <span class="o">+</span> <span class="n">available</span><span class="p">[</span><span class="n">column</span><span class="o">.</span><span class="n">translate</span><span class="p">(</span><span class="n">ascii_case</span><span class="p">)]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">'"'</span><span class="p">,</span> <span class="s1">'""'</span><span class="p">)</span> <span class="o">+</span> <span class="s1">'"'</span>
+                <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">columns</span>
+            <span class="p">)</span>
+            <span class="n">total_rows</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SELECT COUNT(*) FROM </span><span class="si">{</span><span class="n">table_sql</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"DELETE FROM </span><span class="si">{</span><span class="n">table_sql</span><span class="si">}</span><span class="s2"> WHERE </span><span class="si">{</span><span class="n">rowid_alias</span><span class="si">}</span><span class="s2"> NOT IN "</span>
+                <span class="sa">f</span><span class="s2">"(SELECT MIN(</span><span class="si">{</span><span class="n">rowid_alias</span><span class="si">}</span><span class="s2">) FROM </span><span class="si">{</span><span class="n">table_sql</span><span class="si">}</span><span class="s2"> GROUP BY </span><span class="si">{</span><span class="n">group_columns</span><span class="si">}</span><span class="s2">)"</span>
+            <span class="p">)</span>
+            <span class="n">total_duplicates</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">rowcount</span>
+            <span class="n">total_unique</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SELECT COUNT(*) FROM </span><span class="si">{</span><span class="n">table_sql</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
 
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">dry_run</span><span class="p">:</span>
-            <span class="c1"># Replace original table with deduplicated one</span>
-            <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;DROP TABLE </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-            <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;ALTER TABLE </span><span class="si">{</span><span class="n">temp_table</span><span class="si">}</span><span class="s2"> RENAME TO </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-            <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;VACUUM&quot;</span><span class="p">)</span>
-            <span class="n">conn</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="c1"># Clean up temp table in dry run</span>
-            <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;DROP TABLE IF EXISTS </span><span class="si">{</span><span class="n">temp_table</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total rows processed: </span><span class="si">{</span><span class="n">total_rows</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total unique rows: </span><span class="si">{</span><span class="n">total_unique</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total duplicates removed: </span><span class="si">{</span><span class="n">total_duplicates</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Total rows processed: </span><span class="si">{</span><span class="n">total_rows</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Total rows remaining: </span><span class="si">{</span><span class="n">total_unique</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Total duplicates removed: </span><span class="si">{</span><span class="n">total_duplicates</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">total_rows</span><span class="p">,</span> <span class="n">total_duplicates</span>
 
     <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;An error occurred: </span><span class="si">{</span><span class="n">error</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">"An error occurred: </span><span class="si">{</span><span class="n">error</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
         <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
 
     <span class="k">finally</span><span class="p">:</span>
-        <span class="n">conn</span><span class="o">.</span><span class="n">close</span><span class="p">()</span></div>
+        <span class="k">if</span> <span class="n">conn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">conn</span><span class="o">.</span><span class="n">close</span><span class="p">()</span></div>
 
 
 

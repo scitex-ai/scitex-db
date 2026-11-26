@@ -8,9 +8,10 @@ tags: [scitex-db-numpy-blob, scitex-db]
 
 # Numpy BLOB Storage
 
-The `_BaseBlobMixin` lets you stash ndarrays directly as BLOB columns
-with optional compression (zlib). Typical size reduction for float64
-arrays is 70–90%.
+`SQLite3.save_array` stores numeric NumPy arrays in BLOB columns through
+`_ArrayMixin.save_arrays`. Compression uses zlib when requested and the
+payload exceeds 1,024 bytes. Savings depend on dtype and values; measure
+stored size and CPU cost on representative data instead of assuming a percentage.
 
 ## Save / load
 
@@ -18,38 +19,179 @@ arrays is 70–90%.
 import numpy as np
 from scitex_db import SQLite3
 
-arr = np.random.randn(2000, 2000)
+arr = np.arange(2048, dtype=np.float32).reshape(512, 4)
 
 with SQLite3("arrays.db", compress_by_default=True) as db:
     db.create_table("m", {"id": "INTEGER PRIMARY KEY", "data": "BLOB"})
-    row_id = db.save_array("m", arr, column="data")
+    db.save_array("m", arr, additional_columns={"id": 1}, verbose=False)
+    db.save_array("m", arr, additional_columns={"id": 2}, compress=False, verbose=False)
+    db.save_array("m", arr + 1, ids=2, compress=False, verbose=False)
 
-    back = db.load_array("m", row_id=row_id, column="data")
-    assert back.shape == arr.shape
+    first = db.load_array("m", "data", ids=1, verbose=False)
+    updated = db.load_array("m", "data", ids=2, verbose=False)
+    assert first.shape == (1, 512, 4)
+    np.testing.assert_array_equal(first[0], arr)
+    np.testing.assert_array_equal(updated[0], arr + 1)
+
+    frame = db.get_rows("m", order_by="id")
+    stacked = db.get_array_dict(frame)["data"]
+    decoded = db.decode_array_columns(frame.copy())
+    np.testing.assert_array_equal(stacked[0], arr)
+    np.testing.assert_array_equal(stacked[1], arr + 1)
+    np.testing.assert_array_equal(decoded["data"].iloc[0], arr)
+    np.testing.assert_array_equal(decoded["data"].iloc[1], arr + 1)
+
+    empty_frame = frame.iloc[:0].copy()
+    original_empty = empty_frame.copy(deep=True)
+    assert db.get_array_dict(empty_frame) == {"data": None}
+    assert db.decode_array_columns(empty_frame).equals(original_empty)
+
+    null_frame = frame.copy()
+    null_frame["data"] = None
+    assert db.get_array_dict(null_frame)["data"] is None
+
+    scalar = np.array(7, dtype=np.int16)
+    scalar_frame = frame[["data"]].iloc[:1].copy()
+    scalar_frame["data"] = [scalar.tobytes()]
+    binary_scalar = db.binary_to_array(scalar.tobytes(), dtype=scalar.dtype, shape=())
+    assert binary_scalar.shape == () and binary_scalar.item() == 7
+    stacked_scalar = db.get_array_dict(scalar_frame, dtype=scalar.dtype, shape=())["data"]
+    assert stacked_scalar.shape == (1,) and stacked_scalar[0] == 7
+    decoded_scalar = db.decode_array_columns(scalar_frame.copy(), dtype=scalar.dtype, shape=())
+    assert decoded_scalar["data"].iloc[0].shape == () and decoded_scalar["data"].iloc[0].item() == 7
+
+    db.create_table("nullable", {"id": "INTEGER PRIMARY KEY", "data": "BLOB"})
+    db.save_array("nullable", arr, additional_columns={"id": 1}, compress=False, verbose=False)
+    db.execute("INSERT INTO nullable (id, data) VALUES (?, ?)", (2, None))
+    mixed = db.load_array("nullable", "data", verbose=False)
+    np.testing.assert_array_equal(mixed[0], arr)
+    assert np.isnan(mixed[1]).all()
+    mixed_frame = db.get_rows("nullable", order_by="id")
+    mixed_stacked = db.get_array_dict(mixed_frame)["data"]
+    assert np.array_equal(mixed_stacked, mixed, equal_nan=True)
+    mixed_decoded = db.decode_array_columns(mixed_frame.copy())
+    assert mixed_decoded["data"].iloc[1] is None
 ```
 
-`save_array(table, ndarray, column=…, row=None)` inserts a new row if
-`row` is `None`, otherwise updates `row`.
+Run the example in a new directory: it creates synthetic `arrays.db`.
+Choose insertion IDs explicitly with `additional_columns`; `ids=2` updates
+the existing row in this example. `load_array` requires the array column name
+and returns a leading row dimension even when selecting one row. A save call
+does not return an inserted row ID.
 
 ## Per-call compression override
 
-```python
-db.save_array("m", arr, column="data", compress=False)   # force raw
-```
+`compress_by_default=False` is the constructor default. The example enables
+it and overrides it with `compress=False` for the second row. The compression
+flag and companion metadata are stored per array column and row.
 
 ## Payload format
 
-Serialization: `dtype + shape + optionally-zlib-compressed .tobytes()`.
-Deserialization reads the header, then reshapes/decompresses. Round-
-trips exactly, including `dtype` and endianness on the same platform.
+The BLOB contains array bytes, optionally zlib-compressed. Companion columns
+store dtype, shape, compression flag and hash; they are not a combined binary
+header. `load_arrays` reconstructs arrays from that metadata and stacks the
+selected rows. The example checks its float32 shape and values.
+
+Shape strings are parsed as Python literals by both `load_arrays` and
+`binary_to_array`; executable Python expressions are rejected. The latter
+parser also serves `get_array_dict` and `decode_array_columns`. Existing
+literal tuple, list and integer shape forms remain accepted by the helper.
+
+With `columns`, `dtype` and `shape` omitted, both DataFrame helpers infer
+payload columns from their dtype/shape companions, preserving DataFrame order.
+Scalar fields and hashes without their own companions are excluded; real array
+names ending in metadata suffixes still qualify when they have companions.
+Explicit-column and nondefault dtype/shape-hint calls retain their existing
+selection paths. `get_array_dict` returns stacked arrays; `decode_array_columns`
+replaces cells in the supplied DataFrame, so the example passes a copy.
+For zero-row DataFrames, `get_array_dict` maps selected array columns to
+`None`, matching the main reader's absence result instead of inventing an
+array dtype or shape. `decode_array_columns` returns the same empty frame
+without changing its schema or dtypes. A stored row containing a zero-length
+NumPy array remains a present array with its original shape and dtype.
+
+A selected column whose payloads are all SQL `NULL` also maps to `None` in
+`get_array_dict`, matching `load_arrays`. This applies per column, including
+when its companion metadata values are NULL; a neighboring populated array
+column still stacks normally. The example checks an all-None DataFrame copy;
+native SQLite NULL controls and owning-reader comparisons live in
+`test_all_null_dictionary_columns_match_absence_policy` and
+`test_main_reader_all_null_columns_return_none` in the array reader test file
+below. Mixed valid/NULL rows have separate behavior described next.
+
+## Mixed floating arrays and NULL rows
+
+For the controlled non-scalar floating records in the example, `load_arrays`
+(and its single-column wrapper `load_array`) fills a NULL payload row with a
+NaN array using the first present array's shape and dtype before stacking.
+The existing NumPy stacking conversion still applies, including byte order.
+When every selected payload is NULL, the column result remains `None`.
+
+`get_array_dict` uses the same NaN fill when its first present array has a
+floating dtype. The decoder retains `None` cells. All-NULL dictionary columns
+return `None`; integer/bool/complex NULL policies remain unchanged.
+
+Owning `_ArrayMixin` methods are covered by
+`test_floating_null_dictionary_matches_main` and
+`test_mixed_null_decoder_retains_none_cell`, with adjacent dtype/shape,
+present-value and main-file byte checks in the array reader test file below.
+Main: float32, float64, big-endian float32; decoder: float32. Both schemas,
+first/middle/last NULL rows and raw/compressed present records are covered.
+Main-file byte checks do not establish WAL/sidecar or concurrency guarantees.
+
+## DataFrame selection and raw hints
+
+For `get_array_dict`, each explicitly selected column must have both dtype and
+shape companion columns, or the call must provide usable `dtype` and `shape`
+hints. An unsupported selection raises `ValueError`, including on empty frames;
+it never returns a preceding column's arrays under another name. This check
+validates metadata presence, not metadata values. Controls:
+`test_dictionary_missing_metadata_rejects_selection` and
+`test_dictionary_scalar_selection_rejects_previous_array_reuse` in the array
+reader test file named below. The in-place decoder's selection behavior is
+unchanged.
+
+For raw DataFrame payloads without companion metadata, supply both `dtype` and
+`shape` hints. The scalar example uses a one-column copy and raw int16 bytes;
+`shape=()` reconstructs a zero-dimensional scalar, while the dictionary stacks
+it into a leading row dimension `(1,)`. `None` means a missing hint; the empty
+tuple is a supplied shape. `binary_to_array` also supports these hints. Existing
+NumPy stacking conversion still applies to the dictionary. The in-place
+decoder retains scalar ndarray cells and their dtype, matching its existing
+metadata-backed scalar path. Native controls:
+`test_fallback_hint_preserves_native_payload` and
+`test_scalar_hint_default_selection_decodes_value` in the array reader test
+file below, with empty/NULL frame and missing-component controls alongside.
+This does not add fallback-hint handling to the main `load_array` reader.
+
+Both DataFrame helpers honor per-row `{column}_is_compressed` flags with
+companion metadata or fallback hints: `1`, `"1"` and `True` mean compressed.
+A missing flag means raw bytes. Native fallback controls:
+`test_fallback_flag_rows_match_metadata_values` in the adjacent test file
+`test__ArrayMixin_fallback_flags.py`.
+
+The array reader tests below cover numeric payloads with explicit and inferred columns,
+including raw/compressed rows in the same DataFrame. Wrapper-created tables
+use BOOLEAN metadata; saving arrays to pre-existing native tables can add TEXT
+metadata. Both formats retain the existing dtype and stacking conversions.
+Non-floating NULL policies,
+malformed metadata on present payloads, generic BLOBs, PostgreSQL and large-scale
+behavior remain outside this selected result.
 
 ## Large arrays
 
-For arrays >~100 MB, consider writing to disk (scitex-io) and storing
-only the path. BLOB reads load the full payload into memory.
+BLOB reads load and decode each selected payload completely. Selecting a row
+ID is not a sample-range read within a recording. Qualify the working set and
+compression trade-off on the actual data; chunked/range storage remains
+separate work. Keep each connection in its creating thread; see
+[read-only workers](17_readonly-workers.md).
 
 ## PostgreSQL
 
-Same API via `PostgreSQL`; backend uses `BYTEA`. Compression and header
-format are backend-shared so arrays saved from one backend can be
-migrated to the other at the byte level.
+PostgreSQL and migration need backend-specific checks. This SQLite example
+does not establish compatible storage bytes or cross-backend migration.
+
+Behavioral controls: `tests/scitex_db/_sqlite3/test__SQLite3.py` runs this
+specific example in an owned directory and checks values, dtype, stacked shape
+and stored compression flags. Array reader controls also live in
+`tests/scitex_db/_sqlite3/_SQLite3Mixins/test__ArrayMixin.py`.

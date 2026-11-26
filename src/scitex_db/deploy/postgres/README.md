@@ -34,6 +34,34 @@ failure mode that made vpn.scitex.ai's predecessor painful. The compose
 REFUSES to start without it (`:?`), which is a declaration failing loudly
 rather than evaporating.
 
+## archive_command: `archive-wal.sh`
+
+`archive-wal.sh` is the primary's `archive_command`. It is bind-mounted
+read-only into the container as `/usr/local/bin/scitex-pg-archive-wal`.
+
+    archive_command = /usr/local/bin/scitex-pg-archive-wal %p %f /var/lib/postgresql/wal-archive
+
+It copies the segment to a hidden temp name in the archive directory, fsyncs
+it, and compares it with the source. It then publishes it with `ln`, which is
+atomic and refuses to replace an existing name, and fsyncs the directory. If a
+segment of that name is already archived, the run succeeds only when the two
+files are byte-identical. Otherwise it fails and says so in the server log.
+Any failure removes the temp file. A full disk therefore leaves nothing
+behind, and the next retry starts clean.
+
+It replaces `test ! -f DEST && cp -f SRC DEST`. On 2026-11-24 the disk filled
+while `cp` was writing a segment, which left a truncated file under the real
+name. Every retry then hit `test ! -f`, so archiving stopped for good and WAL
+piled up in `pg_wal`. `tests/integration/test_deploy_postgres_archive_wal.py`
+reproduces that failure with the old command and shows the new one recovering
+from it.
+
+Changing `archive_command` on the command line, or adding the bind mount,
+takes effect only when the container is recreated. The same recreate also
+applies the docker log cap (`logging:`) and the reduced connection logging.
+The live nas-03 compose is the copy in `~/.dotfiles/src/.scitex/pg/compose/`,
+and its README has the apply steps.
+
 ## Verifying — a check that can fail
 
     docker inspect scitex-pg18 --format '{{.State.Health.Status}}'   # healthy

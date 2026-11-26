@@ -59,12 +59,11 @@ def main(ctx, as_json):
     """Database utilities — SQLite/Postgres inspection and health checks.
 
     \b
-    Configuration precedence (highest -> lowest):
-      1. Explicit CLI flags
-      2. ./config.yaml (project-local)
-      3. $SCITEX_DB_CONFIG (path to a YAML file)
-      4. ~/.scitex/db/config.yaml (user-wide)
-      5. Built-in defaults
+    Configuration files are not implemented. Pass paths and options explicitly.
+    ./config.yaml, SCITEX_DB_CONFIG, ~/.scitex/db/config.yaml and automatic
+    .env loading do not configure these commands. Malformed files are ignored;
+    successful commands do not validate them. Portable .scitex/db configuration
+    remains an intended contract; no file precedence is supported yet.
     """
     ctx.ensure_object(dict)
     ctx.obj["as_json"] = as_json
@@ -87,17 +86,29 @@ def main(ctx, as_json):
     default=False,
     help="Emit machine-readable JSON output.",
 )
-def inspect_db(db_path, tables, quiet, as_json):
+@click.pass_context
+def inspect_db(ctx, db_path, tables, quiet, as_json):
     """Inspect a database's structure (tables, schemas, row counts).
 
     \b
     Example:
         $ scitex-db inspect-db ./mydb.sqlite
-        $ scitex-db inspect-db ./mydb.sqlite --tables users orders
+        $ scitex-db inspect-db ./mydb.sqlite --tables users --tables orders
     """
     from ._inspect import inspect
 
-    inspect(db_path, table_names=list(tables) or None, verbose=not quiet)
+    as_json = as_json or ctx.find_root().obj.get("as_json", False)
+    results = inspect(
+        db_path, table_names=list(tables) or None, verbose=not (quiet or as_json)
+    )
+    if as_json:
+        try:
+            payload = json.dumps(results, indent=2, allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            raise click.ClickException(
+                f"Cannot encode inspection as standard JSON: {exc}"
+            ) from exc
+        click.echo(payload)
 
 
 @main.command("check-health")
@@ -131,12 +142,17 @@ def inspect_db(db_path, tables, quiet, as_json):
 def check_health(db_paths, fix, quiet, dry_run, yes, as_json):
     """Check database health and optionally repair issues.
 
+    A missing scitex loadability provider is reported before database scans or
+    repairs. This presence check does not validate the provider's implementation.
+
     \b
     Example:
         $ scitex-db check-health ./mydb.sqlite
         $ scitex-db check-health ./db1.sqlite ./db2.sqlite
         $ scitex-db check-health ./mydb.sqlite --fix --yes
     """
+    from importlib.util import find_spec
+
     from ._check_health import batch_health_check
     from ._check_health import check_health as _check
 
@@ -150,6 +166,12 @@ def check_health(db_paths, fix, quiet, dry_run, yes, as_json):
             err=True,
         )
         sys.exit(2)
+
+    if find_spec("scitex") is None:
+        raise click.ClickException(
+            "check-health cannot find the 'scitex' loadability provider. "
+            "No checks or repairs were attempted."
+        )
 
     if len(db_paths) == 1:
         _check(db_paths[0], verbose=not quiet, fix_issues=fix)

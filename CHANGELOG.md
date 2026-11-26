@@ -7,6 +7,129 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Documentation
+- Clarify SQLite input-row batch filtering, suppressed evaluation errors and
+  transaction-entry commits of prior caller work; runtime behavior is unchanged.
+
+
+### Fixed
+
+- Return without a batch write when a valid SQLite `insert_many`/`replace_many` filter excludes every supplied row, instead of indexing an empty filtered list. Existing transaction policy is unchanged.
+
+### Fixed
+
+- Preserve native SQLite exception classes, arguments and error metadata through `get_rows`, matching `execute`. Remove the generic `Query execution failed:` wrapper while retaining successful result formats.
+
+### Fixed
+
+- Allocate SQLite temporary copies exclusively so same-basename sources cannot overwrite each other or share close-time cleanup. Remove allocated files on copy-source failure; this does not establish live-database snapshot consistency.
+
+### Documentation
+
+- Qualify SQLite query classification as keyword routing: PRAGMA assignments can mutate while read-classified, and trigger bodies can be split into classification fragments. Runtime access controls and parser behavior are unchanged.
+
+### Fixed
+
+- Preserve the configured SQLite connection timeout in writable modes instead
+  of replacing it with an undocumented five-minute busy-handler budget.
+
+- Refuse invalid CSV import `if_exists` policies before CSV reads or transaction
+  entry, preserving pending caller work on invalid-policy refusal.
+
+- Open the CSV reader before entering the import transaction so missing, empty
+  and directory sources preserve pending caller work; close the reader on exit.
+
+- Validate CSV import batch and chunk sizes before opening a transaction,
+  preserving pending caller work and target schema/data on invalid-size refusal.
+
+- Reject invalid SQLite CSV export batch sizes before SQL or output changes,
+  preventing zero-size loops and accidental output truncation.
+
+- Close SQLite backup destination connections even when a progress callback
+  raises, preserving the existing callback and wrapped-error behavior.
+
+- Bind SQLite `vacuum(into=...)` destinations as SQL values so filenames with
+  apostrophes copy successfully while retaining the existing transaction boundary.
+
+
+### Documentation
+
+- Qualify observer dispatch, notifications before commit, live cursor ownership and
+  callback exception isolation; preserve executable logic and public annotations.
+
+- Qualify read-only worker guidance: WAL readers can create sidecars in writable
+  directories while main-database content remains read-only.
+
+- Qualify cutover quiescence and retirement guidance: equal row counts and a
+  completion marker do not prove writers stopped; document bounded observation
+  evidence, marker-stage refusal and per-path retirement verification.
+
+- Update the portable-store proposal to current location/DDL/transaction/report
+  contracts while retaining unmet lifecycle, native PostgreSQL and linter requirements.
+
+- Consolidate CLI guidance and correct help depth, JSON flag scope, limited
+  API/MCP inventories and skill installation destination/side-effect contracts.
+
+- Replace invalid README database/repair examples with a disposable verified
+  SQLite quick start,accurate backend composition and command-specific CLI scope.
+
+- Correct installation dependencies,PostgreSQL driver and standalone namespace
+  guidance; distinguish installed profile checks from umbrella/native adoption.
+
+- Consolidate quick starts around a disposable verified SQLite example; correct
+  context-manager, maintenance-keyword, backend and health-provider guidance.
+
+- Correct migration observation imports, evidence/refusal boundaries, advisory
+  locking and stored-schema-text guidance; state native PostgreSQL coverage limits.
+
+- Correct the mixin guide's base-inheritance and backend method-name claims;
+  replace stale coverage counts with source owners and actual test scope.
+
+- Describe existing floating mixed-NULL reader results and the unresolved
+  array-dictionary alignment gap, with native behavioral controls.
+
+### Fixed
+
+- Reject non-boolean DDL run flags before collecting statements or opening a
+  cursor, preventing truthy strings such as `"False"` from running schema changes.
+
+- Validate the required DDL version even when the observed store version is
+  unknown, preventing invalid inputs from authorizing schema changes.
+
+- Add the leaf-owned STX-DB002 warning for direct store-related environment
+  lookups passed to Path, with explicit syntax and false-positive limits.
+
+- Honor provided per-row compression flags with raw array dtype/shape fallback
+  hints, retaining the existing no-flag and empty-frame paths.
+
+- Fill NULL rows in floating array dictionaries with NaN arrays, matching the
+  main reader while retaining existing non-floating handling.
+
+- Honor explicit scalar `shape=()` fallback hints in binary and DataFrame array
+  helpers by checking hint presence instead of truthiness.
+
+- Return `None` for all-NULL payload columns in array dictionaries, matching
+  the main reader's absence result while retaining populated neighboring arrays.
+
+- Reject array-dictionary selections without dtype/shape metadata or usable hints
+  instead of reusing a preceding column's arrays or raising an unbound-local error.
+
+- Handle zero-row DataFrames in array helpers: the dictionary maps recognized
+  columns to `None`, matching `load_arrays`, and the in-place decoder preserves
+  the empty frame without a Pandas assignment error. Present zero-length
+  NumPy arrays retain their shape and dtype.
+- Infer default DataFrame array columns from dtype/shape companions rather
+  than suffix filtering. Scalar/hash fields are excluded and actual payloads
+  with metadata-like names remain discoverable; explicit columns and hint-based
+  decoding retain their existing paths.
+- Forward each row's compression flag in `get_array_dict` and normalize
+  integer/text flags in `decode_array_columns`, matching the main array reader.
+  Numeric DataFrames from `get_rows` can decode raw and compressed payloads
+  from both wrapper-created and pre-existing native SQLite tables.
+- Parse `binary_to_array` shape metadata with `ast.literal_eval`, matching the
+  main array reader. Python expressions in shape strings are rejected instead
+  of executed, including calls through the DataFrame decoding helpers.
+
 ## [0.2.1] — 2026-08-02
 
 ### Added

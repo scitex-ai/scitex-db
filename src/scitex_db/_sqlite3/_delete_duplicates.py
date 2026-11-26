@@ -12,6 +12,7 @@ __DIR__ = os.path.dirname(__FILE__)
 # Time-stamp: "2024-11-11 14:16:58 (ywatanabe)"
 
 import sqlite3
+from pathlib import Path
 from typing import List, Optional, Tuple, Union
 
 import pandas as pd
@@ -219,75 +220,81 @@ def delete_sqlite3_duplicates(
     chunk_size: int = 10_000,
     dry_run: bool = True,
 ) -> Tuple[Optional[int], Optional[int]]:
-    try:
-        conn = sqlite3.connect(lpath_db)
-        cursor = conn.cursor()
+    """Return row and duplicate counts, previewing read-only by default.
 
-        # Vacuum the database to free up space
-        if not dry_run:
-            cursor.execute("VACUUM")
-            conn.commit()
+    Preview opens an existing SQLite file without rebuilding tables. Apply mode
+    deletes duplicate native ROWIDs in one transaction, preserving table schema.
+    Apply enables foreign keys and runs normal DELETE triggers/cascade actions.
+    Failures are logged and return ``(None, None)``.
+    """
+    conn = None
+    try:
+        if dry_run:
+            conn = sqlite3.connect(
+                Path(lpath_db).absolute().as_uri() + "?mode=ro", uri=True
+            )
+        else:
+            conn = sqlite3.connect(
+                Path(lpath_db).absolute().as_uri() + "?mode=rw", uri=True
+            )
+            conn.execute("PRAGMA foreign_keys=ON")
+            conn.execute("BEGIN IMMEDIATE")
+        cursor = conn.cursor()
 
         columns = _determine_columns(cursor, table_name, columns, include_blob)
         columns_str = ", ".join(columns)
 
-        # Drop temp table if exists from previous run
-        temp_table = f"{table_name}_temp"
-        cursor.execute(f"DROP TABLE IF EXISTS {temp_table}")
-
-        # Get all columns for creating temp table with same structure
-        cursor.execute(f"PRAGMA table_info({table_name})")
-        all_cols_info = cursor.fetchall()
-        all_cols = [col[1] for col in all_cols_info]
-        all_cols_str = ", ".join(all_cols)
-
-        # Create temp table with same structure
-        cursor.execute(
-            f"CREATE TABLE {temp_table} AS SELECT {all_cols_str} FROM {table_name} LIMIT 0"
-        )
-
-        # Get total row count
-        total_rows = cursor.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
-        log.info(f"Total rows in table: {total_rows}")
-
-        # Insert unique rows based on specified columns
-        insert_query = f"""
-            INSERT INTO {temp_table}
-            SELECT {all_cols_str}
-            FROM (
-                SELECT *, ROW_NUMBER() OVER (PARTITION BY {columns_str} ORDER BY rowid) as rn
-                FROM {table_name}
-            )
-            WHERE rn = 1
-        """
-
         if dry_run:
+            total_rows, total_unique = cursor.execute(
+                "SELECT COALESCE(SUM(group_size), 0), COUNT(*) "
+                f"FROM (SELECT COUNT(*) AS group_size FROM {table_name} "
+                f"GROUP BY {columns_str})"
+            ).fetchone()
+            total_duplicates = total_rows - total_unique
             # PS-220 exception: --dry-run bodies stay on stdout.
             sys.stdout.write(
                 f"[DRY RUN] Would execute deduplication based on: {columns_str}\n"
             )
-        else:
-            cursor.execute(insert_query)
-            conn.commit()
+            log.info(f"Total rows processed: {total_rows}")
+            log.info(f"Total unique rows: {total_unique}")
+            log.info(f"Total duplicates identified: {total_duplicates}")
+            return total_rows, total_duplicates
 
-        # Count unique rows
-        total_unique = cursor.execute(f"SELECT COUNT(*) FROM {temp_table}").fetchone()[
-            0
-        ]
-        total_duplicates = total_rows - total_unique
-
-        if not dry_run:
-            # Replace original table with deduplicated one
-            cursor.execute(f"DROP TABLE {table_name}")
-            cursor.execute(f"ALTER TABLE {temp_table} RENAME TO {table_name}")
-            cursor.execute("VACUUM")
-            conn.commit()
-        else:
-            # Clean up temp table in dry run
-            cursor.execute(f"DROP TABLE IF EXISTS {temp_table}")
+        with conn:
+            table_sql = '"' + table_name.replace('"', '""') + '"'
+            target = cursor.execute(
+                "SELECT type FROM sqlite_master WHERE name=? COLLATE NOCASE",
+                (table_name,),
+            ).fetchone()
+            if not target or target[0] != "table" or table_name.lower().startswith("sqlite_"):
+                raise ValueError("Apply requires an application table with a native ROWID")
+            table_info = cursor.execute(f"PRAGMA table_info({table_sql})").fetchall()
+            ascii_case = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
+            available = {column[1].translate(ascii_case): column[1] for column in table_info}
+            if not columns or any(column.translate(ascii_case) not in available for column in columns):
+                raise ValueError("Deduplication columns must name existing table columns")
+            rowid_alias = next(
+                (alias for alias in ("rowid", "_rowid_", "oid") if alias not in available),
+                None,
+            )
+            if rowid_alias is None:
+                raise ValueError("Cannot safely address native ROWIDs: all aliases are shadowed")
+            # A native lookup rejects WITHOUT ROWID tables before any deletion.
+            cursor.execute(f"SELECT {rowid_alias} FROM {table_sql} LIMIT 0")
+            group_columns = ", ".join(
+                '"' + available[column.translate(ascii_case)].replace('"', '""') + '"'
+                for column in columns
+            )
+            total_rows = cursor.execute(f"SELECT COUNT(*) FROM {table_sql}").fetchone()[0]
+            cursor.execute(
+                f"DELETE FROM {table_sql} WHERE {rowid_alias} NOT IN "
+                f"(SELECT MIN({rowid_alias}) FROM {table_sql} GROUP BY {group_columns})"
+            )
+            total_duplicates = cursor.rowcount
+            total_unique = cursor.execute(f"SELECT COUNT(*) FROM {table_sql}").fetchone()[0]
 
         log.info(f"Total rows processed: {total_rows}")
-        log.info(f"Total unique rows: {total_unique}")
+        log.info(f"Total rows remaining: {total_unique}")
         log.info(f"Total duplicates removed: {total_duplicates}")
 
         return total_rows, total_duplicates
@@ -297,7 +304,8 @@ def delete_sqlite3_duplicates(
         return None, None
 
     finally:
-        conn.close()
+        if conn is not None:
+            conn.close()
 
 
 # EOF

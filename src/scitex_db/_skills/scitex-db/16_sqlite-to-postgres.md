@@ -14,7 +14,7 @@ id, created a file, printed a green check, or reported a matching
 version string.
 
 That is the durable lesson, and it is not any single incompatibility.
-The incompatibilities are finite and listed below. The problem is that a
+The examples below do not exhaust the incompatibilities. A
 backend port moves working code into an environment where its old
 assumptions are silently untrue, and the code keeps reporting success.
 
@@ -56,13 +56,17 @@ construct cannot be ported, raise naming it — never skip it.
 
 ### 3. Write-lock semantics are not portable
 
-SQLite takes a write lock with `BEGIN IMMEDIATE`. PostgreSQL's
-equivalent is `BEGIN` plus `pg_advisory_xact_lock`.
+SQLite `BEGIN IMMEDIATE` starts a write transaction immediately and can
+fail with `SQLITE_BUSY` when another writer is active
+([SQLite transaction rules](https://www.sqlite.org/lang_transaction.html)).
+PostgreSQL transaction-level advisory locks can coordinate cooperating
+writers using the same key, but do not prevent writes from clients that
+ignore that convention; they are not a database-wide SQLite write lock
+([PostgreSQL advisory locks](https://www.postgresql.org/docs/19/explicit-locking.html#ADVISORY-LOCKS)).
 
-`SERIALIZABLE` is **not** a substitute: it aborts the loser instead of
-blocking it. A naive port compiles, passes tests, and changes the
-concurrency contract — visible only under load, as retries that used to
-be waits.
+`SERIALIZABLE` can require transaction retries after a serialization
+failure; it does not promise the same waiting contract
+([PostgreSQL isolation rules](https://www.postgresql.org/docs/19/transaction-iso.html#XACT-SERIALIZABLE)).
 
 Guard: one named "begin a write transaction" primitive per dialect, and
 a test that runs two concurrent writers.
@@ -78,9 +82,12 @@ guess.
 
 ### 4b. SQLite stores the CREATE text you wrote, not the schema you meant
 
-`sqlite_master` keeps the original `CREATE TABLE` statement verbatim —
-comments, whitespace and all. So two databases with identical schemas
-compare unequal if they were built by different routes.
+`sqlite_schema.sql` (also accessible through `sqlite_master`) retains
+much of the original DDL text, but applies documented normalization and
+can change after `ALTER TABLE`. It is not a byte-for-byte record of the
+submitted statement. Text differences can still occur between equivalent
+schemas; compare the intended schema properties as well as stored SQL
+([SQLite schema table](https://www.sqlite.org/schematab.html)).
 
 Measured by scitex-cards, 2026-08-02: an explanatory comment placed
 inside a `CREATE TABLE` column list made a database built via
@@ -100,7 +107,8 @@ that would have told them was present and not consulted.
 ### 5. Standard SQL is not portable SQL
 
 `IS NOT DISTINCT FROM` is standard and unsupported by SQLite before
-3.39. The host in question ran 3.37.2, so every insert raised.
+[3.39.0](https://www.sqlite.org/releaselog/3_39_0.html). The historical host
+in this incident ran 3.37.2, so every insert raised.
 
 Guard: pin the minimum SQLite version you support and test against *it*,
 not against whatever the developer's machine has.
@@ -114,8 +122,19 @@ reports quiet over exactly the writer that will lose your rows.
 
 Poll over an interval and return the interval:
 `"no writer observed over 60s at 0.2s sampling"`, never `"quiescent"`.
-`scitex_db._migrate.observe_source` does this and refuses to mark a
-migration complete if a writer was seen.
+Those numbers illustrate a report, not defaults. The actual observer is
+`scitex_db._migrate._observe.observe_source(source_path, *, seconds, interval)`;
+it is not re-exported as `scitex_db._migrate.observe_source`. Both timing
+arguments are required. It returns `QuiescenceEvidence`; seeing a writer
+does not itself raise or stop that writer.
+
+`scitex_db._migrate.migrate` does not start observation. The caller supplies
+`quiescence_evidence` explicitly: positive evidence refuses completion in
+`_copy.finalize`, while `None` or unobservable evidence can still reach a
+marker under the current API. The marker records that absence of evidence;
+it does not prove quiet. A separate `Quiescence` declaration names the
+caller's mechanism for stopping writers. A bounded negative, an unobservable
+source or a completion marker is no replacement for actually stopping them.
 
 Two things measured while building it, both worth stealing:
 
@@ -131,14 +150,22 @@ Two things measured while building it, both worth stealing:
 [13_mixins.md](13_mixins.md) for the measured divergence. Do not plan a
 port as "construct the other class".
 
-The migration toolkit (`scitex_db._migrate`) does cover the copy itself:
-introspection, DDL translation, trigger handling, row copy, verification,
-provenance markers, and the quiescence observer above.
+The toolkit exports `preflight` and `migrate` for a one-way cutover, not
+a dual-live-store abstraction. Source owners include `_introspect`, `_ddl`,
+`_triggers`, `_run`, `_verify`, `_provenance` and `_observe`. Reuse these
+primitives before adding another migration implementation, but qualify
+each application's routing, DDL, locking, health and version requirements.
 
-The five guards above are **not** yet a shared module. Until they are,
-each porting package implements them itself — which is precisely the
-duplication this file exists to shorten. If you are about to write them,
-say so on the scitex-db board first.
+Behavioral evidence lives in `tests/scitex_db/_migrate/`: `test__observe.py`
+uses real SQLite files and a background writer, and
+`test__copy_quiescence_refusal.py` checks positive-writer refusal and the
+marker evidence for no observation/unobservable cases. `test__run.py`
+uses SQLite on both sides; `test__run_acceptance.py` checks actual SQLite
+rejection of translated PostgreSQL trigger SQL. These do not prove that
+a PostgreSQL server accepts every translated trigger or that a live port
+is safe. PostgreSQL execution, cooperative locking and application cutover
+need their own native tests. The historical Cards incident counts above
+are incident context, not a fresh audit of its current deployment.
 
 ## See also
 

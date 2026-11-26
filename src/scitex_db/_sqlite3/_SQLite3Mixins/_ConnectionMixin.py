@@ -15,7 +15,7 @@ THIS_FILE = "/home/ywatanabe/proj/scitex_repo/src/scitex/db/_SQLite3Mixins/_Conn
 
 """
 1. Functionality:
-   - Manages SQLite database connections with thread-safe operations
+   - Manages SQLite database connections in their creating thread
    - Handles database journal files and transaction states
 2. Input:
    - Database file path
@@ -30,6 +30,7 @@ import shutil
 import sqlite3
 import tempfile
 import threading
+from urllib.parse import quote
 
 
 class _ConnectionMixin:
@@ -61,12 +62,15 @@ class _ConnectionMixin:
         self.close()
 
     def _create_temp_copy(self, db_path: str) -> str:
-        """Creates temporary copy of database."""
-        temp_dir = tempfile.gettempdir()
-        self.temp_path = os.path.join(
-            temp_dir, f"temp_{os.path.basename(db_path)}"
-        )
-        shutil.copy2(db_path, self.temp_path)
+        """Copy to a unique owned file; this is not a live SQLite snapshot."""
+        descriptor, temp_path = tempfile.mkstemp(prefix="scitex-db-", suffix=".db")
+        os.close(descriptor)
+        try:
+            shutil.copy2(db_path, temp_path)
+        except BaseException:
+            os.remove(temp_path)
+            raise
+        self.temp_path = temp_path
         return self.temp_path
 
     def connect(
@@ -87,9 +91,16 @@ class _ConnectionMixin:
         # Always go through SQLite's URI form so the open mode is explicit.
         # ``mode='rwc'`` (default) matches the previous ``sqlite3.connect(path)``
         # behaviour of opening read-write and creating the file if missing.
-        uri = f"file:{path_to_connect}?mode={mode}"
+        # Encode literal path characters before adding our own URI options.
+        # Otherwise '?'/'#' truncate filenames and '%HH' selects another path.
+        filename = quote(os.fspath(path_to_connect), safe="/:")
+        uri = f"file:{filename}?mode={mode}"
         self.conn = sqlite3.connect(uri, uri=True, timeout=timeout)
         self.cursor = self.conn.cursor()
+        # Explicit connect() changes must also govern subsequent reconnects.
+        self.db_path = db_path
+        self.mode = mode
+        self.timeout = timeout
 
         # PRAGMA tuning. ``ro`` is read-only so the journal-mode write and the
         # ``commit()`` at the bottom would error — skip them in that branch.
@@ -99,7 +110,7 @@ class _ConnectionMixin:
                 # WAL mode settings (write-only)
                 self.cursor.execute("PRAGMA journal_mode = WAL")
                 self.cursor.execute("PRAGMA synchronous = NORMAL")
-                self.cursor.execute("PRAGMA busy_timeout = 300000")  # 5 minutes
+                # Keep the busy handler configured by sqlite3.connect(timeout=...).
                 self.cursor.execute("PRAGMA mmap_size = 30000000000")
                 self.cursor.execute("PRAGMA temp_store = MEMORY")
                 self.cursor.execute("PRAGMA cache_size = -2000")
@@ -192,8 +203,11 @@ class _ConnectionMixin:
                 pass
 
     def reconnect(self, use_temp_db: bool = False) -> None:
+        """Reopen using the most recently selected path, mode and timeout."""
         if self.db_path:
-            self.connect(self.db_path, use_temp_db)
+            self.connect(
+                self.db_path, use_temp_db, mode=self.mode, timeout=self.timeout
+            )
         else:
             raise ValueError("No database path specified for reconnection")
 

@@ -8,77 +8,139 @@ tags: [scitex-db-mixins, scitex-db]
 
 # Mixin Architecture
 
-`SQLite3` and `PostgreSQL` are each composed from mixins in the
-`_BaseMixins/` namespace, overridden by backend-specific mixins in
-`_SQLite3Mixins/` and `_PostgreSQLMixins/`.
+The public classes are composed in `_sqlite3/_SQLite3.py::SQLite3` and
+`_postgresql/_PostgreSQL.py::PostgreSQL`. Inspect each class's `__mro__`
+and the defining class of a method when tracing a capability. A matching
+method name does not establish matching arguments, results or transaction
+semantics across backends.
 
-## The base declares; the backends implement a subset
+## Base mixins are not a universal fallback
 
-`_BaseMixins` declares 59 methods, almost all as a bare
-`raise NotImplementedError`. That is a declaration, not a promise — and
-the two backends have honoured it unevenly. Measured 2026-08-02 by
-walking the source:
+`SQLite3` directly lists its SQLite-specific mixins. Those classes do not
+inherit the `_BaseMixins` classes; some modules import a base class without
+using it as a parent. For example, `_SQLite3Mixins/_TableMixin.py` imports
+`_BaseTableMixin`, but declares `class _TableMixin:`.
 
-| | declared in base | not implemented by this backend |
+Consequently, absent names such as `SQLite3.select`, `insert`, `update`,
+`delete`, `count` and `get_tables` are missing attributes. They do not
+resolve to base stubs that raise `NotImplementedError`. Use the SQLite
+methods below or explicit SQL through `execute`.
+
+Some PostgreSQL mixins do inherit base classes. For example,
+`_PostgreSQLMixins/_TransactionMixin.py::_TransactionMixin` inherits
+`_BaseTransactionMixin`, whose `transaction` context manager calls
+`begin`, `commit` and `rollback`; the PostgreSQL mixin defines those
+operations. The inherited context manager is an implementation, not a
+bare `NotImplementedError` stub. This source relationship alone does not
+qualify PostgreSQL transaction behavior against a live server.
+
+## Shared names and additional PostgreSQL operations
+
+These methods are defined on both backend surfaces. This table records
+names and source owners, not interchangeable behavior:
+
+| Operation | Shared name | Backend-specific source |
 |---|---|---|
-| `SQLite3` | 59 | **23** — `select`, `insert`, `update`, `delete`, `count`, `table_exists`, `get_tables`, `get_table_info`, `analyze`, `backup_database`, … |
-| `PostgreSQL` | 59 | 1 — `transaction` |
+| List tables | `get_table_names` | `_TableMixin.py` |
+| Describe a table | `get_table_schema` | `_TableMixin.py` |
+| Primary key | `get_primary_key` | `_TableMixin.py` |
+| Run SQL | `execute` | SQLite `_QueryMixin.py`; PostgreSQL `_ConnectionMixin.py` |
+| Read rows | `get_rows` | `_RowMixin.py` |
+| Row count | `get_row_count` | `_RowMixin.py` |
+| Insert records in batches | `insert_many` | `_BatchMixin.py` |
 
-Calling one of those 23 on a `SQLite3` instance reaches the base method
-and raises `NotImplementedError` at runtime.
+PostgreSQL additionally defines `get_tables` and `get_primary_keys` in
+`_SchemaMixin.py`, and `select`, `insert`, `update`, `delete`, `count`
+and `execute_query` in `_QueryMixin.py`. These are additional operations;
+the shared table/row/SQL names above are not exclusive to SQLite.
+PostgreSQL `get_table_info()` is defined in `_MaintenanceMixin.py` and
+takes no table argument; it is not a drop-in spelling for SQLite
+`get_table_schema(table_name)`.
 
-## The same operation has two names
+SQLite's `_ArrayMixin`, `_ColumnMixin` and `_GitMixin` are listed in its
+composition; the PostgreSQL class does not list counterparts. Port callers
+by checking actual signatures, SQL parameter styles, result formats and
+storage behavior rather than replacing only the class name. PostgreSQL
+support also requires its optional driver; the lazy public export can be
+`None` when an `ImportError` prevents loading it (`scitex_db.__getattr__`).
 
-Where both backends do implement an operation, they often spell it
-differently. This is the part that makes "swap the backend" a rewrite
-rather than a config change:
+## SQLite query classification limits
 
-| operation | `SQLite3` | `PostgreSQL` |
-|---|---|---|
-| list tables | `get_table_names` | `get_tables` |
-| describe a table | `get_table_schema` | `get_table_info` |
-| primary key | `get_primary_key` | `get_primary_keys` |
-| run SQL | `execute` | `execute_query` |
-| read rows | `get_rows` | `select` |
-| row count | `get_row_count` | `count` |
-| insert rows | `insert_many` | `insert` |
+`_SQLite3Mixins/_QueryMixin.py::_is_write_query` routes the wrapper's
+writable check and observer dispatch using keywords. It is not a complete
+SQLite parser or a guarantee that a read-classified query has no side effects.
+In particular, all `PRAGMA` queries are read-classified: a writable connection
+can execute `PRAGMA user_version = 7`, change that value and emit a post-load
+notification. Native read-only connections and `query_only` remain separate
+SQLite controls; the classifier alone is not an authorization boundary.
 
-32 method names exist only on `SQLite3` (the `_ArrayMixin`, `_ColumnMixin`
-and `_GitMixin` groups have no PostgreSQL counterpart at all); 23 exist
-only on `PostgreSQL`.
+`_split_statements` ignores semicolons inside recognized quotes/comments and
+parentheses, but does not track trigger `BEGIN ... END` blocks. It can return
+trigger fragments. The existing
+`test_a_semicolon_inside_a_trigger_body_does_not_split_the_statement` checks
+only that `_script_is_write` returns `True`, not that splitting is absent.
+The complete script is still passed to SQLite for execution. Comprehensive
+SQL classification and trigger-aware parsing remain unresolved gaps.
 
-## Test coverage is asymmetric too
+## SQLite batch filters and transaction boundaries
 
-`SQLite3`: 98 test functions across 3 files. `PostgreSQL`: 12 test
-functions in 1 file (`_BatchMixin`). Treat the PostgreSQL class as
-lightly exercised and verify behaviour against your own data before
-relying on it.
+SQLite `insert_many` and `replace_many` evaluate a nonempty `where` separately
+against each supplied dictionary, using a parameterized single-row SELECT.
+For `where="score > 10"`, only supplied rows whose score exceeds 10 proceed;
+the predicate does not select existing destination rows. `update_many` takes
+a different branch: its `where` is part of the destination UPDATE statement.
+These operations do not have interchangeable predicate semantics.
 
-## Method resolution
+Valid filters selecting no supplied rows return `None` without a batch
+INSERT/REPLACE. Existing native controls for selection, no-match and read-only
+refusal live in `test__BatchMixin_filter.py` under
+`tests/scitex_db/_sqlite3/_SQLite3Mixins/`.
 
-```
-class SQLite3(_SQLite3ConnectionMixin,
-              _SQLite3QueryMixin,
-              ...
-              _BaseConnectionMixin,
-              _BaseQueryMixin,
-              ...):
-    ...
-```
+Known limitation: insert/replace filter evaluation catches `Exception`, logs a
+warning and excludes that input row. A malformed predicate can therefore return
+normally after excluding every row; missing dictionary fields can cause partial
+selection. This is an unresolved error-reporting gap, not fail-fast validation
+or a recommended way to validate input.
 
-Backend-specific mixins come first in the MRO, so they win wherever they
-define a name. Where they do not define it, the base's
-`NotImplementedError` is what you get.
+All three public batch methods enter `transaction()` before `_run_many`.
+`_TransactionMixin.begin` commits an already pending connection transaction
+before issuing BEGIN. Thus even a no-match batch can commit earlier caller
+writes, which a subsequent rollback cannot undo. The wrapper commits on normal
+exit and rolls back its active transaction on `Exception`; this does not give
+nested savepoint semantics or a pending-work preservation guarantee. Source
+owners: SQLite `_BatchMixin._run_many` and `_TransactionMixin.begin/transaction`.
+The existing class transaction and context-exit tests below cover their stated
+cases; they do not qualify every batch failure or nested transaction scenario.
 
-## Why mixins
+## Evidence and coverage limits
 
-Makes it obvious which capability a method belongs to when reading
-source, and avoids a 2000-line god-class. When adding a new capability,
-add a new `_BaseXMixin` + backend-specific sibling rather than
-extending an existing one — and implement it on **both** backends, or
-say plainly in this file that you did not.
+The SQLite tests in `tests/scitex_db/_sqlite3/test__SQLite3.py` exercise
+real temporary database files. For example,
+`test_create_table_basic_lists_new_table`,
+`test_get_table_schema_identifies_primary_key_row`,
+`test_insert_then_get_rows_returns_inserted_row`,
+`test_insert_many_writes_all_rows_with_batching` and the transaction
+commit/rollback tests check results rather than method presence alone.
+`test_sqlite3_exposes_mixin_method` separately checks method availability.
+The context-exit persistence controls live in
+`tests/scitex_db/_sqlite3/test__SQLite3_context_commit.py`.
+
+The PostgreSQL `_BatchMixin` tests in
+`tests/scitex_db/_postgresql/_PostgreSQLMixins/test__BatchMixin.py` check
+SQL construction, parameter flattening, dtype mapping and option
+validation using real Python data. They do not connect to a server and
+skip at module level when `psycopg2` is unavailable. Passing these helpers
+or inspecting the installed class MRO does not verify PostgreSQL schema,
+query, transaction, array or migration behavior on a live database.
+
+When adding a capability, choose its owning backend mixin and check whether
+it belongs in a shared base contract. Verify inheritance explicitly;
+adding a base declaration does not expose it on SQLite. Implement and test
+each supported backend, and document any remaining backend limitation.
 
 ## See also
 
-- [16_sqlite-to-postgres.md](16_sqlite-to-postgres.md) — what a real port
-  costs, and the five silent failures to guard against.
+- [03_python-api.md](03_python-api.md) — current SQLite-first public API and
+  verified examples.
+- [16_sqlite-to-postgres.md](16_sqlite-to-postgres.md) — migration concerns;
+  this architecture review does not qualify a live port.

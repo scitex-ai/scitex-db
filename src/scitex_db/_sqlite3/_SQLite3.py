@@ -47,11 +47,11 @@ class SQLite3(
     """SQLite database manager with automatic metadata handling, numpy array storage, and compression.
 
     This class provides a comprehensive interface for SQLite database operations with
-    automatic compression, thread-safe operations, and specialized numpy array handling.
+    automatic compression, managed connections, and specialized numpy array handling.
 
     Features:
-        - Automatic compression for BLOB data (70-90% reduction)
-        - Thread-safe operations with proper connection management
+        - Configurable compression for BLOB data; savings depend on the data
+        - Connections stay in their creating thread; open a new one per worker
         - Metadata handling for BLOB columns
         - Batch processing support
         - Context manager support for proper resource cleanup
@@ -89,9 +89,9 @@ class SQLite3(
 
     Notes:
         - Always use context manager (with statement) for proper resource cleanup
-        - BLOB columns automatically get metadata columns: {column}_dtype, {column}_shape, {column}_compressed
-        - Compression is enabled by default for arrays > 1KB
-        - Thread-safe operations are supported
+        - Array metadata uses {column}_dtype, {column}_shape, {column}_is_compressed and {column}_hash
+        - Array compression follows compress_by_default (False by default) or the per-call override, for payloads over 1024 bytes
+        - Live connections must stay in their creating thread
     """
 
     def __init__(
@@ -175,7 +175,7 @@ class SQLite3(
         called ``close()``, and ``close()`` issues an explicit
         ``conn.rollback()`` -- so with the default ``autocommit=False`` a block
         that wrote and then ended normally threw the work away. Measured
-        2026-07-31:
+        2026-07-31::
 
             with SQLite3(p) as db:
                 db.execute("INSERT INTO t VALUES (1)")
