@@ -50,7 +50,8 @@
 <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Installation</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#requirements">Requirements</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#basic-installation">Basic Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#basic-installation">Basic installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#optional-profiles">Optional profiles</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#development">Development</a></li>
 </ul>
 </li>
@@ -106,23 +107,42 @@
 <h1>Installation<a class="headerlink" href="#installation" title="Link to this heading"></a></h1>
 <section id="requirements">
 <h2>Requirements<a class="headerlink" href="#requirements" title="Link to this heading"></a></h2>
-<ul class="simple">
-<li><p>Python &gt;= 3.10</p></li>
-</ul>
+<p>Python 3.10 or newer with SQLite support is required. Declared runtime
+requirements are click&gt;=8.0, numpy, pandas and scitex-logging&gt;=0.2.0.
+Dependency build requirements depend on the platform and available wheels.</p>
 </section>
 <section id="basic-installation">
-<h2>Basic Installation<a class="headerlink" href="#basic-installation" title="Link to this heading"></a></h2>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>scitex-db
+<h2>Basic installation<a class="headerlink" href="#basic-installation" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>scitex-db
+python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"import sqlite3, scitex_db; print(scitex_db.__version__, sqlite3.sqlite_version)"</span>
+scitex-db<span class="w"> </span>--version
+scitex-db<span class="w"> </span>--help
 </pre></div>
 </div>
+<p>The standalone namespace is scitex_db and the command is scitex-db.
+This distribution does not ship a scitex package or implement scitex.db.
+Any separately installed umbrella facade needs its own installed checks.
+Import, version and help checks do not establish health, repair or native
+PostgreSQL support.</p>
+</section>
+<section id="optional-profiles">
+<h2>Optional profiles<a class="headerlink" href="#optional-profiles" title="Link to this heading"></a></h2>
+<p>The postgresql extra declares psycopg2-binary and sqlalchemy; its driver
+module is psycopg2. Installing it does not create a server or credentials.
+The git extra declares GitPython; dev provides test/development tooling and
+the PostgreSQL driver for tests; docs provides Sphinx and its extensions.
+The all extra references those four extras. pyproject.toml owns the exact
+requirements; installed distribution metadata describes a specific environment.</p>
 </section>
 <section id="development">
 <h2>Development<a class="headerlink" href="#development" title="Link to this heading"></a></h2>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/ywatanabe1989/scitex-db.git
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/scitex-ai/scitex-db.git
 <span class="nb">cd</span><span class="w"> </span>scitex-db
-pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">".[all]"</span>
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">".[all]"</span>
 </pre></div>
 </div>
+<p>An editable installation describes the selected checkout. It does not prove
+that a public wheel, running service or served documentation has adopted it.</p>
 </section>
 </section>
 
