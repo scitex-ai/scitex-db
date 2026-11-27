@@ -52,10 +52,10 @@ postgresql = [
 dev = [
     "scitex-dev>=0.11.7",
     "pytest>=7.0",
-    "pytest-cov>=4.0.0",
+    "pytest-cov>=7.0.0",
     "pytest-xdist>=3.0.0",
     "pre-commit>=3.5.0",
-    "coverage>=7.0",            # tests/conftest.py subprocess-coverage shim
+    "coverage[toml]>=7.13.0",   # subprocess coverage: [tool.coverage.run] patch
     "psycopg2-binary",          # tests/**/_postgresql/test_*.py
 ]
 docs = [
@@ -87,9 +87,9 @@ scitex-db = "scitex_db.__main__:main"
 [dependency-groups]
 dev = [
     "pytest>=7.0",
-    "pytest-cov>=4.0.0",
+    "pytest-cov>=7.0.0",
     "pytest-xdist>=3.0.0",
-    "coverage>=7.0",            # tests/conftest.py subprocess-coverage shim
+    "coverage[toml]>=7.13.0",   # subprocess coverage: [tool.coverage.run] patch
 ]
 
 [project.entry-points."scitex_dev.docs"]
@@ -121,6 +121,7 @@ markers = [
 
 [tool.coverage.run]
 parallel = true
+patch = ["subprocess"]
 source = ["scitex_db"]
 concurrency = ["multiprocessing", "thread"]
 

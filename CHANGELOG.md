@@ -7,6 +7,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Configure subprocess coverage declaratively via coverage `patch = ["subprocess"]`; `tests/conftest.py` no longer writes `.pth` files into site-packages or overwrites caller-owned coverage environment variables.
+
 ### Documentation
 - Clarify SQLite input-row batch filtering, suppressed evaluation errors and
   transaction-entry commits of prior caller work; runtime behavior is unchanged.
