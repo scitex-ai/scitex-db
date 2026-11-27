@@ -49,7 +49,8 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../installation.html#requirements">Requirements</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../installation.html#basic-installation">Basic Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation.html#basic-installation">Basic installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation.html#optional-profiles">Optional profiles</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../installation.html#development">Development</a></li>
 </ul>
 </li>
@@ -373,7 +374,7 @@ Failures are logged and return <code class="docutils literal notranslate"><span 
 <dl class="py function">
 <dt class="sig sig-object py" id="scitex_db.register_post_load_hook">
 <span class="sig-prename descclassname"><span class="pre">scitex_db.</span></span><span class="sig-name descname"><span class="pre">register_post_load_hook</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fn</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/scitex_db/_observers.html#register_post_load_hook"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scitex_db.register_post_load_hook" title="Link to this definition"></a></dt>
-<dd><p>Register a function to run after every successful scitex-db read.</p>
+<dd><p>Append a post-load callback with the same isolation rules as post-save.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><span class="highlight sphinx_autodoc_typehints-value"><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><code class="xref py py-obj docutils literal notranslate"><span class="kc"><span class="pre">None</span></span></code></a></span></span></p>
@@ -384,10 +385,11 @@ Failures are logged and return <code class="docutils literal notranslate"><span 
 <dl class="py function">
 <dt class="sig sig-object py" id="scitex_db.register_post_save_hook">
 <span class="sig-prename descclassname"><span class="pre">scitex_db.</span></span><span class="sig-name descname"><span class="pre">register_post_save_hook</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fn</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/scitex_db/_observers.html#register_post_save_hook"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scitex_db.register_post_save_hook" title="Link to this definition"></a></dt>
-<dd><p>Register a function to run after every successful scitex-db write.</p>
-<p>Hooks fire in registration order. They MUST NOT raise — exceptions
-are swallowed with <code class="docutils literal notranslate"><span class="pre">logger.debug</span></code>. A misbehaving observer must
-never break the host’s database access.</p>
+<dd><p>Append a callback for explicit post-save dispatch in this process.</p>
+<p>Hooks run synchronously in registration order. Callback Exception
+subclasses are caught and logged at debug level, allowing later hooks
+to run. BaseException subclasses propagate and can stop later hooks,
+after SQL may already have executed. Callbacks are not sandboxed.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><span class="highlight sphinx_autodoc_typehints-value"><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><code class="xref py py-obj docutils literal notranslate"><span class="kc"><span class="pre">None</span></span></code></a></span></span></p>

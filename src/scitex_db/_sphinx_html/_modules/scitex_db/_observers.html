@@ -47,7 +47,8 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../installation.html#requirements">Requirements</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../installation.html#basic-installation">Basic Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation.html#basic-installation">Basic installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation.html#optional-profiles">Optional profiles</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../installation.html#development">Development</a></li>
 </ul>
 </li>
@@ -104,6 +105,12 @@
 <span class="c1"># -*- coding: utf-8 -*-</span>
 <span class="sd">"""Neutral post-save / post-load hook registry for scitex-db.</span>
 
+<span class="sd">This registry does not intercept database access. SQLite's _QueryMixin calls</span>
+<span class="sd">it explicitly; direct driver calls and helpers bypassing that dispatcher are</span>
+<span class="sd">not automatically observed. Comprehensive cross-backend observation remains</span>
+<span class="sd">an unmet capability, not a property of this registry. Notifications alone do</span>
+<span class="sd">not prove commit or durable storage.</span>
+
 <span class="sd">Public extension API. Observer packages (scitex-clew, future audit or</span>
 <span class="sd">notification observers) register callbacks here on their own import;</span>
 <span class="sd">scitex-db itself never names any observer.</span>
@@ -123,7 +130,7 @@
 
 <span class="sd">&gt;&gt;&gt; from scitex_db import register_post_save_hook</span>
 <span class="sd">&gt;&gt;&gt; def on_write(db_path, query, parameters):</span>
-<span class="sd">...     # never raise; hooks fail silently</span>
+<span class="sd">...     # Exception subclasses are isolated; BaseException propagates</span>
 <span class="sd">...     ...</span>
 <span class="sd">&gt;&gt;&gt; register_post_save_hook(on_write)</span>
 <span class="sd">"""</span>
@@ -140,17 +147,19 @@
 <span class="n">PostSaveHook</span> <span class="o">=</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span>
 <span class="sd">"""Signature: ``(db_path, query, parameters) -&gt; None``.</span>
 
-<span class="sd">Fires after every successful write statement (INSERT / UPDATE / DELETE /</span>
-<span class="sd">DROP / CREATE / ALTER).</span>
+<span class="sd">SQLite execute/executemany dispatch according to the wrapper's SQL</span>
+<span class="sd">classification. Batch calls and scripts classified as writes emit one event,</span>
+<span class="sd">not one per row or statement. With autocommit=False, execute can notify before a later rollback;</span>
+<span class="sd">executemany and executescript perform their own commit call before dispatch.</span>
 <span class="sd">"""</span>
 
 <span class="n">PostLoadHook</span> <span class="o">=</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span>
 <span class="sd">"""Signature: ``(db_path, query, result) -&gt; None``.</span>
 
-<span class="sd">Fires after every successful read statement. ``result`` is the live</span>
-<span class="sd">cursor, NOT materialized rows — fetching is the caller's job, and a hook</span>
-<span class="sd">must not consume it. Fetch from a hook only if you know you own the</span>
-<span class="sd">cursor.</span>
+<span class="sd">SQLite execute/executemany read dispatch supplies a live caller-owned</span>
+<span class="sd">cursor, not materialized rows or a stable snapshot. Fetching in a hook can</span>
+<span class="sd">consume rows before the caller. Scripts classified as reads do not emit</span>
+<span class="sd">post-load notifications.</span>
 <span class="sd">"""</span>
 
 
@@ -161,11 +170,12 @@
 <div class="viewcode-block" id="register_post_save_hook">
 <a class="viewcode-back" href="../../api/scitex_db.html#scitex_db.register_post_save_hook">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">register_post_save_hook</span><span class="p">(</span><span class="n">fn</span><span class="p">:</span> <span class="n">PostSaveHook</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Register a function to run after every successful scitex-db write.</span>
+<span class="w">    </span><span class="sd">"""Append a callback for explicit post-save dispatch in this process.</span>
 
-<span class="sd">    Hooks fire in registration order. They MUST NOT raise — exceptions</span>
-<span class="sd">    are swallowed with ``logger.debug``. A misbehaving observer must</span>
-<span class="sd">    never break the host's database access.</span>
+<span class="sd">    Hooks run synchronously in registration order. Callback Exception</span>
+<span class="sd">    subclasses are caught and logged at debug level, allowing later hooks</span>
+<span class="sd">    to run. BaseException subclasses propagate and can stop later hooks,</span>
+<span class="sd">    after SQL may already have executed. Callbacks are not sandboxed.</span>
 <span class="sd">    """</span>
     <span class="n">_post_save_hooks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">fn</span><span class="p">)</span></div>
 
@@ -174,13 +184,13 @@
 <div class="viewcode-block" id="register_post_load_hook">
 <a class="viewcode-back" href="../../api/scitex_db.html#scitex_db.register_post_load_hook">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">register_post_load_hook</span><span class="p">(</span><span class="n">fn</span><span class="p">:</span> <span class="n">PostLoadHook</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Register a function to run after every successful scitex-db read."""</span>
+<span class="w">    </span><span class="sd">"""Append a post-load callback with the same isolation rules as post-save."""</span>
     <span class="n">_post_load_hooks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">fn</span><span class="p">)</span></div>
 
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">fire_post_save</span><span class="p">(</span><span class="n">db_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">parameters</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Internal: invoke registered post-save hooks. Never raises."""</span>
+<span class="w">    </span><span class="sd">"""Invoke post-save hooks; catch callback Exception, propagate BaseException."""</span>
     <span class="k">for</span> <span class="n">fn</span> <span class="ow">in</span> <span class="n">_post_save_hooks</span><span class="p">:</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">fn</span><span class="p">(</span><span class="n">db_path</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">parameters</span><span class="p">)</span>
@@ -191,7 +201,7 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">fire_post_load</span><span class="p">(</span><span class="n">db_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">result</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Internal: invoke registered post-load hooks. Never raises."""</span>
+<span class="w">    </span><span class="sd">"""Invoke post-load hooks; catch callback Exception, propagate BaseException."""</span>
     <span class="k">for</span> <span class="n">fn</span> <span class="ow">in</span> <span class="n">_post_load_hooks</span><span class="p">:</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">fn</span><span class="p">(</span><span class="n">db_path</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
